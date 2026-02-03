@@ -6,8 +6,6 @@
 |-----------|-------------|------------|
 | `/api` | Backend API | Python 3.11+, FastAPI, SQLAlchemy, PostgreSQL, Jinja2 (K8s templates) |
 | `/web` | Frontend App | React 19, TypeScript, TanStack Router/Query, Tailwind CSS |
-| `/docker` | Docker configs | Container setup |
-
 
 ## Development Commands
 
