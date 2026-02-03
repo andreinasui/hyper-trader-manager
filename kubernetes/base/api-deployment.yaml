@@ -1,0 +1,79 @@
+# HyperTrader API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hypertrader-api
+  namespace: hyper-trader
+  labels:
+    app: hypertrader-api
+    managed-by: infra-ctl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hypertrader-api
+  template:
+    metadata:
+      labels:
+        app: hypertrader-api
+        managed-by: infra-ctl
+    spec:
+      serviceAccountName: hypertrader-api
+      containers:
+        - name: api
+          image: ghcr.io/andreinasui/hyper-trader-api:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            # Database connection
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: api-secret
+                  key: database-url
+            # Encryption key for private keys
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: api-secret
+                  key: encryption-key
+            # Scripts directory (built into image)
+            - name: SCRIPTS_DIR
+              value: /app/scripts
+            # Debug mode (disable in production)
+            - name: DEBUG
+              value: "false"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # Liveness probe - is the container running?
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Readiness probe - is the container ready to serve traffic?
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false  # Need writable for temp files
+            runAsNonRoot: true
+            runAsUser: 1000
+      restartPolicy: Always

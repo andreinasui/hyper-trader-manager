@@ -1,0 +1,65 @@
+# HyperTrader API RBAC Configuration
+# Grants the API service account permissions to manage trader resources
+---
+# Service Account for the API
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hypertrader-api
+  namespace: hyper-trader
+  labels:
+    app: hypertrader-api
+    managed-by: infra-ctl
+---
+# Role with permissions to manage trader resources
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hypertrader-api-role
+  namespace: hyper-trader
+  labels:
+    app: hypertrader-api
+    managed-by: infra-ctl
+rules:
+  # Manage pods (for trader status, logs, restart)
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  # Manage pods/log (for trader logs)
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+  # Manage StatefulSets (for trader deployments)
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Manage ConfigMaps (for trader configs)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Manage Secrets (for trader private keys)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Read events (for status information)
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+---
+# Bind the role to the service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hypertrader-api-rolebinding
+  namespace: hyper-trader
+  labels:
+    app: hypertrader-api
+    managed-by: infra-ctl
+subjects:
+  - kind: ServiceAccount
+    name: hypertrader-api
+    namespace: hyper-trader
+roleRef:
+  kind: Role
+  name: hypertrader-api-role
+  apiGroup: rbac.authorization.k8s.io

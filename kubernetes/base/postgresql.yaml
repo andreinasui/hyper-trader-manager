@@ -1,0 +1,261 @@
+# PostgreSQL deployment for HyperTrader SaaS platform
+# Includes: PVC, ConfigMap (init scripts), Deployment, Service
+
+---
+# PersistentVolumeClaim for PostgreSQL data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: hyper-trader
+  labels:
+    app: postgres
+    managed-by: infra-ctl
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  # Uses default StorageClass
+
+---
+# ConfigMap with database initialization scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: hyper-trader
+  labels:
+    app: postgres
+    managed-by: infra-ctl
+data:
+  01-schema.sql: |
+    -- HyperTrader Database Schema
+    -- Version: 1.0
+    -- Created: Phase 1 - Foundation Layer
+
+    -- Enable UUID extension
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+    -- Users table
+    CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        email VARCHAR(255) UNIQUE NOT NULL,
+        api_key_hash VARCHAR(255),
+        password_hash VARCHAR(255),
+        is_admin BOOLEAN DEFAULT FALSE,
+        plan_tier VARCHAR(50) DEFAULT 'free',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- Traders table
+    CREATE TABLE IF NOT EXISTS traders (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        wallet_address VARCHAR(42) UNIQUE NOT NULL,
+        k8s_name VARCHAR(255) UNIQUE NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        image_tag VARCHAR(100) DEFAULT 'latest',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- Trader configs (versioned)
+    CREATE TABLE IF NOT EXISTS trader_configs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        trader_id UUID REFERENCES traders(id) ON DELETE CASCADE,
+        config_json JSONB NOT NULL,
+        version INTEGER NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(trader_id, version)
+    );
+
+    -- Trader secrets (encrypted private keys)
+    CREATE TABLE IF NOT EXISTS trader_secrets (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        trader_id UUID UNIQUE REFERENCES traders(id) ON DELETE CASCADE,
+        encrypted_private_key TEXT NOT NULL,
+        encryption_key_id VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- Deployment history
+    CREATE TABLE IF NOT EXISTS deployments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        trader_id UUID REFERENCES traders(id) ON DELETE CASCADE,
+        image_tag VARCHAR(100),
+        status VARCHAR(50),
+        k8s_metadata JSONB,
+        deployed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        completed_at TIMESTAMP WITH TIME ZONE
+    );
+
+    -- Usage metrics
+    CREATE TABLE IF NOT EXISTS usage_metrics (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        trader_id UUID REFERENCES traders(id) ON DELETE CASCADE,
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        metric_type VARCHAR(50),
+        value NUMERIC,
+        metadata JSONB
+    );
+
+    -- Refresh tokens for JWT authentication
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        revoked BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- Indexes for performance
+    CREATE INDEX IF NOT EXISTS idx_traders_user_id ON traders(user_id);
+    CREATE INDEX IF NOT EXISTS idx_traders_status ON traders(status);
+    CREATE INDEX IF NOT EXISTS idx_deployments_trader_id ON deployments(trader_id);
+    CREATE INDEX IF NOT EXISTS idx_usage_metrics_trader_id ON usage_metrics(trader_id);
+    CREATE INDEX IF NOT EXISTS idx_usage_metrics_timestamp ON usage_metrics(timestamp);
+    CREATE UNIQUE INDEX IF NOT EXISTS ix_refresh_tokens_token_hash ON refresh_tokens(token_hash);
+    CREATE INDEX IF NOT EXISTS ix_refresh_tokens_user_id ON refresh_tokens(user_id);
+
+    -- Function to update updated_at timestamp
+    CREATE OR REPLACE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+    END;
+    $$ language 'plpgsql';
+
+    -- Triggers for updated_at
+    DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+    CREATE TRIGGER update_users_updated_at
+        BEFORE UPDATE ON users
+        FOR EACH ROW
+        EXECUTE FUNCTION update_updated_at_column();
+
+    DROP TRIGGER IF EXISTS update_traders_updated_at ON traders;
+    CREATE TRIGGER update_traders_updated_at
+        BEFORE UPDATE ON traders
+        FOR EACH ROW
+        EXECUTE FUNCTION update_updated_at_column();
+
+    DROP TRIGGER IF EXISTS update_trader_secrets_updated_at ON trader_secrets;
+    CREATE TRIGGER update_trader_secrets_updated_at
+        BEFORE UPDATE ON trader_secrets
+        FOR EACH ROW
+        EXECUTE FUNCTION update_updated_at_column();
+
+---
+# PostgreSQL Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: hyper-trader
+  labels:
+    app: postgres
+    managed-by: infra-ctl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  strategy:
+    type: Recreate  # Required for persistent volumes
+  template:
+    metadata:
+      labels:
+        app: postgres
+        managed-by: infra-ctl
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_DB
+              value: hypertrader
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - hypertrader
+                - -d
+                - hypertrader
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - hypertrader
+                - -d
+                - hypertrader
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+        - name: init-scripts
+          configMap:
+            name: postgres-init-scripts
+
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: hyper-trader
+  labels:
+    app: postgres
+    managed-by: infra-ctl
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    app: postgres

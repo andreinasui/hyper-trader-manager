@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hyper-trader
+  labels:
+    app: hyper-trader
+    managed-by: trader-ctl

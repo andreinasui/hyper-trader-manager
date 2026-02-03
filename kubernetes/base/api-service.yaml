@@ -1,0 +1,18 @@
+# HyperTrader API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: hypertrader-api
+  namespace: hyper-trader
+  labels:
+    app: hypertrader-api
+    managed-by: infra-ctl
+spec:
+  type: ClusterIP
+  selector:
+    app: hypertrader-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8000
+      targetPort: 8000

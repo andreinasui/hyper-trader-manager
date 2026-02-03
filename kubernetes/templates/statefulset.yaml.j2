@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ trader_name }}
+  namespace: {{ namespace }}
+  labels:
+    app: hyper-trader
+    trader-address: "{{ wallet_address }}"
+    managed-by: api
+spec:
+  serviceName: {{ trader_name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hyper-trader
+      trader-address: "{{ wallet_address }}"
+  template:
+    metadata:
+      labels:
+        app: hyper-trader
+        trader-address: "{{ wallet_address }}"
+        managed-by: api
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      
+      containers:
+        - name: trader
+          image: ghcr.io/{{ github_repo }}:{{ image_tag }}
+          imagePullPolicy: Always
+          
+          env:
+            - name: PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ trader_name }}-secret
+                  key: PRIVATE_KEY
+            - name: CONFIG_PATH
+              value: /app/config/config.json
+            - name: RUST_LOG
+              value: info
+            # OpenTelemetry configuration
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector:4317
+            - name: OTEL_SERVICE_NAME
+              value: {{ trader_name }}
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: trader.address={{ wallet_address }},deployment.environment=k8s
+          
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+          
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pgrep -x hyper-trader
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pgrep -x hyper-trader
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      
+      volumes:
+        - name: config
+          configMap:
+            name: {{ trader_name }}-config
+      
+      restartPolicy: Always
+  
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0

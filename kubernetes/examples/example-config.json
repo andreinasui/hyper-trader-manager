@@ -1,0 +1,35 @@
+{
+  "name": "example-trader",
+  "exchange": "hyperliquid",
+  "self_account": {
+    "address": "0xYOUR_WALLET_ADDRESS_HERE",
+    "base_url": "testnet",
+    "is_sub": false
+  },
+  "copy_account": {
+    "address": "0xTARGET_WALLET_TO_COPY",
+    "base_url": "testnet"
+  },
+  "settings": {
+    "min_self_funds": 10,
+    "min_copy_funds": 5,
+    "trading_strategy": {
+      "type": "order_based",
+      "risk_parameters": {
+        "allowed_assets": null,
+        "blocked_assets": [],
+        "max_leverage": null,
+        "open_on_low_pnl": {
+          "enabled": true,
+          "max_pnl": 0.05
+        },
+        "self_proportionality_multiplier": 1.0,
+        "bucket_config": {
+          "manual": {
+            "width_percent": 0.00001
+          }
+        }
+      }
+    }
+  }
+}
