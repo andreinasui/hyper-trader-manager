@@ -1,6 +1,11 @@
-# HyperTrader K8s Deployment
+# HyperTrader Manager
 
-Complete Kubernetes deployment solution for managing multiple HyperTrader instances on K3s.
+Management application for HyperTrader instances, including Backend API and Frontend Web.
+
+## Components
+- **api/**: FastAPI backend for trader management and Kubernetes orchestration.
+- **web/**: React/Vite frontend for monitoring and controlling traders.
+- **kubernetes/**: Manifests and templates for deploying traders.
 
 ## Overview
 
