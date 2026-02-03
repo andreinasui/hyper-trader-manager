@@ -3,7 +3,7 @@
 Management application for HyperTrader instances, including Backend API and Frontend Web.
 
 ## Components
-- **api/**: FastAPI backend for trader management and Kubernetes orchestration.
+- **api/**: FastAPI backend for trader management and Kubernetes orchestration (includes Jinja2 templates in `api/templates`).
 - **web/**: React/Vite frontend for monitoring and controlling traders.
 
 ## Overview

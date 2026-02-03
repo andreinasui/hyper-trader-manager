@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     k8s_enabled: bool = True
     k8s_namespace: str = "hyper-trader"
     github_repo: str = "andreinasui/hyper-trader"
-    templates_dir: str = "kubernetes/templates"
+    templates_dir: str = "api/templates"
     reconciliation_interval: int = 30  # seconds
 
 
