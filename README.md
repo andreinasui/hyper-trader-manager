@@ -5,7 +5,6 @@ Management application for HyperTrader instances, including Backend API and Fron
 ## Components
 - **api/**: FastAPI backend for trader management and Kubernetes orchestration.
 - **web/**: React/Vite frontend for monitoring and controlling traders.
-- **kubernetes/**: Manifests and templates for deploying traders.
 
 ## Overview
 
