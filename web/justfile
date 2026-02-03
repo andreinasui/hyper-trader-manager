@@ -1,0 +1,122 @@
+# HyperTrader Web - Development Commands
+
+set shell := ["bash", "-cu"]
+set dotenv-load := true
+set dotenv-filename := ".env.development"
+
+# Default recipe - show help
+default:
+    @just --list
+
+# ─────────────────────────────────────────────────────────────
+# Setup
+# ─────────────────────────────────────────────────────────────
+
+# Install dependencies
+install:
+    pnpm install
+
+# Clean install (remove node_modules first)
+install-clean:
+    rm -rf node_modules
+    pnpm install
+
+# Update dependencies
+update:
+    pnpm update
+
+# Update dependencies interactively
+update-interactive:
+    pnpm update --interactive
+
+# ─────────────────────────────────────────────────────────────
+# Development
+# ─────────────────────────────────────────────────────────────
+
+# Run dev server with hot reload
+dev:
+    pnpm dev
+
+# Run dev server on specific port
+dev-port port="3000":
+    pnpm dev --port {{port}}
+
+# ─────────────────────────────────────────────────────────────
+# Build
+# ─────────────────────────────────────────────────────────────
+
+# Build for production
+build:
+    pnpm build
+
+# Preview production build locally
+preview:
+    pnpm preview
+
+# ─────────────────────────────────────────────────────────────
+# Testing
+# ─────────────────────────────────────────────────────────────
+
+# Run all tests (unit + e2e)
+test:
+    pnpm test && pnpm test:e2e
+
+# Run unit tests (vitest)
+test-unit:
+    pnpm test
+
+# Run e2e tests (Playwright)
+test-e2e:
+    pnpm test:e2e
+
+# Run e2e tests with UI mode
+test-e2e-ui:
+    pnpm test:e2e:ui
+
+# Run e2e tests in headed mode (see browser)
+test-e2e-headed:
+    pnpm test:e2e:headed
+
+# Debug e2e tests
+test-e2e-debug:
+    pnpm test:e2e:debug
+
+# Generate test report
+test-e2e-report:
+    pnpm test:e2e:report
+
+# Install Playwright browsers (one-time setup)
+test-setup:
+    npx playwright install
+
+# ─────────────────────────────────────────────────────────────
+# Code Quality
+# ─────────────────────────────────────────────────────────────
+
+# Run linter
+lint:
+    pnpm lint 2>/dev/null || echo "No lint script configured"
+
+# Run type checker
+typecheck:
+    pnpm typecheck 2>/dev/null || pnpm exec tsc --noEmit
+
+# ─────────────────────────────────────────────────────────────
+# Utilities
+# ─────────────────────────────────────────────────────────────
+
+# Clean build artifacts and caches
+clean:
+    rm -rf .output .vinxi node_modules/.vite dist
+
+# Check Node.js version
+check-node:
+    @echo "Required: >=22.12.0"
+    @echo "Current:  $(node --version)"
+    @node -e "const v = process.versions.node.split('.').map(Number); if (v[0] < 22 || (v[0] === 22 && v[1] < 12)) { console.error('ERROR: Node.js >=22.12.0 required'); process.exit(1); } else { console.log('✓ Node.js version OK'); }"
+
+# Show pnpm info
+info:
+    @echo "Node.js: $(node --version)"
+    @echo "pnpm:    $(pnpm --version)"
+    @echo "Path:    $(which node)"

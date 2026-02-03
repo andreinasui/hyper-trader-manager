@@ -1,0 +1,109 @@
+# HyperTrader API - Development Commands
+
+set shell := ["bash", "-cu"]
+set dotenv-load := true
+set dotenv-filename := ".env.development"
+
+# Default recipe - show help
+default:
+    @just --list
+
+# ─────────────────────────────────────────────────────────────
+# Setup
+# ─────────────────────────────────────────────────────────────
+
+# Install production dependencies
+install:
+    uv sync --no-dev
+
+# Install all dependencies including dev tools
+install-dev:
+    uv sync --all-extras
+
+# Update lockfile
+lock:
+    uv lock
+
+# Upgrade all dependencies
+upgrade:
+    uv lock --upgrade
+
+# ─────────────────────────────────────────────────────────────
+# Development
+# ─────────────────────────────────────────────────────────────
+
+# Run API server with hot reload
+dev:
+    uv run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+
+# Run API server (production mode, no reload)
+run:
+    uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
+
+# ─────────────────────────────────────────────────────────────
+# Testing
+# ─────────────────────────────────────────────────────────────
+
+# Run tests
+test *args:
+    uv run pytest {{args}}
+
+# Run tests with verbose output
+test-v:
+    uv run pytest -v
+
+# Run tests with coverage
+test-cov:
+    uv run pytest --cov=api --cov-report=html --cov-report=term
+
+# ─────────────────────────────────────────────────────────────
+# Code Quality
+# ─────────────────────────────────────────────────────────────
+
+# Run linter
+lint:
+    uv run ruff check .
+
+# Run linter and fix auto-fixable issues
+lint-fix:
+    uv run ruff check . --fix
+
+# Format code
+format:
+    uv run ruff format .
+
+# Check formatting without changes
+format-check:
+    uv run ruff format . --check
+
+# Run type checker
+typecheck:
+    uv run mypy .
+
+# Run all code quality checks
+check: lint format-check typecheck test
+
+# ─────────────────────────────────────────────────────────────
+# Utilities
+# ─────────────────────────────────────────────────────────────
+
+# Generate a Fernet encryption key
+gen-encryption-key:
+    @uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+# Generate a JWT secret key
+gen-jwt-secret:
+    @openssl rand -hex 32
+
+# Generate both keys and show .env format
+gen-keys:
+    @echo "Add these to your .env.development file:"
+    @echo ""
+    @echo "ENCRYPTION_KEY=$(uv run python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+    @echo "JWT_SECRET_KEY=$(openssl rand -hex 32)"
+
+# Clean up cache files
+clean:
+    rm -rf __pycache__ .pytest_cache .mypy_cache .ruff_cache htmlcov .coverage
+    find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+    find . -type f -name "*.pyc" -delete 2>/dev/null || true

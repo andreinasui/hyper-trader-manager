@@ -1,0 +1,25 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+count.txt
+.env
+.env.local
+.env.development
+.env.production
+.nitro
+.tanstack
+.wrangler
+
+# Node.js / npm / pnpm
+node_modules/
+package-lock.json
+.pnpm-store/
+.pnpm-debug.log
+
+# Build outputs
+.output/
+.vinxi/
+dist/
+.vite/
