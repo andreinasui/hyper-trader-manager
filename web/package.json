@@ -18,9 +18,11 @@
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:report": "playwright show-report",
-    "test:all": "pnpm test && pnpm test:e2e"
+    "test:all": "pnpm test && pnpm test:e2e",
+    "gen:api": "openapi-ts --input http://localhost:8000/openapi.json --output src/lib/api/generated --client @hey-api/client-fetch"
   },
   "dependencies": {
+    "@hey-api/client-fetch": "^0.13.1",
     "@hookform/resolvers": "^5.2.2",
     "@privy-io/react-auth": "^3.13.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -52,6 +54,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "^0.91.1",
     "@playwright/test": "^1.58.1",
     "@tanstack/devtools-vite": "^0.3.11",
     "@testing-library/dom": "^10.4.0",
@@ -62,9 +65,11 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "buffer": "^6.0.3",
     "jsdom": "^27.0.0",
     "typescript": "^5.7.2",
     "vite": "^7.1.7",
+    "vite-plugin-node-polyfills": "^0.25.0",
     "vitest": "^3.0.5",
     "web-vitals": "^5.1.0"
   }

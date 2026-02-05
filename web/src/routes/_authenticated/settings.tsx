@@ -64,12 +64,9 @@ function SettingsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                Your wallet is secured by Privy's embedded wallet system. 
-                Private keys are managed securely and never exposed.
+                Your wallet is managed by your external wallet provider (MetaMask, Rabby, etc.).
+                Your private keys remain under your control.
               </p>
-              <Button variant="outline" disabled>
-                Export Wallet (Coming Soon)
-              </Button>
             </CardContent>
           </Card>
         </div>

@@ -8,6 +8,7 @@ import { usePrivy as useRealPrivy } from '@privy-io/react-auth'
 import { usePrivy as useMockPrivy } from '@/test/mocks/MockPrivyProvider'
 import { useEffect } from 'react'
 import { api } from '@/lib/api'
+import { setTokenGetter } from '@/lib/api/client'
 
 export interface AuthUser {
   walletAddress: string
@@ -35,20 +36,24 @@ export function useAuth() {
   // Set up API client token getter when hook initializes
   useEffect(() => {
     api.setPrivyTokenGetter(getAccessToken)
+    setTokenGetter(getAccessToken)
   }, [getAccessToken])
 
-  // Extract embedded wallet address from Privy user
+  // Extract wallet address from Privy user
   const getWalletAddress = (): string | null => {
     if (!privyUser || !authenticated) return null
     
-    // Find embedded wallet in linked accounts
-    const embeddedWallet = privyUser.linkedAccounts?.find(
+    // First try to use the primary wallet if available
+    if (privyUser.wallet?.address) return privyUser.wallet.address
+
+    // Fallback to finding the first external wallet in linked accounts
+    const wallet = privyUser.linkedAccounts?.find(
       (account: any) => 
         account.type === 'wallet' && 
-        account.walletClientType === 'privy'
+        account.walletClientType !== 'privy'
     )
     
-    return embeddedWallet?.address || null
+    return wallet?.address || null
   }
 
   const user: AuthUser | null = authenticated && privyUser ? {

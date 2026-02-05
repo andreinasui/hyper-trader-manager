@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../../lib/api';
-import { TraderCard } from '../../../components/traders/TraderCard';
+import { api } from '@/lib/api';
+import { traderKeys } from '@/lib/query-keys';
+import { TraderCard } from '@/components/traders/TraderCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,7 +14,7 @@ export const Route = createFileRoute('/_authenticated/traders/')({
 
 function TradersPage() {
   const { data: traders, isLoading } = useQuery({
-    queryKey: ['traders'],
+    queryKey: traderKeys.lists(),
     queryFn: () => api.listTraders(),
   });
 

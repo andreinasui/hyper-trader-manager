@@ -19,11 +19,14 @@ export interface AuthFixtures {
  */
 export const createMockUser = (overrides?: Partial<MockPrivyUser>): MockPrivyUser => ({
   id: 'test-privy-user-id',
+  wallet: {
+    address: '0x1234567890123456789012345678901234567890',
+  },
   linkedAccounts: [
     {
       type: 'wallet',
       address: '0x1234567890123456789012345678901234567890',
-      walletClientType: 'privy',
+      walletClientType: 'metamask',
     },
   ],
   ...overrides,

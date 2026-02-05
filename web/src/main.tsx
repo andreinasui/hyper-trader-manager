@@ -8,6 +8,7 @@ import * as TanStackQueryProvider from './integrations/tanstack-query/root-provi
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 import { MockPrivyProvider } from './test/mocks/MockPrivyProvider.tsx'
 import { useAuth } from './hooks/useAuth'
+import { useAuthWithWalletSetup } from './hooks/useAuthWithWalletSetup'
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
@@ -54,8 +55,12 @@ declare module '@tanstack/react-router' {
  * AppRouter component that provides auth context to the router
  */
 function AppRouter() {
-  const auth = useAuth()
+  // Check if we're in mock mode (for E2E tests)
+  const isMock = typeof window !== 'undefined' && !!(window as any).__PRIVY_MOCK__?.enabled
   
+  // Use auto wallet setup in production, regular auth in tests
+  const auth = isMock ? useAuth() : useAuthWithWalletSetup()
+
   return <RouterProvider router={router} context={{ auth }} />
 }
 
@@ -65,7 +70,7 @@ function AppRouter() {
  */
 function getPrivyProvider() {
   const useMock = typeof window !== 'undefined' && (window as any).__PRIVY_MOCK__?.enabled;
-  
+
   if (useMock) {
     // Return a wrapper that uses MockPrivyProvider
     return ({ children }: { children: ReactNode }) => {
@@ -83,7 +88,7 @@ function getPrivyProvider() {
       );
     };
   }
-  
+
   // Return real PrivyProvider wrapper
   return ({ children }: { children: ReactNode }) => (
     <PrivyProvider
@@ -92,11 +97,15 @@ function getPrivyProvider() {
         appearance: {
           theme: 'dark',
           accentColor: '#6366f1',
+          walletChainType: 'ethereum-only'
         },
         loginMethods: ['wallet'],
         embeddedWallets: {
           ethereum: {
             createOnLogin: 'all-users',
+          },
+          solana: {
+            createOnLogin: 'off',
           },
           showWalletUIs: true,
         },
@@ -134,7 +143,7 @@ const rootElement = document.getElementById('app')
 if (rootElement && !rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement)
   const AuthProvider = getPrivyProvider();
-  
+
   root.render(
     <StrictMode>
       <ErrorBoundary>

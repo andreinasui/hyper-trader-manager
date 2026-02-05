@@ -1,163 +1,116 @@
 /**
  * Typed API client for HyperTrader API.
- * 
- * Handles authentication with Privy tokens and API calls.
+ * Uses the generated OpenAPI client.
  */
+
+import { setTokenGetter } from '@/lib/api/client';
+import {
+  getMeApiV1AuthMeGet,
+  listTradersApiV1TradersGet,
+  createTraderApiV1TradersPost,
+  getTraderApiV1TradersTraderIdGet,
+  deleteTraderApiV1TradersTraderIdDelete,
+  restartTraderApiV1TradersTraderIdRestartPost,
+  getTraderStatusApiV1TradersTraderIdStatusGet,
+  getTraderLogsApiV1TradersTraderIdLogsGet,
+  listUsersApiV1AdminUsersGet,
+  listAllTradersApiV1AdminTradersGet,
+  getSystemStatsApiV1AdminStatsGet
+} from '@/lib/api/generated/sdk.gen';
 
 import type {
   User,
   Trader,
   CreateTraderRequest,
   TraderStatusResponse,
-  TraderLogsResponse,
-  SystemStats,
+  SystemStats
 } from './types';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
-// Type for the Privy token getter function
-type TokenGetter = () => Promise<string | null>;
-
-class ApiClient {
-  private privyTokenGetter: TokenGetter | null = null;
-
-  /**
-   * Set the Privy token getter function.
-   * This should be called from the useAuth hook when it initializes.
-   */
-  setPrivyTokenGetter(getter: TokenGetter): void {
-    this.privyTokenGetter = getter;
+// Helper to handle response
+async function handle<T>(promise: Promise<{ data?: T; error?: unknown }>): Promise<T> {
+  const { data, error } = await promise;
+  if (error) {
+    const err = error as any;
+    if (err.detail) throw new Error(JSON.stringify(err.detail));
+    throw new Error(JSON.stringify(error));
   }
-
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${API_BASE}${endpoint}`;
-    
-    // Add authentication header with Privy token
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string>),
-    };
-    
-    // Get Privy access token if available
-    if (this.privyTokenGetter) {
-      const privyToken = await this.privyTokenGetter();
-      if (privyToken) {
-        headers['Authorization'] = `Bearer ${privyToken}`;
-      }
-    }
-    
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-    
-    // Handle 401 Unauthorized - redirect to login
-    if (response.status === 401) {
-      // Privy token expired or invalid, redirect to login
-      window.location.href = '/';
-      throw new Error('Authentication required');
-    }
-    
-    if (!response.ok) {
-      const error = await response.json();
-      
-      // Handle FastAPI validation errors (422)
-      if (response.status === 422) {
-        // New format with errors array
-        if (error.errors && Array.isArray(error.errors)) {
-          const fieldErrors = error.errors.map((e: any) => 
-            `${e.field}: ${e.message}`
-          ).join('\n');
-          throw new Error(fieldErrors);
-        }
-        
-        // Fallback for old format
-        if (error.detail && Array.isArray(error.detail)) {
-          const messages = error.detail.map((e: any) => {
-            const field = e.loc ? e.loc[e.loc.length - 1] : 'field';
-            const msg = e.msg || e.message || 'Invalid value';
-            return `${field}: ${msg}`;
-          });
-          throw new Error(messages.join('\n'));
-        }
-      }
-      
-      throw new Error(error.detail || 'Request failed');
-    }
-    
-    return response.json();
-  }
-  
-  // Auth endpoints (Privy-based)
-  async me(): Promise<User> {
-    return this.request<User>('/api/v1/auth/me');
-  }
-  
-  // Trader endpoints
-  async listTraders(): Promise<Trader[]> {
-    return this.request<Trader[]>('/api/v1/traders');
-  }
-  
-  async getTrader(id: string): Promise<Trader> {
-    return this.request<Trader>(`/api/v1/traders/${id}`);
-  }
-  
-  async createTrader(data: CreateTraderRequest): Promise<Trader> {
-    return this.request<Trader>('/api/v1/traders', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-  
-  async deleteTrader(id: string): Promise<void> {
-    await this.request(`/api/v1/traders/${id}`, {
-      method: 'DELETE',
-    });
-  }
-  
-  async startTrader(id: string): Promise<void> {
-    await this.request(`/api/v1/traders/${id}/start`, {
-      method: 'POST',
-    });
-  }
-  
-  async stopTrader(id: string): Promise<void> {
-    await this.request(`/api/v1/traders/${id}/stop`, {
-      method: 'POST',
-    });
-  }
-  
-  async restartTrader(id: string): Promise<void> {
-    await this.request(`/api/v1/traders/${id}/restart`, {
-      method: 'POST',
-    });
-  }
-  
-  async getTraderStatus(id: string): Promise<TraderStatusResponse> {
-    return this.request<TraderStatusResponse>(`/api/v1/traders/${id}/status`);
-  }
-  
-  async getTraderLogs(id: string, lines?: number): Promise<string[]> {
-    const params = lines ? `?lines=${lines}` : '';
-    const response = await this.request<TraderLogsResponse>(`/api/v1/traders/${id}/logs${params}`);
-    return response.logs;
-  }
-  
-  // Admin endpoints
-  async adminListUsers(skip = 0, limit = 100): Promise<User[]> {
-    return this.request<User[]>(`/api/v1/admin/users?skip=${skip}&limit=${limit}`);
-  }
-  
-  async adminListTraders(skip = 0, limit = 100): Promise<Trader[]> {
-    return this.request<Trader[]>(`/api/v1/admin/traders?skip=${skip}&limit=${limit}`);
-  }
-  
-  async adminGetStats(): Promise<SystemStats> {
-    return this.request<SystemStats>('/api/v1/admin/stats');
-  }
+  return data!;
 }
 
-export const api = new ApiClient();
+export const api = {
+  setPrivyTokenGetter: setTokenGetter,
+
+  // Auth
+  async me(): Promise<User> {
+    const data = await handle(getMeApiV1AuthMeGet());
+    return data as unknown as User;
+  },
+
+  // Traders
+  async listTraders(): Promise<Trader[]> {
+    const data = await handle(listTradersApiV1TradersGet());
+    // The backend returns { traders: [], count: 0 }
+    // Old api expected Trader[]
+    return (data as any).traders as Trader[];
+  },
+
+  async getTrader(id: string): Promise<Trader> {
+    const data = await handle(getTraderApiV1TradersTraderIdGet({ path: { trader_id: id } }));
+    return data as unknown as Trader;
+  },
+
+  async createTrader(data: CreateTraderRequest): Promise<Trader> {
+    const result = await handle(createTraderApiV1TradersPost({ 
+      body: data as any 
+    }));
+    return result as unknown as Trader;
+  },
+
+  async deleteTrader(id: string): Promise<void> {
+    await handle(deleteTraderApiV1TradersTraderIdDelete({ path: { trader_id: id } }));
+  },
+
+  async restartTrader(id: string): Promise<void> {
+    await handle(restartTraderApiV1TradersTraderIdRestartPost({ path: { trader_id: id } }));
+  },
+  
+  // Note: startTrader and stopTrader are not currently exposed in the OpenAPI spec
+  async startTrader(_id: string): Promise<void> {
+     throw new Error("Start trader not implemented in current API version");
+  },
+  
+  async stopTrader(_id: string): Promise<void> {
+     throw new Error("Stop trader not implemented in current API version");
+  },
+
+  async getTraderStatus(id: string): Promise<TraderStatusResponse> {
+     const data = await handle(getTraderStatusApiV1TradersTraderIdStatusGet({ path: { trader_id: id } }));
+     return data as unknown as TraderStatusResponse;
+  },
+
+  async getTraderLogs(id: string, lines?: number): Promise<string[]> {
+    const data = await handle(getTraderLogsApiV1TradersTraderIdLogsGet({ 
+      path: { trader_id: id },
+      query: lines ? { tail_lines: lines } : undefined
+    }));
+    // OpenAPI says logs is a string
+    const logs = (data as any).logs as string;
+    return logs ? logs.split('\n') : [];
+  },
+
+  // Admin
+  async adminListUsers(skip = 0, limit = 100): Promise<User[]> {
+    const data = await handle(listUsersApiV1AdminUsersGet({ query: { skip, limit } }));
+    return data as unknown as User[];
+  },
+
+  async adminListTraders(skip = 0, limit = 100): Promise<Trader[]> {
+    const data = await handle(listAllTradersApiV1AdminTradersGet({ query: { skip, limit } }));
+    return data as unknown as Trader[];
+  },
+
+  async adminGetStats(): Promise<SystemStats> {
+    const data = await handle(getSystemStatsApiV1AdminStatsGet());
+    return data as unknown as SystemStats;
+  }
+}

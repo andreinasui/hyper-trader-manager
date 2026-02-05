@@ -11,6 +11,9 @@ import type { ReactNode } from 'react';
 // Mock user structure matching Privy's user object
 export interface MockPrivyUser {
   id: string;
+  wallet?: {
+    address: string;
+  };
   linkedAccounts?: Array<{
     type: string;
     address: string;
@@ -41,11 +44,14 @@ const MockPrivyContext = createContext<PrivyContextValue | null>(null);
  */
 export const createMockPrivyUser = (overrides?: Partial<MockPrivyUser>): MockPrivyUser => ({
   id: 'test-privy-user-id',
+  wallet: {
+    address: '0x1234567890123456789012345678901234567890',
+  },
   linkedAccounts: [
     {
       type: 'wallet',
       address: '0x1234567890123456789012345678901234567890',
-      walletClientType: 'privy', // Embedded wallet
+      walletClientType: 'metamask', // External wallet
     },
   ],
   ...overrides,

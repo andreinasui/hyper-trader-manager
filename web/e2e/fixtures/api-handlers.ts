@@ -67,121 +67,127 @@ export async function setupApiMocks(page: Page) {
     });
   });
 
-  // Mock traders list
-  await page.route('**/api/v1/traders', async (route) => {
-    if (route.request().method() === 'GET') {
-      await route.fulfill({
-        status: 200,
-        json: [mockTrader],
-      });
-    } else if (route.request().method() === 'POST') {
-      const body = route.request().postDataJSON() as CreateTraderRequest;
-      
-      // Validate request
-      const errors: any[] = [];
-      
-      if (!body.wallet_address) {
-        errors.push({ 
-          field: 'wallet_address', 
-          message: 'Field required' 
-        });
-      }
-      
-      if (!body.config?.name) {
-        errors.push({ 
-          field: 'config.name', 
-          message: 'Trader name is required' 
-        });
-      }
-      
-      if (errors.length > 0) {
+  // Mock traders list - be permissive with trailing slashes
+  await page.route(url => url.pathname.includes('/api/v1/traders'), async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+    
+    // Base list or create endpoint
+    if (url.match(/\/api\/v1\/traders\/?(\?.*)?$/)) {
+      if (method === 'GET') {
         await route.fulfill({
-          status: 422,
-          json: { errors },
+          status: 200,
+          json: {
+            traders: [mockTrader],
+            count: 1
+          },
+        });
+        return;
+      } else if (method === 'POST') {
+        const body = route.request().postDataJSON() as CreateTraderRequest;
+        
+        // Validate request
+        const errors: any[] = [];
+        
+        if (!body.wallet_address) {
+          errors.push({ 
+            field: 'wallet_address', 
+            message: 'Field required' 
+          });
+        }
+        
+        if (!body.config?.name) {
+          errors.push({ 
+            field: 'config.name', 
+            message: 'Trader name is required' 
+          });
+        }
+        
+        if (errors.length > 0) {
+          await route.fulfill({
+            status: 422,
+            json: { detail: errors },
+          });
+          return;
+        }
+        
+        // Create new trader
+        const newTrader: Trader = {
+          ...mockTrader,
+          id: `trader-${Date.now()}`,
+          wallet_address: body.wallet_address,
+          latest_config: body.config,
+          status: 'pending',
+        };
+        
+        await route.fulfill({
+          status: 201,
+          json: newTrader,
         });
         return;
       }
-      
-      // Create new trader
-      const newTrader: Trader = {
-        ...mockTrader,
-        id: `trader-${Date.now()}`,
-        wallet_address: body.wallet_address,
-        latest_config: body.config,
-        status: 'pending',
-      };
-      
-      await route.fulfill({
-        status: 201,
-        json: newTrader,
-      });
     }
-  });
-
-  // Mock single trader detail
-  await page.route('**/api/v1/traders/*', async (route) => {
-    const method = route.request().method();
     
-    if (method === 'GET') {
+    // Sub-resources (e.g., /api/v1/traders/{id}/status)
+    if (url.match(/\/api\/v1\/traders\/[^\/]+\/status\/?$/)) {
       await route.fulfill({
         status: 200,
-        json: mockTrader,
-      });
-    } else if (method === 'DELETE') {
-      await route.fulfill({
-        status: 204,
-      });
-    }
-  });
-
-  // Mock trader control endpoints
-  await page.route('**/api/v1/traders/*/start', async (route) => {
-    await route.fulfill({ status: 200, json: {} });
-  });
-
-  await page.route('**/api/v1/traders/*/stop', async (route) => {
-    await route.fulfill({ status: 200, json: {} });
-  });
-
-  await page.route('**/api/v1/traders/*/restart', async (route) => {
-    await route.fulfill({ status: 200, json: {} });
-  });
-
-  // Mock trader status
-  await page.route('**/api/v1/traders/*/status', async (route) => {
-    await route.fulfill({
-      status: 200,
-      json: {
-        id: mockTrader.id,
-        wallet_address: mockTrader.wallet_address,
-        k8s_name: mockTrader.k8s_name,
-        status: 'running',
-        k8s_status: {
-          pod_phase: 'Running',
-          ready: true,
-          restarts: 0,
-          pod_ip: '10.0.0.1',
-          node: 'node-1',
-          started_at: '2024-01-01T00:00:00Z',
+        json: {
+          id: mockTrader.id,
+          wallet_address: mockTrader.wallet_address,
+          k8s_name: mockTrader.k8s_name,
+          status: 'running',
+          k8s_status: {
+            pod_phase: 'Running',
+            ready: true,
+            restarts: 0,
+            pod_ip: '10.0.0.1',
+            node: 'node-1',
+            started_at: '2024-01-01T00:00:00Z',
+          },
         },
-      },
-    });
-  });
+      });
+      return;
+    }
 
-  // Mock trader logs
-  await page.route('**/api/v1/traders/*/logs*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      json: {
-        trader_id: mockTrader.id,
-        logs: [
-          '[2024-01-01 00:00:00] Trader started',
-          '[2024-01-01 00:01:00] Connected to exchange',
-          '[2024-01-01 00:02:00] Monitoring positions',
-        ],
-        total_lines: 3,
-      },
-    });
+    if (url.match(/\/api\/v1\/traders\/[^\/]+\/logs\/?/)) {
+      await route.fulfill({
+        status: 200,
+        json: {
+          trader_id: mockTrader.id,
+          logs: [
+            '[2024-01-01 00:00:00] Trader started',
+            '[2024-01-01 00:01:00] Connected to exchange',
+            '[2024-01-01 00:02:00] Monitoring positions',
+          ],
+          total_lines: 3,
+        },
+      });
+      return;
+    }
+
+    // Single trader detail
+    if (url.match(/\/api\/v1\/traders\/[^\/]+\/?$/)) {
+      if (method === 'GET') {
+        await route.fulfill({
+          status: 200,
+          json: mockTrader,
+        });
+      } else if (method === 'DELETE') {
+        await route.fulfill({
+          status: 204,
+        });
+      }
+      return;
+    }
+
+    // Control endpoints
+    if (url.match(/\/api\/v1\/traders\/[^\/]+\/(start|stop|restart)\/?$/)) {
+      await route.fulfill({ status: 200, json: {} });
+      return;
+    }
+
+    await route.continue();
   });
 }
 

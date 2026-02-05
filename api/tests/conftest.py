@@ -3,25 +3,26 @@ Pytest fixtures for HyperTrader API tests.
 
 Uses mocks instead of real database connections.
 """
+
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
-from contextlib import asynccontextmanager
 
 import pytest
 from fastapi.testclient import TestClient
 
 # Mock the database engine and lifespan BEFORE importing the app
-with patch("api.database.engine") as mock_engine:
+with patch("hyper_trader_api.database.engine") as mock_engine:
     mock_engine.connect.return_value.__enter__.return_value.execute.return_value = None
     mock_engine.dispose.return_value = None
-    
+
     # Mock the reconciliation workers
-    with patch("api.main.start_reconciliation"), \
-         patch("api.main.stop_reconciliation"):
-        
-        from api.main import app
-        from api.database import get_db
+    with (
+        patch("hyper_trader_api.main.start_reconciliation"),
+        patch("hyper_trader_api.main.stop_reconciliation"),
+    ):
+        from hyper_trader_api.database import get_db
+        from hyper_trader_api.main import app
 
 
 @pytest.fixture
@@ -33,17 +34,18 @@ def mock_db():
 @pytest.fixture
 def client(mock_db):
     """Test client with mocked database."""
+
     def override_get_db():
         yield mock_db
-    
+
     app.dependency_overrides[get_db] = override_get_db
-    
+
     # Mock the engine for health checks
-    with patch("api.main.engine") as mock_engine:
+    with patch("hyper_trader_api.main.engine") as mock_engine:
         mock_engine.connect.return_value.__enter__.return_value.execute.return_value = None
         with TestClient(app) as c:
             yield c
-    
+
     app.dependency_overrides.clear()
 
 
@@ -57,7 +59,7 @@ def mock_user():
     user.is_admin = False
     user.password_hash = "hashed_password"
     user.api_key_hash = None
-    user.created_at = datetime.now(timezone.utc)
+    user.created_at = datetime.now(UTC)
     return user
 
 
@@ -71,8 +73,8 @@ def mock_trader(mock_user):
     trader.k8s_name = "trader-12345678"
     trader.status = "running"
     trader.image_tag = "latest"
-    trader.created_at = datetime.now(timezone.utc)
-    trader.updated_at = datetime.now(timezone.utc)
+    trader.created_at = datetime.now(UTC)
+    trader.updated_at = datetime.now(UTC)
     trader.latest_config = MagicMock()
     trader.latest_config.config_json = {"name": "Test Trader", "exchange": "hyperliquid"}
     return trader

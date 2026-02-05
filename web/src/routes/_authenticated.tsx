@@ -1,5 +1,6 @@
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect, Navigate } from '@tanstack/react-router'
 import { useAuth } from '@/hooks/useAuth'
+import { AppShell } from '@/components/layout/AppShell'
 
 export const Route = createFileRoute('/_authenticated')({
   component: AuthenticatedLayout,
@@ -32,12 +33,11 @@ function AuthenticatedLayout() {
     )
   }
 
-  // This should never render if not authenticated (beforeLoad handles redirect)
-  // but keeping as safety check
+  // Redirect to login if not authenticated
   if (!authenticated) {
-    return null
+    return <Navigate to="/" />
   }
 
-  // Render protected content
-  return <Outlet />
+  // Render protected content wrapped in AppShell
+  return <AppShell />
 }

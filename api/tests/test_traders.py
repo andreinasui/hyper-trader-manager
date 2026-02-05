@@ -1,16 +1,17 @@
 """
 Trader endpoint tests using mocks.
 """
+
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from api.main import app
-from api.database import get_db
-from api.services.trader_service import TraderNotFoundError, TraderOwnershipError
+from hyper_trader_api.database import get_db
+from hyper_trader_api.main import app
+from hyper_trader_api.services.trader_service import TraderNotFoundError, TraderOwnershipError
 
 
 @pytest.fixture
@@ -22,7 +23,7 @@ def mock_db():
 def client(mock_db):
     def override_get_db():
         yield mock_db
-    
+
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c
@@ -36,7 +37,7 @@ def mock_user():
     user.email = "test@example.com"
     user.plan_tier = "free"
     user.is_admin = False
-    user.created_at = datetime.now(timezone.utc)
+    user.created_at = datetime.now(UTC)
     return user
 
 
@@ -49,8 +50,8 @@ def mock_trader(mock_user):
     trader.k8s_name = "trader-12345678"
     trader.status = "running"
     trader.image_tag = "latest"
-    trader.created_at = datetime.now(timezone.utc)
-    trader.updated_at = datetime.now(timezone.utc)
+    trader.created_at = datetime.now(UTC)
+    trader.updated_at = datetime.now(UTC)
     trader.latest_config = MagicMock()
     trader.latest_config.config_json = {"name": "Test", "exchange": "hyperliquid"}
     return trader
@@ -59,9 +60,11 @@ def mock_trader(mock_user):
 class TestCreateTrader:
     """Tests for POST /api/v1/traders/"""
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
-    def test_create_trader_success(self, mock_service_class, mock_get_user, client, mock_user, mock_trader):
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
+    def test_create_trader_success(
+        self, mock_service_class, mock_get_user, client, mock_user, mock_trader
+    ):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
         mock_service.create_trader.return_value = mock_trader
@@ -73,8 +76,8 @@ class TestCreateTrader:
             json={
                 "wallet_address": "0x1234567890123456789012345678901234567890",
                 "private_key": "0x1234567890123456789012345678901234567890123456789012345678901234",
-                "config": {"name": "Test Trader", "exchange": "hyperliquid"}
-            }
+                "config": {"name": "Test Trader", "exchange": "hyperliquid"},
+            },
         )
 
         assert response.status_code == 201
@@ -83,7 +86,7 @@ class TestCreateTrader:
         assert data["k8s_name"] == mock_trader.k8s_name
         mock_service.create_trader.assert_called_once()
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
     def test_create_trader_invalid_wallet_format(self, mock_get_user, client, mock_user):
         mock_get_user.return_value = mock_user
 
@@ -93,15 +96,17 @@ class TestCreateTrader:
             json={
                 "wallet_address": "invalid_address",
                 "private_key": "0x1234567890123456789012345678901234567890123456789012345678901234",
-                "config": {"name": "Test"}
-            }
+                "config": {"name": "Test"},
+            },
         )
 
         assert response.status_code == 422
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
-    def test_create_trader_duplicate_wallet(self, mock_service_class, mock_get_user, client, mock_user):
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
+    def test_create_trader_duplicate_wallet(
+        self, mock_service_class, mock_get_user, client, mock_user
+    ):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
         mock_service.create_trader.side_effect = ValueError("Trader already exists for wallet")
@@ -113,8 +118,8 @@ class TestCreateTrader:
             json={
                 "wallet_address": "0x1234567890123456789012345678901234567890",
                 "private_key": "0x1234567890123456789012345678901234567890123456789012345678901234",
-                "config": {"name": "Test"}
-            }
+                "config": {"name": "Test"},
+            },
         )
 
         assert response.status_code == 409
@@ -126,8 +131,8 @@ class TestCreateTrader:
             json={
                 "wallet_address": "0x1234567890123456789012345678901234567890",
                 "private_key": "0x1234567890123456789012345678901234567890123456789012345678901234",
-                "config": {"name": "Test"}
-            }
+                "config": {"name": "Test"},
+            },
         )
 
         assert response.status_code == 401
@@ -136,36 +141,32 @@ class TestCreateTrader:
 class TestListTraders:
     """Tests for GET /api/v1/traders"""
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
     def test_list_traders_empty(self, mock_service_class, mock_get_user, client, mock_user):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
         mock_service.list_traders.return_value = []
         mock_service_class.return_value = mock_service
 
-        response = client.get(
-            "/api/v1/traders",
-            headers={"Authorization": "Bearer valid_token"}
-        )
+        response = client.get("/api/v1/traders", headers={"Authorization": "Bearer valid_token"})
 
         assert response.status_code == 200
         data = response.json()
         assert data["count"] == 0
         assert data["traders"] == []
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
-    def test_list_traders_with_data(self, mock_service_class, mock_get_user, client, mock_user, mock_trader):
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
+    def test_list_traders_with_data(
+        self, mock_service_class, mock_get_user, client, mock_user, mock_trader
+    ):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
         mock_service.list_traders.return_value = [mock_trader]
         mock_service_class.return_value = mock_service
 
-        response = client.get(
-            "/api/v1/traders",
-            headers={"Authorization": "Bearer valid_token"}
-        )
+        response = client.get("/api/v1/traders", headers={"Authorization": "Bearer valid_token"})
 
         assert response.status_code == 200
         data = response.json()
@@ -181,25 +182,26 @@ class TestListTraders:
 class TestGetTrader:
     """Tests for GET /api/v1/traders/{id}"""
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
-    def test_get_trader_success(self, mock_service_class, mock_get_user, client, mock_user, mock_trader):
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
+    def test_get_trader_success(
+        self, mock_service_class, mock_get_user, client, mock_user, mock_trader
+    ):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
         mock_service.get_trader.return_value = mock_trader
         mock_service_class.return_value = mock_service
 
         response = client.get(
-            f"/api/v1/traders/{mock_trader.id}",
-            headers={"Authorization": "Bearer valid_token"}
+            f"/api/v1/traders/{mock_trader.id}", headers={"Authorization": "Bearer valid_token"}
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["wallet_address"] == mock_trader.wallet_address
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
     def test_get_trader_not_found(self, mock_service_class, mock_get_user, client, mock_user):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
@@ -207,14 +209,13 @@ class TestGetTrader:
         mock_service_class.return_value = mock_service
 
         response = client.get(
-            f"/api/v1/traders/{uuid.uuid4()}",
-            headers={"Authorization": "Bearer valid_token"}
+            f"/api/v1/traders/{uuid.uuid4()}", headers={"Authorization": "Bearer valid_token"}
         )
 
         assert response.status_code == 404
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
     def test_get_trader_forbidden(self, mock_service_class, mock_get_user, client, mock_user):
         """Test accessing another user's trader."""
         mock_get_user.return_value = mock_user
@@ -223,8 +224,7 @@ class TestGetTrader:
         mock_service_class.return_value = mock_service
 
         response = client.get(
-            f"/api/v1/traders/{uuid.uuid4()}",
-            headers={"Authorization": "Bearer valid_token"}
+            f"/api/v1/traders/{uuid.uuid4()}", headers={"Authorization": "Bearer valid_token"}
         )
 
         assert response.status_code == 403
@@ -233,15 +233,20 @@ class TestGetTrader:
 class TestUpdateTrader:
     """Tests for PATCH /api/v1/traders/{id}"""
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
-    def test_update_trader_success(self, mock_service_class, mock_get_user, client, mock_user, mock_trader):
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
+    def test_update_trader_success(
+        self, mock_service_class, mock_get_user, client, mock_user, mock_trader
+    ):
         mock_get_user.return_value = mock_user
-        
+
         # Update trader's config for the test
         updated_trader = mock_trader
-        updated_trader.latest_config.config_json = {"name": "Updated Trader", "exchange": "hyperliquid"}
-        
+        updated_trader.latest_config.config_json = {
+            "name": "Updated Trader",
+            "exchange": "hyperliquid",
+        }
+
         mock_service = MagicMock()
         mock_service.update_trader.return_value = updated_trader
         mock_service_class.return_value = mock_service
@@ -249,15 +254,15 @@ class TestUpdateTrader:
         response = client.patch(
             f"/api/v1/traders/{mock_trader.id}",
             headers={"Authorization": "Bearer valid_token"},
-            json={"config": {"name": "Updated Trader", "exchange": "hyperliquid"}}
+            json={"config": {"name": "Updated Trader", "exchange": "hyperliquid"}},
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["latest_config"]["name"] == "Updated Trader"
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
     def test_update_trader_not_found(self, mock_service_class, mock_get_user, client, mock_user):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
@@ -267,7 +272,7 @@ class TestUpdateTrader:
         response = client.patch(
             f"/api/v1/traders/{uuid.uuid4()}",
             headers={"Authorization": "Bearer valid_token"},
-            json={"config": {"name": "Updated"}}
+            json={"config": {"name": "Updated"}},
         )
 
         assert response.status_code == 404
@@ -276,9 +281,11 @@ class TestUpdateTrader:
 class TestDeleteTrader:
     """Tests for DELETE /api/v1/traders/{id}"""
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
-    def test_delete_trader_success(self, mock_service_class, mock_get_user, client, mock_user, mock_trader):
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
+    def test_delete_trader_success(
+        self, mock_service_class, mock_get_user, client, mock_user, mock_trader
+    ):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
         mock_service.get_trader.return_value = mock_trader
@@ -286,8 +293,7 @@ class TestDeleteTrader:
         mock_service_class.return_value = mock_service
 
         response = client.delete(
-            f"/api/v1/traders/{mock_trader.id}",
-            headers={"Authorization": "Bearer valid_token"}
+            f"/api/v1/traders/{mock_trader.id}", headers={"Authorization": "Bearer valid_token"}
         )
 
         assert response.status_code == 200
@@ -296,8 +302,8 @@ class TestDeleteTrader:
         assert data["wallet_address"] == mock_trader.wallet_address
         mock_service.delete_trader.assert_called_once()
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
     def test_delete_trader_not_found(self, mock_service_class, mock_get_user, client, mock_user):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
@@ -305,14 +311,13 @@ class TestDeleteTrader:
         mock_service_class.return_value = mock_service
 
         response = client.delete(
-            f"/api/v1/traders/{uuid.uuid4()}",
-            headers={"Authorization": "Bearer valid_token"}
+            f"/api/v1/traders/{uuid.uuid4()}", headers={"Authorization": "Bearer valid_token"}
         )
 
         assert response.status_code == 404
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
     def test_delete_trader_forbidden(self, mock_service_class, mock_get_user, client, mock_user):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
@@ -320,8 +325,7 @@ class TestDeleteTrader:
         mock_service_class.return_value = mock_service
 
         response = client.delete(
-            f"/api/v1/traders/{uuid.uuid4()}",
-            headers={"Authorization": "Bearer valid_token"}
+            f"/api/v1/traders/{uuid.uuid4()}", headers={"Authorization": "Bearer valid_token"}
         )
 
         assert response.status_code == 403
@@ -330,9 +334,11 @@ class TestDeleteTrader:
 class TestRestartTrader:
     """Tests for POST /api/v1/traders/{id}/restart"""
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
-    def test_restart_trader_success(self, mock_service_class, mock_get_user, client, mock_user, mock_trader):
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
+    def test_restart_trader_success(
+        self, mock_service_class, mock_get_user, client, mock_user, mock_trader
+    ):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
         mock_service.get_trader.return_value = mock_trader
@@ -341,7 +347,7 @@ class TestRestartTrader:
 
         response = client.post(
             f"/api/v1/traders/{mock_trader.id}/restart",
-            headers={"Authorization": "Bearer valid_token"}
+            headers={"Authorization": "Bearer valid_token"},
         )
 
         assert response.status_code == 200
@@ -349,8 +355,8 @@ class TestRestartTrader:
         assert "restart initiated" in data["message"]
         assert data["k8s_name"] == mock_trader.k8s_name
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
     def test_restart_trader_not_found(self, mock_service_class, mock_get_user, client, mock_user):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
@@ -359,7 +365,7 @@ class TestRestartTrader:
 
         response = client.post(
             f"/api/v1/traders/{uuid.uuid4()}/restart",
-            headers={"Authorization": "Bearer valid_token"}
+            headers={"Authorization": "Bearer valid_token"},
         )
 
         assert response.status_code == 404
@@ -368,9 +374,11 @@ class TestRestartTrader:
 class TestGetTraderStatus:
     """Tests for GET /api/v1/traders/{id}/status"""
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
-    def test_get_trader_status_success(self, mock_service_class, mock_get_user, client, mock_user, mock_trader):
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
+    def test_get_trader_status_success(
+        self, mock_service_class, mock_get_user, client, mock_user, mock_trader
+    ):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
         mock_service.get_trader_status.return_value = {
@@ -385,14 +393,14 @@ class TestGetTraderStatus:
                 "restarts": 0,
                 "pod_ip": "10.0.0.1",
                 "node": "node-1",
-                "started_at": datetime.now(timezone.utc).isoformat()
-            }
+                "started_at": datetime.now(UTC).isoformat(),
+            },
         }
         mock_service_class.return_value = mock_service
 
         response = client.get(
             f"/api/v1/traders/{mock_trader.id}/status",
-            headers={"Authorization": "Bearer valid_token"}
+            headers={"Authorization": "Bearer valid_token"},
         )
 
         assert response.status_code == 200
@@ -405,9 +413,11 @@ class TestGetTraderStatus:
 class TestGetTraderLogs:
     """Tests for GET /api/v1/traders/{id}/logs"""
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
-    def test_get_trader_logs_success(self, mock_service_class, mock_get_user, client, mock_user, mock_trader):
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
+    def test_get_trader_logs_success(
+        self, mock_service_class, mock_get_user, client, mock_user, mock_trader
+    ):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
         mock_service.get_trader.return_value = mock_trader
@@ -416,7 +426,7 @@ class TestGetTraderLogs:
 
         response = client.get(
             f"/api/v1/traders/{mock_trader.id}/logs",
-            headers={"Authorization": "Bearer valid_token"}
+            headers={"Authorization": "Bearer valid_token"},
         )
 
         assert response.status_code == 200
@@ -424,9 +434,11 @@ class TestGetTraderLogs:
         assert "Log line 1" in data["logs"]
         assert data["tail_lines"] == 100  # default
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.traders.TraderService")
-    def test_get_trader_logs_with_tail(self, mock_service_class, mock_get_user, client, mock_user, mock_trader):
+    @patch("hyper_trader_api.middleware.jwt_auth.get_current_user_from_jwt")
+    @patch("hyper_trader_api.routers.traders.TraderService")
+    def test_get_trader_logs_with_tail(
+        self, mock_service_class, mock_get_user, client, mock_user, mock_trader
+    ):
         mock_get_user.return_value = mock_user
         mock_service = MagicMock()
         mock_service.get_trader.return_value = mock_trader
@@ -435,7 +447,7 @@ class TestGetTraderLogs:
 
         response = client.get(
             f"/api/v1/traders/{mock_trader.id}/logs?tail_lines=50",
-            headers={"Authorization": "Bearer valid_token"}
+            headers={"Authorization": "Bearer valid_token"},
         )
 
         assert response.status_code == 200

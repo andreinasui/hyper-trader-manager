@@ -1,19 +1,18 @@
 """
 JWT Service unit tests using mocks.
 """
+
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from api.services.jwt_service import JWTService
+from hyper_trader_api.services.jwt_service import JWTService
 
 
 class TestCreateAccessToken:
     """Tests for JWTService.create_access_token"""
 
-    @patch("api.services.jwt_service.get_settings")
+    @patch("hyper_trader_api.services.jwt_service.get_settings")
     def test_creates_valid_token(self, mock_settings):
         mock_settings.return_value.jwt_secret_key = "test_secret"
         mock_settings.return_value.jwt_algorithm = "HS256"
@@ -25,7 +24,7 @@ class TestCreateAccessToken:
         assert isinstance(token, str)
         assert len(token) > 0
 
-    @patch("api.services.jwt_service.get_settings")
+    @patch("hyper_trader_api.services.jwt_service.get_settings")
     def test_token_can_be_verified(self, mock_settings):
         mock_settings.return_value.jwt_secret_key = "test_secret"
         mock_settings.return_value.jwt_algorithm = "HS256"
@@ -40,7 +39,7 @@ class TestCreateAccessToken:
         assert payload["email"] == "test@example.com"
         assert payload["type"] == "access"
 
-    @patch("api.services.jwt_service.get_settings")
+    @patch("hyper_trader_api.services.jwt_service.get_settings")
     def test_token_contains_expiration(self, mock_settings):
         mock_settings.return_value.jwt_secret_key = "test_secret"
         mock_settings.return_value.jwt_algorithm = "HS256"
@@ -57,7 +56,7 @@ class TestCreateAccessToken:
 class TestVerifyAccessToken:
     """Tests for JWTService.verify_access_token"""
 
-    @patch("api.services.jwt_service.get_settings")
+    @patch("hyper_trader_api.services.jwt_service.get_settings")
     def test_invalid_token_returns_none(self, mock_settings):
         mock_settings.return_value.jwt_secret_key = "test_secret"
         mock_settings.return_value.jwt_algorithm = "HS256"
@@ -65,7 +64,7 @@ class TestVerifyAccessToken:
         payload = JWTService.verify_access_token("invalid_token")
         assert payload is None
 
-    @patch("api.services.jwt_service.get_settings")
+    @patch("hyper_trader_api.services.jwt_service.get_settings")
     def test_wrong_secret_returns_none(self, mock_settings):
         # Create token with one secret
         mock_settings.return_value.jwt_secret_key = "secret1"
@@ -80,7 +79,7 @@ class TestVerifyAccessToken:
 
         assert payload is None
 
-    @patch("api.services.jwt_service.get_settings")
+    @patch("hyper_trader_api.services.jwt_service.get_settings")
     def test_empty_token_returns_none(self, mock_settings):
         mock_settings.return_value.jwt_secret_key = "test_secret"
         mock_settings.return_value.jwt_algorithm = "HS256"
@@ -92,7 +91,7 @@ class TestVerifyAccessToken:
 class TestCreateRefreshToken:
     """Tests for JWTService.create_refresh_token"""
 
-    @patch("api.services.jwt_service.get_settings")
+    @patch("hyper_trader_api.services.jwt_service.get_settings")
     def test_creates_token_and_stores_hash(self, mock_settings):
         mock_settings.return_value.jwt_secret_key = "test_secret"
         mock_settings.return_value.jwt_algorithm = "HS256"
@@ -108,7 +107,7 @@ class TestCreateRefreshToken:
         mock_db.add.assert_called_once()
         mock_db.commit.assert_called_once()
 
-    @patch("api.services.jwt_service.get_settings")
+    @patch("hyper_trader_api.services.jwt_service.get_settings")
     def test_token_includes_jti(self, mock_settings):
         """Test that refresh token includes a unique token ID."""
         mock_settings.return_value.jwt_secret_key = "test_secret"
@@ -119,13 +118,14 @@ class TestCreateRefreshToken:
         user_id = uuid.uuid4()
 
         token = JWTService.create_refresh_token(mock_db, user_id)
-        
+
         # Verify token structure (decode without validation for testing)
         from jose import jwt
+
         payload = jwt.decode(
             token,
             mock_settings.return_value.jwt_secret_key,
-            algorithms=[mock_settings.return_value.jwt_algorithm]
+            algorithms=[mock_settings.return_value.jwt_algorithm],
         )
 
         assert "jti" in payload
@@ -135,7 +135,7 @@ class TestCreateRefreshToken:
 class TestVerifyRefreshToken:
     """Tests for JWTService.verify_refresh_token"""
 
-    @patch("api.services.jwt_service.get_settings")
+    @patch("hyper_trader_api.services.jwt_service.get_settings")
     def test_valid_token_returns_payload(self, mock_settings):
         mock_settings.return_value.jwt_secret_key = "test_secret"
         mock_settings.return_value.jwt_algorithm = "HS256"
@@ -150,7 +150,7 @@ class TestVerifyRefreshToken:
         # Mock the database query to return a non-revoked token
         mock_token = MagicMock()
         mock_token.revoked = False
-        mock_token.expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        mock_token.expires_at = datetime.now(UTC) + timedelta(days=7)
         mock_db.query.return_value.filter.return_value.first.return_value = mock_token
 
         # Verify the token
@@ -160,14 +160,14 @@ class TestVerifyRefreshToken:
         assert payload["sub"] == str(user_id)
         assert payload["type"] == "refresh"
 
-    @patch("api.services.jwt_service.get_settings")
+    @patch("hyper_trader_api.services.jwt_service.get_settings")
     def test_revoked_token_returns_none(self, mock_settings):
         mock_settings.return_value.jwt_secret_key = "test_secret"
         mock_settings.return_value.jwt_algorithm = "HS256"
         mock_settings.return_value.jwt_refresh_token_expire_days = 7
 
         mock_db = MagicMock()
-        
+
         # Mock the database query to return None (revoked or not found)
         mock_db.query.return_value.filter.return_value.first.return_value = None
 
@@ -175,7 +175,7 @@ class TestVerifyRefreshToken:
 
         assert payload is None
 
-    @patch("api.services.jwt_service.get_settings")
+    @patch("hyper_trader_api.services.jwt_service.get_settings")
     def test_invalid_token_returns_none(self, mock_settings):
         mock_settings.return_value.jwt_secret_key = "test_secret"
         mock_settings.return_value.jwt_algorithm = "HS256"
@@ -217,7 +217,7 @@ class TestRevokeAllUserTokens:
     def test_revokes_multiple_tokens(self):
         mock_db = MagicMock()
         user_id = uuid.uuid4()
-        
+
         # Mock the update to return count of 3
         mock_db.query.return_value.filter.return_value.update.return_value = 3
 
@@ -229,7 +229,7 @@ class TestRevokeAllUserTokens:
     def test_revokes_zero_tokens_when_none_exist(self):
         mock_db = MagicMock()
         user_id = uuid.uuid4()
-        
+
         # Mock the update to return count of 0
         mock_db.query.return_value.filter.return_value.update.return_value = 0
 
@@ -243,7 +243,7 @@ class TestCleanupExpiredTokens:
 
     def test_deletes_expired_tokens(self):
         mock_db = MagicMock()
-        
+
         # Mock delete to return count of 5
         mock_db.query.return_value.filter.return_value.delete.return_value = 5
 
@@ -254,7 +254,7 @@ class TestCleanupExpiredTokens:
 
     def test_deletes_zero_when_none_expired(self):
         mock_db = MagicMock()
-        
+
         # Mock delete to return count of 0
         mock_db.query.return_value.filter.return_value.delete.return_value = 0
 

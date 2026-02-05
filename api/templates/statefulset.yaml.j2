@@ -6,7 +6,7 @@ metadata:
   labels:
     app: hyper-trader
     trader-address: "{{ wallet_address }}"
-    managed-by: api
+    managed-by: hyper-trader-api
 spec:
   serviceName: {{ trader_name }}
   replicas: 1
@@ -19,7 +19,7 @@ spec:
       labels:
         app: hyper-trader
         trader-address: "{{ wallet_address }}"
-        managed-by: api
+        managed-by: hyper-trader-api
     spec:
       imagePullSecrets:
         - name: ghcr-secret
@@ -29,12 +29,10 @@ spec:
           image: ghcr.io/{{ github_repo }}:{{ image_tag }}
           imagePullPolicy: Always
           
+          # Environment variables
           env:
-            - name: PRIVATE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ trader_name }}-secret
-                  key: PRIVATE_KEY
+            - name: PRIVY_USER_ID
+              value: "{{ privy_user_id }}"
             - name: CONFIG_PATH
               value: /app/config/config.json
             - name: RUST_LOG
