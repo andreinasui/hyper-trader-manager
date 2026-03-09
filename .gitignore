@@ -12,3 +12,5 @@
 
 # Note: Python-specific ignores are in api/.gitignore
 # Note: Frontend-specific ignores could be added to web/.gitignore if needed
+
+.worktrees/
