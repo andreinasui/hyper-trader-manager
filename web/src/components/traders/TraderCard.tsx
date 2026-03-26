@@ -14,7 +14,7 @@ export function TraderCard({ trader }: TraderCardProps) {
       <CardHeader>
         <div className="flex justify-between items-start">
           <CardTitle className="text-xl">
-            {trader.latest_config?.name || trader.k8s_name}
+            {trader.latest_config?.name || trader.runtime_name}
           </CardTitle>
           <StatusBadge status={trader.status} />
         </div>

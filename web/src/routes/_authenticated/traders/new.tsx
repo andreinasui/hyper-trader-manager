@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import type { CreateTraderRequest } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Alert } from '@/components/ui/alert';
 import { ArrowLeft, Bot, Info } from 'lucide-react';
 import { useState } from 'react';
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
 export const Route = createFileRoute('/_authenticated/traders/new')({
   component: CreateTraderPage,
@@ -23,7 +23,6 @@ interface TraderFormData {
 }
 
 function CreateTraderPage() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
@@ -39,18 +38,19 @@ function CreateTraderPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: TraderFormData) => {
-      if (!user?.walletAddress) {
-        throw new Error('Wallet address not found');
-      }
+      // Generate a new secure agent wallet
+      const privateKey = generatePrivateKey();
+      const account = privateKeyToAccount(privateKey);
+      const walletAddress = account.address;
 
       const request: CreateTraderRequest = {
-        wallet_address: user.walletAddress,
-        private_key: '', // Not used with Privy - agent wallet auto-generated
+        wallet_address: walletAddress,
+        private_key: privateKey,
         config: {
           name: data.name,
           exchange: 'hyperliquid',
           self_account: {
-            address: user.walletAddress,
+            address: walletAddress,
             base_url: data.network,
           },
           copy_account: {

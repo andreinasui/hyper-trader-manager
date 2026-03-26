@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Shield } from 'lucide-react';
+import { ArrowLeft, User } from 'lucide-react';
 
 export const Route = createFileRoute('/_authenticated/settings')({
   component: SettingsPage,
@@ -33,43 +33,22 @@ function SettingsPage() {
                 <CardTitle>Account Information</CardTitle>
               </div>
               <CardDescription>
-                Your connected wallet details
+                Your account details
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
-                  Wallet Address
+                  Username
                 </label>
-                <p className="font-mono text-sm mt-1">{user?.walletAddress}</p>
+                <p className="font-mono text-sm mt-1">{user?.username}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
-                  Privy User ID
+                  Email
                 </label>
-                <p className="font-mono text-sm mt-1">{user?.privyUserId}</p>
+                <p className="font-mono text-sm mt-1">{user?.email}</p>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                <CardTitle>Security</CardTitle>
-              </div>
-              <CardDescription>
-                Manage your security settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Your wallet is secured by Privy's embedded wallet system. 
-                Private keys are managed securely and never exposed.
-              </p>
-              <Button variant="outline" disabled>
-                Export Wallet (Coming Soon)
-              </Button>
             </CardContent>
           </Card>
         </div>

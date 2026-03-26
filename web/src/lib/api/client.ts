@@ -189,7 +189,7 @@ class ApiClient {
     });
   }
   
-  async stopTrader(id: string): Promise<void> {
+  async stopTrader(_id: string): Promise<void> {
      // Backend doesn't support stop yet, maybe simulate or ignore
      // Or maybe DELETE deployment but keep DB record?
      // For now, just log warning or fail gracefully if needed.

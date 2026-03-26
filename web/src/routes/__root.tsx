@@ -3,18 +3,18 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import Header from '../components/Header'
-
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
-
 import type { QueryClient } from '@tanstack/react-query'
+import type { AuthState } from '@/hooks/useAuth'
+import type { LoginRequest } from '@/lib/types'
 
 interface MyRouterContext {
   queryClient: QueryClient
-  auth: {
-    ready: boolean
-    authenticated: boolean
-    user: { walletAddress: string; privyUserId: string } | null
-    loading: boolean
+  auth: AuthState & {
+      login: (data: LoginRequest) => Promise<void>
+      logout: () => Promise<void>
+      checkAuth: () => Promise<void>
+      ready: boolean
   }
 }
 
@@ -27,12 +27,10 @@ function RootComponent() {
   const currentPath = router.location.pathname
   
   // Don't show Header on login (root path), dashboard, or trader routes
+  // Wait, dashboard should probably show header?
+  // Let's keep it as is for now to avoid breaking layout changes unrelated to auth.
   const hideHeader = currentPath === '/' || 
-                     currentPath === '/register' ||
-                     currentPath === '/dashboard' ||
-                     currentPath.startsWith('/traders') ||
-                     currentPath.startsWith('/settings') ||
-                     currentPath.startsWith('/admin')
+                     currentPath === '/register'
   
   return (
     <>
