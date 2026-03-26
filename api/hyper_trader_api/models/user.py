@@ -1,8 +1,7 @@
 """
 User model for HyperTrader API.
 
-Represents user accounts with local username/password authentication
-for self-hosted deployment.
+Represents user accounts with local username/password authentication.
 """
 
 import uuid
@@ -24,7 +23,7 @@ class User(Base):
     """
     User account model with local authentication.
 
-    For self-hosted deployment with username/password instead of Privy.
+    Uses username/password instead of Privy.
 
     Attributes:
         id: Unique identifier (UUID string)

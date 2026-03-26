@@ -19,7 +19,7 @@ settings = get_settings()
 
 # Create engine with database-specific configuration
 if settings.database_url.startswith("sqlite"):
-    # SQLite configuration for self-hosted deployment
+    # SQLite configuration
     # Use StaticPool to avoid QueuePool threading issues
     engine = create_engine(
         settings.database_url,

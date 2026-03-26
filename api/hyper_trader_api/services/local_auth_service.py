@@ -1,5 +1,5 @@
 """
-Local authentication service for self-hosted deployment.
+Local authentication service.
 
 Provides username/password authentication without relying on Privy.
 """
@@ -14,7 +14,7 @@ class LocalAuthService:
     """
     Service for local username/password authentication.
 
-    Used in self-hosted mode instead of Privy authentication.
+    Used instead of Privy authentication.
     """
 
     def __init__(self, db: Session):

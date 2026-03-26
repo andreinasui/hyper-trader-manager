@@ -1,5 +1,5 @@
 """
-Local auth service unit tests for self-hosted deployment.
+Local auth service unit tests.
 
 These tests target the planned LocalAuthService, not the old AuthService
 that was never fully implemented.
@@ -14,7 +14,7 @@ def test_placeholder_baseline_note():
     (hyper_trader_api.services.auth_service) that does not exist.
 
     This test file will be replaced with tests for LocalAuthService
-    during Task 4 of the self-hosted v1 implementation plan.
+    during Task 4 of the v1 implementation plan.
 
     Target service: LocalAuthService
     - system_initialized() -> bool

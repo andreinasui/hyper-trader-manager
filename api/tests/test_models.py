@@ -1,5 +1,5 @@
 """
-Tests for SQLAlchemy models with SQLite self-hosted schema.
+Tests for SQLAlchemy models with SQLite schema.
 
 Covers:
 - User model with username/password authentication
@@ -84,7 +84,7 @@ class TestBootstrap:
 
 
 class TestUserModel:
-    """Test User model with self-hosted authentication."""
+    """Test User model with local authentication."""
 
     def test_user_creation(self, sqlite_session):
         """User can be created with username and password."""

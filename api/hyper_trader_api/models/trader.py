@@ -2,7 +2,7 @@
 Trader-related models for HyperTrader API.
 
 Contains models for traders, their configurations, and secrets
-for self-hosted deployment with SQLite.
+with SQLite compatibility.
 """
 
 import uuid

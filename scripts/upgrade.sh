@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# upgrade-selfhosted.sh — Upgrade HyperTrader self-hosted to the latest version
-# Usage: ./scripts/upgrade-selfhosted.sh [--env-file PATH] [--skip-backup]
+# upgrade.sh — Upgrade HyperTrader Manager to the latest version
+# Usage: ./scripts/upgrade.sh [--env-file PATH] [--skip-backup]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-ENV_FILE=".env.selfhosted"
-COMPOSE_FILE="docker-compose.selfhosted.yml"
+ENV_FILE=".env"
+COMPOSE_FILE="docker-compose.yml"
 SKIP_BACKUP=false
 
 # ─── Colours ─────────────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ while [[ $# -gt 0 ]]; do
     -h|--help)
       echo "Usage: $0 [--env-file PATH] [--skip-backup]"
       echo
-      echo "  --env-file     Path to the env file (default: .env.selfhosted)"
+      echo "  --env-file     Path to the env file (default: .env)"
       echo "  --skip-backup  Skip the pre-upgrade backup (not recommended)"
       exit 0
       ;;
@@ -43,7 +43,7 @@ done
 # ─── Pre-flight checks ────────────────────────────────────────────────────────
 if [[ ! -f "$ENV_FILE" ]]; then
   error "Environment file not found: $ENV_FILE"
-  error "Have you run install-selfhosted.sh first?"
+  error "Have you run install.sh first?"
   exit 1
 fi
 
@@ -55,7 +55,7 @@ fi
 # ─── Pre-upgrade backup ───────────────────────────────────────────────────────
 if [[ "$SKIP_BACKUP" == "false" ]]; then
   info "Running pre-upgrade backup..."
-  "$SCRIPT_DIR/backup-selfhosted.sh" --env-file "$ENV_FILE" --quiet
+  "$SCRIPT_DIR/backup.sh" --env-file "$ENV_FILE" --quiet
   success "Backup complete"
 else
   warn "Skipping pre-upgrade backup (--skip-backup)"
@@ -69,10 +69,10 @@ fi
 
 # ─── Rebuild and restart ──────────────────────────────────────────────────────
 info "Rebuilding images..."
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build --pull
+docker compose --env-file "$ENV_FILE" build --pull
 
 info "Restarting stack with new images..."
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d
+docker compose --env-file "$ENV_FILE" up -d
 
 # ─── Smoke test ───────────────────────────────────────────────────────────────
 info "Waiting for services to be healthy..."
@@ -89,7 +89,7 @@ until curl -sf "${BASE_URL}/health" -o /dev/null 2>/dev/null; do
     error "API did not become healthy after upgrade"
     echo
     error "Check container logs:"
-    echo "  docker compose --env-file $ENV_FILE -f $COMPOSE_FILE logs"
+    echo "  docker compose --env-file $ENV_FILE logs"
     exit 1
   fi
   info "Still waiting... ($n/$MAX_RETRIES)"
@@ -98,7 +98,7 @@ done
 
 # ─── Show running versions ────────────────────────────────────────────────────
 info "Running containers:"
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps
+docker compose --env-file "$ENV_FILE" ps
 
 echo
 success "Upgrade complete! Stack is healthy at ${BASE_URL}"

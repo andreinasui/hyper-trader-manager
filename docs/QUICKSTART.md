@@ -1,10 +1,10 @@
-# Self-Hosted Quick Start
+# Quick Start
 
 Get HyperTrader Manager running on a VPS in minutes.
 
 ## What You Get
 
-HyperTrader self-hosted v1 is a single-VPS Docker Compose deployment:
+HyperTrader Manager v1 is a single-VPS Docker Compose deployment:
 
 - Web dashboard at `http://your-server[:port]`
 - Local admin account (username + password)
@@ -18,7 +18,6 @@ HyperTrader self-hosted v1 is a single-VPS Docker Compose deployment:
 - Single VPS only
 - Single local admin account
 - SQLite (not PostgreSQL)
-- No Kubernetes, no Privy / wallet auth
 
 ## Security Warning
 
@@ -69,13 +68,13 @@ Or download and extract the release archive, then `cd` into it.
 Copy the example config file:
 
 ```bash
-cp deploy/.env.selfhosted.example .env.selfhosted
+cp deploy/.env.example .env
 ```
 
 Edit it:
 
 ```bash
-nano .env.selfhosted
+nano .env
 ```
 
 **Required values to set:**
@@ -118,7 +117,7 @@ If you use a cloud provider (AWS, GCP, DigitalOcean…), also open the port in t
 ## Step 5: Run the Installer
 
 ```bash
-./scripts/install-selfhosted.sh
+./scripts/install.sh
 ```
 
 The script will:
@@ -131,7 +130,7 @@ The script will:
 Or start manually:
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up -d --build
+docker compose up -d --build
 ```
 
 ## Step 6: Open the Dashboard
@@ -188,7 +187,7 @@ From the dashboard you can:
 When a new version is available:
 
 ```bash
-./scripts/upgrade-selfhosted.sh
+./scripts/upgrade.sh
 ```
 
 This will rebuild images, restart the stack, and run a health check.  
@@ -197,7 +196,7 @@ Your SQLite database and env config are preserved.
 ## Backup
 
 ```bash
-./scripts/backup-selfhosted.sh
+./scripts/backup.sh
 ```
 
 Saves a timestamped archive to `./backups/` containing:
@@ -205,20 +204,20 @@ Saves a timestamped archive to `./backups/` containing:
 - `data/traders/` — trader config files
 - `env.backup` — env config (secrets redacted)
 
-See [SELF_HOSTED_OPERATIONS.md](SELF_HOSTED_OPERATIONS.md) for restore instructions.
+See [OPERATIONS.md](OPERATIONS.md) for restore instructions.
 
 ## Troubleshooting
 
 ### Check running containers
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml ps
+docker compose ps
 ```
 
 ### Check stack logs
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml logs -f
+docker compose logs -f
 ```
 
 ### Check API health
@@ -235,9 +234,9 @@ curl http://localhost:${PUBLIC_PORT}/api/v1/auth/setup-status
 
 ### App does not load in the browser
 
-- Check the stack is running: `docker compose ... ps`
+- Check the stack is running: `docker compose ps`
 - Check the port is open: `sudo ufw status` or cloud firewall rules
-- Confirm `PUBLIC_PORT` in `.env.selfhosted` matches the port you opened
+- Confirm `PUBLIC_PORT` in `.env` matches the port you opened
 
 ### Login fails
 
@@ -259,5 +258,5 @@ When reporting an issue, include:
 - Docker version (`docker --version`)
 - Docker Compose version (`docker compose version`)
 - Public port used
-- Logs from all services: `docker compose ... logs`
+- Logs from all services: `docker compose logs`
 - The exact step where the problem occurred

@@ -1,5 +1,5 @@
 """
-Database bootstrap utilities for self-hosted deployment.
+Database bootstrap utilities.
 
 Creates all tables in SQLite on application startup.
 """
@@ -13,7 +13,7 @@ def bootstrap_database(engine: Engine) -> None:
     """
     Create all database tables.
 
-    This is used for self-hosted SQLite deployments where we don't have
+    This is used for SQLite deployments where we don't have
     separate migration tools. In production, this should be run once
     during initial setup.
 

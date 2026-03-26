@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# backup-selfhosted.sh — Backup HyperTrader self-hosted data
-# Usage: ./scripts/backup-selfhosted.sh [--env-file PATH] [--output-dir DIR] [--quiet]
+# backup.sh — Backup HyperTrader Manager data
+# Usage: ./scripts/backup.sh [--env-file PATH] [--output-dir DIR] [--quiet]
 #
 # Creates a timestamped archive containing:
 #   - data/db.sqlite        (SQLite database)
 #   - data/traders/         (trader configuration files)
-#   - .env.selfhosted       (environment config, secrets redacted)
+#   - .env                  (environment config, secrets redacted)
 #
 # The archive is written to BACKUP_DIR (default: ./backups)
 set -euo pipefail
@@ -14,9 +14,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-ENV_FILE=".env.selfhosted"
+ENV_FILE=".env"
 BACKUP_DIR="backups"
-COMPOSE_FILE="docker-compose.selfhosted.yml"
+COMPOSE_FILE="docker-compose.yml"
 QUIET=false
 
 # ─── Colours ─────────────────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ while [[ $# -gt 0 ]]; do
     -h|--help)
       echo "Usage: $0 [--env-file PATH] [--output-dir DIR] [--quiet]"
       echo
-      echo "  --env-file    Path to the env file (default: .env.selfhosted)"
+      echo "  --env-file    Path to the env file (default: .env)"
       echo "  --output-dir  Directory where backups are written (default: backups/)"
       echo "  --quiet       Suppress informational output"
       exit 0
@@ -74,8 +74,7 @@ info "Preparing backup staging area..."
 # ─── Copy data directory ──────────────────────────────────────────────────────
 # NOTE: SQLite is copied while the API may still be running. For low-traffic
 # instances this is generally safe, but for guaranteed consistency stop the
-# stack first: docker compose --env-file .env.selfhosted \
-#   -f docker-compose.selfhosted.yml down
+# stack first: docker compose down
 cp -r data "$STAGING_DIR/data"
 info "Included: data/"
 

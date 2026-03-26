@@ -122,7 +122,7 @@ export async function setupApiMocks(page: Page) {
       } else if (method === 'POST') {
         const body = route.request().postDataJSON() as CreateTraderRequest;
         
-        // Validate request - only config.name is required in self-hosted v1
+        // Validate request - only config.name is required in v1
         const errors: any[] = [];
         
         if (!body.config?.name) {

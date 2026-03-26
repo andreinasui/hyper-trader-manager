@@ -1,5 +1,5 @@
 """
-Token service unit tests for self-hosted deployment.
+Token service unit tests.
 
 These tests target the planned TokenService, not the old JWTService
 with refresh token storage that was never fully implemented.
@@ -14,7 +14,7 @@ def test_placeholder_baseline_note():
     (hyper_trader_api.services.jwt_service) that does not exist.
 
     This test file will be replaced with tests for TokenService
-    during Task 4 of the self-hosted v1 implementation plan.
+    during Task 4 of the v1 implementation plan.
 
     Target service: TokenService
     - create_access_token(user) -> str

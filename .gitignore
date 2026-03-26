@@ -9,6 +9,7 @@
 .env
 .env.local
 .env.production
+.env.development
 deploy/.env
 
 # Note: Python-specific ignores are in api/.gitignore

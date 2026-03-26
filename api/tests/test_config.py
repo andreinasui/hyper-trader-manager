@@ -1,16 +1,16 @@
 """
-Configuration tests for self-hosted deployment.
+Configuration tests.
 
-These tests verify the Settings class defaults to SQLite and self-hosted
+These tests verify the Settings class defaults to SQLite and local
 configuration instead of PostgreSQL/Privy/Kubernetes.
 """
 
 
-class TestSelfHostedSettings:
-    """Tests for self-hosted configuration defaults."""
+class TestSettings:
+    """Tests for configuration defaults."""
 
-    def test_default_selfhosted_database_url(self, monkeypatch):
-        """Default database URL should be SQLite for self-hosted deployment."""
+    def test_default_database_url(self, monkeypatch):
+        """Default database URL should be SQLite."""
         # Clear any existing DATABASE_URL
         monkeypatch.delenv("DATABASE_URL", raising=False)
         # Clear cached settings
@@ -63,11 +63,13 @@ class TestSelfHostedSettings:
 
         settings = Settings()
         assert hasattr(settings, "public_base_url")
-        assert "localhost" in settings.public_base_url or "127.0.0.1" in settings.public_base_url
+        assert (
+            "localhost" in settings.public_base_url
+            or "127.0.0.1" in settings.public_base_url
+        )
 
     def test_runtime_mode_default(self, monkeypatch):
-        """Runtime mode should default to docker for self-hosted."""
-        monkeypatch.delenv("RUNTIME_MODE", raising=False)
+        """Runtime mode should default to docker."""
         monkeypatch.delenv("DATABASE_URL", raising=False)
         from hyper_trader_api.config import get_settings
 

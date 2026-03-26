@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# install-selfhosted.sh — First-time install for HyperTrader self-hosted
-# Usage: ./scripts/install-selfhosted.sh [--port PORT] [--env-file PATH]
+# install.sh — First-time install for HyperTrader Manager
+# Usage: ./scripts/install.sh [--port PORT] [--env-file PATH]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-ENV_SOURCE="deploy/.env.selfhosted.example"
-ENV_FILE=".env.selfhosted"
-COMPOSE_FILE="docker-compose.selfhosted.yml"
+ENV_SOURCE="deploy/.env.example"
+ENV_FILE=".env"
+COMPOSE_FILE="docker-compose.yml"
 
 # ─── Colours ─────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -32,7 +32,7 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: $0 [--port PORT] [--env-file PATH]"
       echo
       echo "  --port       Override PUBLIC_PORT in the env file"
-      echo "  --env-file   Path to the env file (default: .env.selfhosted)"
+      echo "  --env-file   Path to the env file (default: .env)"
       exit 0
       ;;
     *) error "Unknown option: $1"; exit 1 ;;
@@ -106,7 +106,7 @@ fi
 
 # ─── Build and start ──────────────────────────────────────────────────────────
 info "Building images and starting stack..."
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build
+docker compose --env-file "$ENV_FILE" up -d --build
 
 # ─── Smoke test ───────────────────────────────────────────────────────────────
 info "Waiting for services to be healthy..."
@@ -123,7 +123,7 @@ until curl -sf "${BASE_URL}/health" -o /dev/null 2>/dev/null; do
     error "API did not become healthy after $((MAX_RETRIES * RETRY_DELAY))s"
     echo
     error "Check container logs:"
-    echo "  docker compose --env-file $ENV_FILE -f $COMPOSE_FILE logs"
+    echo "  docker compose --env-file $ENV_FILE logs"
     exit 1
   fi
   info "Still waiting... ($n/$MAX_RETRIES)"

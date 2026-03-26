@@ -23,7 +23,7 @@ class SessionToken(Base):
     Session token for JWT revocation tracking.
 
     Stores hashed tokens to enable logout and token invalidation
-    for self-hosted authentication.
+    for local authentication.
 
     Attributes:
         id: Unique identifier (UUID string)

@@ -1,6 +1,6 @@
-# Self-Hosted Operations Guide
+# Operations Guide
 
-Day-to-day operations reference for HyperTrader self-hosted v1.
+Day-to-day operations reference for HyperTrader Manager v1.
 
 ## Table of Contents
 
@@ -21,13 +21,13 @@ Day-to-day operations reference for HyperTrader self-hosted v1.
 ### Start the stack
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up -d
+docker compose up -d
 ```
 
 ### Stop the stack
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml down
+docker compose down
 ```
 
 Data in `./data/` is preserved. Trader containers managed by the API are not affected.
@@ -35,23 +35,23 @@ Data in `./data/` is preserved. Trader containers managed by the API are not aff
 ### Restart the stack
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml restart
+docker compose restart
 ```
 
 ### Restart a single service
 
 ```bash
 # Restart only the API
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml restart api
+docker compose restart api
 
 # Restart only the web server
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml restart web
+docker compose restart web
 ```
 
 ### Check service status
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml ps
+docker compose ps
 ```
 
 Expected output — all services should be `Up (healthy)` or `Up`:
@@ -67,13 +67,13 @@ hypertrader-web         hyper-trader-manager-web Up (healthy)
 
 ```bash
 # First-time install
-./scripts/install-selfhosted.sh
+./scripts/install.sh
 
 # Upgrade to latest version
-./scripts/upgrade-selfhosted.sh
+./scripts/upgrade.sh
 
 # Backup data
-./scripts/backup-selfhosted.sh
+./scripts/backup.sh
 ```
 
 ---
@@ -83,7 +83,7 @@ hypertrader-web         hyper-trader-manager-web Up (healthy)
 ### Run a backup
 
 ```bash
-./scripts/backup-selfhosted.sh
+./scripts/backup.sh
 ```
 
 Archives are stored in `./backups/` and rotated (last 10 kept).
@@ -91,7 +91,7 @@ Archives are stored in `./backups/` and rotated (last 10 kept).
 ### Run a backup to a custom directory
 
 ```bash
-./scripts/backup-selfhosted.sh --output-dir /mnt/remote-storage/hypertrader-backups
+./scripts/backup.sh --output-dir /mnt/remote-storage/hypertrader-backups
 ```
 
 ### Backup archive contents
@@ -103,7 +103,7 @@ Archives are stored in `./backups/` and rotated (last 10 kept).
 | `env.backup`          | Env config (secrets redacted)      |
 
 > **Important:** The env.backup file has `SECRET_KEY` and `ADMIN_PASSWORD` redacted.
-> Keep a separate secure copy of your actual `.env.selfhosted` file.
+> Keep a separate secure copy of your actual `.env` file.
 
 ### Schedule automated backups (cron)
 
@@ -114,14 +114,14 @@ crontab -e
 Add a daily backup at 2:00 AM:
 
 ```cron
-0 2 * * * /path/to/hyper-trader-manager/scripts/backup-selfhosted.sh --quiet
+0 2 * * * /path/to/hyper-trader-manager/scripts/backup.sh --quiet
 ```
 
 ### Restore from backup
 
 ```bash
 # 1. Stop the running stack
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml down
+docker compose down
 
 # 2. Extract the backup archive
 tar -xzf backups/hypertrader-backup-YYYYMMDD-HHMMSS.tar.gz -C /tmp/ht-restore
@@ -131,11 +131,11 @@ rm -rf data
 cp -r /tmp/ht-restore/data ./data
 
 # 4. Restore your env file (if needed)
-#    NOTE: env.backup has secrets redacted — use your original .env.selfhosted
-#    or recreate it from deploy/.env.selfhosted.example
+#    NOTE: env.backup has secrets redacted — use your original .env
+#    or recreate it from deploy/.env.example
 
 # 5. Start the stack
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up -d
+docker compose up -d
 ```
 
 ### Verify restore
@@ -152,7 +152,7 @@ curl http://localhost:${PUBLIC_PORT}/api/v1/auth/setup-status
 ### Standard upgrade
 
 ```bash
-./scripts/upgrade-selfhosted.sh
+./scripts/upgrade.sh
 ```
 
 This will:
@@ -165,7 +165,7 @@ This will:
 ### Skip the pre-upgrade backup
 
 ```bash
-./scripts/upgrade-selfhosted.sh --skip-backup
+./scripts/upgrade.sh --skip-backup
 ```
 
 Not recommended unless you have a recent backup already.
@@ -174,14 +174,14 @@ Not recommended unless you have a recent backup already.
 
 ```bash
 # Backup first
-./scripts/backup-selfhosted.sh
+./scripts/backup.sh
 
 # Pull latest changes
 git pull --ff-only
 
 # Rebuild and restart
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml build --pull
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up -d
+docker compose build --pull
+docker compose up -d
 
 # Verify
 curl http://localhost:${PUBLIC_PORT}/health
@@ -194,26 +194,26 @@ curl http://localhost:${PUBLIC_PORT}/health
 ### Follow all service logs
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml logs -f
+docker compose logs -f
 ```
 
 ### Follow logs for a specific service
 
 ```bash
 # API logs
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml logs -f api
+docker compose logs -f api
 
 # Web logs
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml logs -f web
+docker compose logs -f web
 
 # Traefik logs
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml logs -f traefik
+docker compose logs -f traefik
 ```
 
 ### Show recent logs (no follow)
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml logs --tail=100 api
+docker compose logs --tail=100 api
 ```
 
 ### Trader container logs
@@ -280,7 +280,7 @@ Run this after install or upgrade to confirm everything works:
 PORT="${PUBLIC_PORT:-80}"
 
 echo "=== Container status ==="
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml ps
+docker compose ps
 
 echo "=== API health ==="
 curl -sf "http://localhost:${PORT}/health" && echo " ✓ health OK" || echo " ✗ health FAILED"
@@ -298,11 +298,11 @@ curl -sf -o /dev/null -w "%{http_code}" "http://localhost:${PORT}/" | grep -q "2
 
 ### Change a setting
 
-1. Edit `.env.selfhosted`
+1. Edit `.env`
 2. Restart the stack:
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up -d
+docker compose up -d
 ```
 
 ### Rotate the SECRET_KEY
@@ -315,16 +315,16 @@ docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up -d
 openssl rand -hex 32
 ```
 
-2. Update `SECRET_KEY` in `.env.selfhosted`
+2. Update `SECRET_KEY` in `.env`
 3. Restart the API:
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml restart api
+docker compose restart api
 ```
 
 ### Change the public port
 
-1. Update `PUBLIC_PORT` in `.env.selfhosted`
+1. Update `PUBLIC_PORT` in `.env`
 2. Open the new port in the firewall:
 
 ```bash
@@ -335,7 +335,7 @@ sudo ufw reload
 3. Restart the stack:
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up -d
+docker compose up -d
 ```
 
 ---
@@ -375,7 +375,7 @@ Trader configs and state are stored in `./data/traders/`. Each trader has a subd
 ### Stack fails to start
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up
+docker compose up
 ```
 
 Running without `-d` shows startup errors in the terminal.
@@ -387,7 +387,7 @@ Running without `-d` shows startup errors in the terminal.
 docker inspect hypertrader-api | grep -A20 '"Health"'
 
 # View API logs
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml logs api
+docker compose logs api
 ```
 
 Common causes:
@@ -399,7 +399,7 @@ Common causes:
 
 ```bash
 # Check Traefik config is valid
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml logs traefik
+docker compose logs traefik
 
 # Verify dynamic config file is mounted
 docker exec hypertrader-traefik cat /etc/traefik/dynamic.yml
@@ -415,10 +415,10 @@ Verify the `DOCKER_GID` in your env file matches the actual GID on your host:
 getent group docker | cut -d: -f3
 ```
 
-Update `DOCKER_GID` in `.env.selfhosted` and restart:
+Update `DOCKER_GID` in `.env` and restart:
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up -d
+docker compose up -d
 ```
 
 ### Database locked or corrupted
@@ -494,13 +494,13 @@ These are planned for future versions.
 
 | Path                              | Purpose                                      |
 |-----------------------------------|----------------------------------------------|
-| `.env.selfhosted`                 | Runtime configuration (secrets, ports, etc.) |
-| `deploy/.env.selfhosted.example`  | Template for `.env.selfhosted`               |
-| `docker-compose.selfhosted.yml`   | Main Docker Compose file                     |
+| `.env`                            | Runtime configuration (secrets, ports, etc.) |
+| `deploy/.env.example`             | Template for `.env`                          |
+| `docker-compose.yml`              | Main Docker Compose file                     |
 | `deploy/traefik/dynamic.yml`      | Traefik routing configuration                |
 | `data/db.sqlite`                  | SQLite database (persistent)                 |
 | `data/traders/`                   | Trader config files (persistent)             |
 | `backups/`                        | Backup archives (created by backup script)   |
-| `scripts/install-selfhosted.sh`   | First-time install script                    |
-| `scripts/upgrade-selfhosted.sh`   | Upgrade script                               |
-| `scripts/backup-selfhosted.sh`    | Backup script                                |
+| `scripts/install.sh`              | First-time install script                    |
+| `scripts/upgrade.sh`              | Upgrade script                               |
+| `scripts/backup.sh`               | Backup script                                |

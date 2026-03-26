@@ -48,7 +48,7 @@ def client(mock_db):
 
 @pytest.fixture
 def mock_user():
-    """Mock user object for self-hosted local auth."""
+    """Mock user object for local auth."""
     user = MagicMock()
     user.id = str(uuid.uuid4())
     user.username = "testuser"
@@ -59,7 +59,7 @@ def mock_user():
 
 @pytest.fixture
 def mock_admin_user():
-    """Mock admin user object for self-hosted local auth."""
+    """Mock admin user object for local auth."""
     user = MagicMock()
     user.id = str(uuid.uuid4())
     user.username = "admin"

@@ -3,7 +3,7 @@ Tests for Privy authentication.
 
 Tests the Privy JWT verification and user creation flow.
 Note: PrivyService tests are skipped as Privy auth has been replaced
-with local username/password auth in the self-hosted v1 release.
+with local username/password auth in the v1 release.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -14,7 +14,7 @@ from fastapi import HTTPException
 from hyper_trader_api.services.privy_service import PrivyError, PrivyService
 
 
-@pytest.mark.skip(reason="Privy auth replaced by local auth in self-hosted v1")
+@pytest.mark.skip(reason="Privy auth replaced by local auth in v1")
 class TestPrivyService:
     """Test Privy service functionality."""
 

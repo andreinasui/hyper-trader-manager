@@ -2,12 +2,12 @@
 
 Management application for HyperTrader instances — backend API and web dashboard.
 
-## Self-Hosted Deployment (v1)
+## Deployment
 
 Run the full HyperTrader stack on a single VPS with Docker Compose and Traefik.
 
-> **New to self-hosted?** See the [Quick Start](docs/SELF_HOSTED_QUICKSTART.md) for step-by-step instructions.
-> For day-to-day operations see [Operations Guide](docs/SELF_HOSTED_OPERATIONS.md).
+> **Getting started?** See the [Quick Start](docs/QUICKSTART.md) for step-by-step instructions.
+> For day-to-day operations see [Operations Guide](docs/OPERATIONS.md).
 
 ### Stack
 
@@ -26,18 +26,18 @@ git clone https://github.com/yourorg/hyper-trader-manager.git
 cd hyper-trader-manager
 
 # 2. Run the installer (guides you through config)
-./scripts/install-selfhosted.sh
+./scripts/install.sh
 ```
 
 Or do it manually:
 
 ```bash
 # 2a. Copy and edit environment file
-cp deploy/.env.selfhosted.example .env.selfhosted
-#    Edit .env.selfhosted — set SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, DOCKER_GID
+cp deploy/.env.example .env
+#    Edit .env — set SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, DOCKER_GID
 
 # 2b. Start the stack
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up -d --build
+docker compose up -d --build
 
 # 2c. Verify
 curl http://localhost/health
@@ -48,7 +48,7 @@ Open `http://your-server-ip` in a browser to complete first-run setup.
 
 ### Configuration
 
-All settings live in `.env.selfhosted` (copied from `deploy/.env.selfhosted.example`):
+All settings live in `.env` (copied from `deploy/.env.example`):
 
 | Variable                   | Default                   | Description                                                    |
 |----------------------------|---------------------------|----------------------------------------------------------------|
@@ -73,20 +73,20 @@ All persistent data is written to `./data/` on the host:
 ### Updating
 
 ```bash
-./scripts/upgrade-selfhosted.sh
+./scripts/upgrade.sh
 ```
 
 Or manually:
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml build --pull
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up -d
+docker compose build --pull
+docker compose up -d
 ```
 
 ### Backup
 
 ```bash
-./scripts/backup-selfhosted.sh
+./scripts/backup.sh
 ```
 
 Saves a timestamped archive to `./backups/` containing the SQLite database, trader configs, and a redacted copy of the env file.

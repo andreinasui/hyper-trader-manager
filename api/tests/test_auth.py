@@ -1,5 +1,5 @@
 """
-Authentication endpoint tests for self-hosted local auth.
+Authentication endpoint tests for local auth.
 
 Tests for username/password authentication with JWT tokens:
 - GET /api/v1/auth/setup-status

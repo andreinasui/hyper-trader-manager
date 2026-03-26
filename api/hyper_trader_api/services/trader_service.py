@@ -1,7 +1,7 @@
 """
 Trader service for HyperTrader API.
 
-Handles trader CRUD operations using Docker runtime for self-hosted deployment.
+Handles trader CRUD operations using Docker runtime.
 """
 
 import json

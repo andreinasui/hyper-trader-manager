@@ -1,7 +1,7 @@
 """
 Authentication router for HyperTrader API.
 
-Local username/password authentication for self-hosted deployment.
+Local username/password authentication.
 """
 
 import logging

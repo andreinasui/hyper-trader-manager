@@ -1,8 +1,8 @@
-# HyperTrader Self-Hosted Stack
+# HyperTrader Manager Stack
 # Usage:
-#   cp deploy/.env.selfhosted.example deploy/.env
-#   # Edit deploy/.env with your settings
-#   docker compose -f docker-compose.selfhosted.yml up -d
+#   cp deploy/.env.example .env
+#   # Edit .env with your settings
+#   docker compose up -d
 
 services:
   # ============================================

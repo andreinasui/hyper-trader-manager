@@ -1,7 +1,7 @@
 """
 Tests for trader endpoints with Docker runtime integration.
 
-Tests the new self-hosted Docker-based trader lifecycle instead of Kubernetes.
+Tests the Docker-based trader lifecycle instead of Kubernetes.
 """
 
 import uuid

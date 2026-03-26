@@ -1,9 +1,9 @@
 -- HyperTrader Database Schema
--- Version: 2.0 - Self-Hosted SQLite
+-- Version: 2.0 - SQLite
 --
 -- This file serves as reference documentation for the database schema.
 -- The actual schema is created via SQLAlchemy models and bootstrap.py
--- for self-hosted SQLite deployment.
+-- for SQLite deployment.
 --
 -- Tables:
 --   users            - User accounts with local username/password auth
