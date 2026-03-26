@@ -38,7 +38,7 @@ async function handle<T>(promise: Promise<{ data?: T; error?: unknown }>): Promi
 }
 
 export const api = {
-  setPrivyTokenGetter: setTokenGetter,
+  setAuthTokenGetter: setTokenGetter,
 
   // Auth
   async me(): Promise<User> {

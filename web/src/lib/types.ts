@@ -19,8 +19,8 @@ export interface Trader {
   user_id: string;
   name?: string;
   wallet_address: string;
-  agent_address: string;
-  k8s_name: string;
+  agent_address?: string;
+  runtime_name: string;
   status: TraderStatus;
   image_tag: string;
   created_at: string;
@@ -49,21 +49,19 @@ export interface TraderDetails extends Trader {
   config?: Record<string, any>;
 }
 
-export interface K8sStatus {
-  pod_phase: string;
-  ready: boolean;
-  restarts: number;
-  pod_ip?: string;
-  node?: string;
+export interface RuntimeStatus {
+  state: string;
+  running: boolean;
   started_at?: string;
+  exit_code?: number;
 }
 
 export interface TraderStatusResponse {
   id: string;
   wallet_address: string;
-  k8s_name: string;
+  runtime_name: string;
   status: string;
-  k8s_status: K8sStatus;
+  runtime_status: RuntimeStatus;
 }
 
 export interface LogLine {
@@ -93,4 +91,15 @@ export interface ValidationError {
 
 export interface ApiError {
   detail: string | ValidationError[];
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
 }

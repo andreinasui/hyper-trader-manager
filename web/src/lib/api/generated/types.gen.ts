@@ -63,41 +63,31 @@ export type HttpValidationError = {
 };
 
 /**
- * K8sStatus
+ * RuntimeStatus
  *
- * Kubernetes status details.
+ * Docker runtime status details.
  */
-export type K8sStatus = {
+export type RuntimeStatus = {
     /**
-     * Pod Phase
+     * State
      *
-     * Pod phase (Pending, Running, Succeeded, Failed, Unknown)
+     * Container state (running, exited, not_found, etc.)
      */
-    pod_phase: string;
+    state: string;
     /**
-     * Ready
+     * Running
      *
-     * Whether the pod is ready
+     * Whether the container is running
      */
-    ready: boolean;
-    /**
-     * Restarts
-     *
-     * Number of container restarts
-     */
-    restarts: number;
-    /**
-     * Pod Ip
-     */
-    pod_ip?: string | null;
-    /**
-     * Node
-     */
-    node?: string | null;
+    running: boolean;
     /**
      * Started At
      */
     started_at?: string | null;
+    /**
+     * Exit Code
+     */
+    exit_code?: number | null;
 };
 
 /**
@@ -107,9 +97,9 @@ export type K8sStatus = {
  */
 export type LoginRequest = {
     /**
-     * Email
+     * Username
      */
-    email: string;
+    username: string;
     /**
      * Password
      */
@@ -127,17 +117,9 @@ export type LoginResponse = {
      */
     access_token: string;
     /**
-     * Refresh Token
-     */
-    refresh_token: string;
-    /**
      * Token Type
      */
     token_type?: string;
-    /**
-     * Expires In
-     */
-    expires_in: number;
     user: UserResponse;
 };
 
@@ -217,9 +199,9 @@ export type RestartResponse = {
      */
     trader_id: string;
     /**
-     * K8S Name
+     * Runtime Name
      */
-    k8s_name: string;
+    runtime_name: string;
 };
 
 /**
@@ -343,9 +325,9 @@ export type TraderResponse = {
      */
     wallet_address: string;
     /**
-     * K8S Name
+     * Runtime Name
      */
-    k8s_name: string;
+    runtime_name: string;
     /**
      * Status
      */
@@ -373,7 +355,7 @@ export type TraderResponse = {
 /**
  * TraderStatusResponse
  *
- * Schema for trader status including K8s details.
+ * Schema for trader status including Docker runtime details.
  */
 export type TraderStatusResponse = {
     /**
@@ -385,14 +367,14 @@ export type TraderStatusResponse = {
      */
     wallet_address: string;
     /**
-     * K8S Name
+     * Runtime Name
      */
-    k8s_name: string;
+    runtime_name: string;
     /**
      * Status
      */
     status: string;
-    k8s_status: K8sStatus;
+    runtime_status: RuntimeStatus;
 };
 
 /**
@@ -438,13 +420,9 @@ export type UserResponse = {
      */
     id: string;
     /**
-     * Email
+     * Username
      */
-    email: string;
-    /**
-     * Plan Tier
-     */
-    plan_tier: string;
+    username: string;
     /**
      * Is Admin
      */

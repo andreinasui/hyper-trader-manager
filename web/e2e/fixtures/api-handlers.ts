@@ -25,8 +25,7 @@ export const mockTrader: Trader = {
   name: 'Test Trader',
   wallet_address: '0x1234567890123456789012345678901234567890',
   agent_address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
-  k8s_name: 'trader-12345678',
-  status: 'running',
+  runtime_name: 'trader-12345678',  status: 'running',
   image_tag: 'latest',
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
@@ -171,14 +170,11 @@ export async function setupApiMocks(page: Page) {
         json: {
           id: mockTrader.id,
           wallet_address: mockTrader.wallet_address,
-          k8s_name: mockTrader.k8s_name,
+          runtime_name: mockTrader.runtime_name,
           status: 'running',
-          k8s_status: {
-            pod_phase: 'Running',
-            ready: true,
-            restarts: 0,
-            pod_ip: '10.0.0.1',
-            node: 'node-1',
+          runtime_status: {
+            state: 'running',
+            running: true,
             started_at: '2024-01-01T00:00:00Z',
           },
         },

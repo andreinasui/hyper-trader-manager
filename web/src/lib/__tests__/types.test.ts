@@ -98,7 +98,7 @@ describe('Type Validation', () => {
         id: 'uuid-here',
         user_id: 'user-uuid',
         wallet_address: '0x1234567890123456789012345678901234567890',
-        k8s_name: 'trader-12345678',
+        runtime_name: 'trader-12345678',
         status: 'running',
         image_tag: 'latest',
         created_at: '2024-01-01T00:00:00Z',
@@ -108,7 +108,7 @@ describe('Type Validation', () => {
 
       expect(validTrader.id).toBe('uuid-here');
       expect(validTrader.status).toBe('running');
-      expect(validTrader.k8s_name).toBe('trader-12345678');
+      expect(validTrader.runtime_name).toBe('trader-12345678');
     });
 
     it('should accept all valid trader statuses', () => {
@@ -119,7 +119,7 @@ describe('Type Validation', () => {
           id: 'id',
           user_id: 'user-id',
           wallet_address: '0x123',
-          k8s_name: 'trader-123',
+          runtime_name: 'trader-123',
           status: status,
           image_tag: 'latest',
           created_at: '2024-01-01T00:00:00Z',
@@ -135,7 +135,7 @@ describe('Type Validation', () => {
         id: 'id',
         user_id: 'user-id',
         wallet_address: '0x123',
-        k8s_name: 'trader-123',
+        runtime_name: 'trader-123',
         status: 'pending',
         image_tag: 'latest',
         created_at: '2024-01-01T00:00:00Z',
@@ -232,47 +232,51 @@ describe('Type Validation', () => {
   });
 
   describe('User types', () => {
+    it('models local auth user shape', () => {
+      const user: User = {
+        id: 'user-123',
+        username: 'testuser',
+        is_admin: false,
+      };
+
+      expect(user.username).toBe('testuser');
+      expect(user.is_admin).toBe(false);
+    });
+
     it('should accept valid User structure', () => {
       const user: User = {
         id: 'user-123',
-        email: 'test@example.com',
-        plan_tier: 'free',
+        username: 'testuser',
         is_admin: false,
-        created_at: '2024-01-01T00:00:00Z',
       };
 
-      expect(user.email).toBe('test@example.com');
+      expect(user.username).toBe('testuser');
       expect(user.is_admin).toBe(false);
     });
 
     it('should accept valid LoginRequest', () => {
       const loginRequest: LoginRequest = {
-        email: 'test@example.com',
+        username: 'testuser',
         password: 'password123',
       };
 
-      expect(loginRequest.email).toBe('test@example.com');
+      expect(loginRequest.username).toBe('testuser');
       expect(loginRequest.password).toBe('password123');
     });
 
     it('should accept valid LoginResponse', () => {
       const loginResponse: LoginResponse = {
         access_token: 'eyJhbGciOiJIUzI1NiIs...',
-        refresh_token: 'eyJhbGciOiJIUzI1NiIs...',
         token_type: 'bearer',
-        expires_in: 3600,
         user: {
           id: 'user-123',
-          email: 'test@example.com',
-          plan_tier: 'free',
+          username: 'testuser',
           is_admin: false,
-          created_at: '2024-01-01T00:00:00Z',
         },
       };
 
       expect(loginResponse.token_type).toBe('bearer');
-      expect(loginResponse.expires_in).toBe(3600);
-      expect(loginResponse.user.email).toBe('test@example.com');
+      expect(loginResponse.user.username).toBe('testuser');
     });
   });
 });

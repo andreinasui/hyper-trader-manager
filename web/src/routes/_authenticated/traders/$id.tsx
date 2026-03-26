@@ -107,7 +107,7 @@ function TraderDetailPage() {
             </Button>
             <div>
               <h1 className="text-2xl font-bold">
-                {trader.latest_config?.name || trader.k8s_name}
+                {trader.latest_config?.name || trader.runtime_name}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {trader.latest_config?.exchange || 'hyperliquid'}
@@ -200,8 +200,8 @@ function TraderDetailPage() {
                 <p className="text-base font-mono text-xs">{trader.wallet_address}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">K8s Name</p>
-                <p className="text-base">{trader.k8s_name}</p>
+                <p className="text-sm font-medium text-muted-foreground">Runtime Name</p>
+                <p className="text-base">{trader.runtime_name}</p>
               </div>
             </div>
           </CardContent>
