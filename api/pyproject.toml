@@ -84,6 +84,10 @@ strict = true
 warn_return_any = true
 warn_unused_ignores = true
 
+[[tool.mypy.overrides]]
+module = "docker.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
