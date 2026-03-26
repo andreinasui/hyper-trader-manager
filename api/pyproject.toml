@@ -15,7 +15,6 @@ dependencies = [
     "uvicorn[standard]>=0.24.0",
     # Database
     "sqlalchemy>=2.0.0",
-    "psycopg2-binary>=2.9.0",
     # Configuration & Validation
     "pydantic[email]>=2.0.0",
     "pydantic-settings>=2.0.0",
@@ -25,12 +24,13 @@ dependencies = [
     # Security & Auth
     "cryptography>=41.0.0",
     "PyJWT[crypto]>=2.8.0",
+    "passlib[bcrypt]>=1.7.4",
     # HTTP Client
     "httpx>=0.25.0",
     # File uploads
     "python-multipart>=0.0.6",
-    # Kubernetes
-    "kubernetes>=28.0.0",
+    # Docker
+    "docker>=7.0.0",
     # Templating
     "jinja2>=3.1.0",
 ]

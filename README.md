@@ -2,6 +2,10 @@
 
 Management application for HyperTrader instances, including Backend API and Frontend Web.
 
+> Draft self-hosted v1 quickstart: `docs/SELF_HOSTED_QUICKSTART.md`
+>
+> Note: the current repository state is still largely K8s/Privy-oriented; the quickstart describes the planned self-hosted v1 delivery model.
+
 ## Components
 - **api/**: FastAPI backend for trader management and Kubernetes orchestration (includes Jinja2 templates in `api/templates`).
 - **web/**: React/Vite frontend for monitoring and controlling traders.

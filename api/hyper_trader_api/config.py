@@ -13,7 +13,7 @@ import os
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,9 +38,9 @@ class Settings(BaseSettings):
     """
     Application settings loaded from environment variables.
 
-    Required in production:
-        PRIVY_APP_ID: Privy application ID
-        PRIVY_APP_SECRET: Privy API secret
+    Required for security:
+        JWT_SECRET_KEY: Secret key for JWT token signing
+        ENCRYPTION_KEY: Key for encrypting sensitive data (API keys, secrets)
     """
 
     model_config = SettingsConfigDict(
@@ -52,36 +52,22 @@ class Settings(BaseSettings):
     )
 
     # ==================== Environment ====================
-    environment: Literal["development", "staging", "production"] = "development"
-
-    # ==================== Privy Authentication ====================
-    privy_app_id: str = ""
-    privy_app_secret: str = ""
-    privy_jwks_url: str = ""  # If empty, constructed from privy_app_id
-    privy_jwks_cache_ttl: int = 3600  # Cache JWKS for 1 hour
-
-    @field_validator("privy_app_id", "privy_app_secret")
-    @classmethod
-    def validate_privy_credentials(cls, v: str, info) -> str:
-        """Require Privy credentials in non-development environments."""
-        env = os.getenv("ENVIRONMENT", "development")
-        if not v and env != "development":
-            raise ValueError(f"{info.field_name} is required in {env} environment")
-        return v
-
-    @property
-    def privy_jwks_endpoint(self) -> str:
-        """Get JWKS URL - uses custom URL or constructs from app_id."""
-        if self.privy_jwks_url:
-            return self.privy_jwks_url
-        return f"https://auth.privy.io/api/v1/apps/{self.privy_app_id}/jwks.json"
+    environment: Literal["development", "production"] = "development"
 
     # ==================== Database ====================
-    database_url: str = ""
-    db_pool_size: int = 10
-    db_max_overflow: int = 20
-    db_pool_pre_ping: bool = True
-    db_pool_recycle: int = 3600
+    database_url: str = "sqlite:///./data/hypertrader.db"
+
+    # ==================== Security & Authentication ====================
+    # IMPORTANT: Generate secure keys with: openssl rand -hex 32
+    # For development only, we provide unsafe defaults
+    jwt_secret_key: str = "dev-secret-key-change-in-production"
+    encryption_key: str = "dev-encryption-key-change-in-production"
+
+    # ==================== Self-Hosted Configuration ====================
+    public_base_url: str = "http://localhost:80"
+    public_port: int = 80
+    docker_socket: str = "unix:///var/run/docker.sock"
+    runtime_mode: Literal["docker"] = "docker"
 
     # ==================== Server ====================
     host: str = "0.0.0.0"
@@ -94,6 +80,15 @@ class Settings(BaseSettings):
 
     # ==================== CORS ====================
     cors_origins: str = "http://localhost:3000"
+
+    @field_validator("jwt_secret_key", "encryption_key")
+    @classmethod
+    def validate_secrets(cls, v: str, info: ValidationInfo) -> str:
+        """Require real secrets in production, allow defaults in development."""
+        env = os.getenv("ENVIRONMENT", "development")
+        if env == "production" and v.startswith("dev-"):
+            raise ValueError(f"{info.field_name} must be set to a secure value in production")
+        return v
 
     @field_validator("cors_origins", mode="after")
     @classmethod
@@ -110,14 +105,6 @@ class Settings(BaseSettings):
 
     # ==================== HTTP Client ====================
     http_timeout: float = 10.0
-
-    # ==================== Kubernetes ====================
-    k8s_enabled: bool = True
-    k8s_namespace: str = "hyper-trader"
-    github_repo: str = "andreinasui/hyper-trader"
-    image_tag: str = "latest"  # Docker image tag for all trader pods
-    templates_dir: str = "api/templates"
-    reconciliation_interval: int = 30
 
     # ==================== API Metadata ====================
     api_title: str = "HyperTrader API"
