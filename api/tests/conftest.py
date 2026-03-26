@@ -1,28 +1,21 @@
 """
 Pytest fixtures for HyperTrader API tests.
 
-Uses mocks instead of real database connections.
+Uses mocks and environment variables to avoid database connection issues
+during test collection.
 """
 
+import os
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 
-# Mock the database engine and lifespan BEFORE importing the app
-with patch("hyper_trader_api.database.engine") as mock_engine:
-    mock_engine.connect.return_value.__enter__.return_value.execute.return_value = None
-    mock_engine.dispose.return_value = None
-
-    # Mock the reconciliation workers
-    with (
-        patch("hyper_trader_api.main.start_reconciliation"),
-        patch("hyper_trader_api.main.stop_reconciliation"),
-    ):
-        from hyper_trader_api.database import get_db
-        from hyper_trader_api.main import app
+# Set a valid DATABASE_URL before any imports that might load config
+# This prevents SQLAlchemy URL parsing errors during collection
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
 
 @pytest.fixture
@@ -34,6 +27,11 @@ def mock_db():
 @pytest.fixture
 def client(mock_db):
     """Test client with mocked database."""
+    # Import here to use the patched environment
+    from fastapi.testclient import TestClient
+
+    from hyper_trader_api.database import get_db
+    from hyper_trader_api.main import app
 
     def override_get_db():
         yield mock_db
@@ -51,14 +49,22 @@ def client(mock_db):
 
 @pytest.fixture
 def mock_user():
-    """Mock user object."""
+    """Mock user object for self-hosted local auth."""
     user = MagicMock()
-    user.id = uuid.uuid4()
-    user.email = "test@example.com"
-    user.plan_tier = "free"
+    user.id = str(uuid.uuid4())
+    user.username = "testuser"
     user.is_admin = False
-    user.password_hash = "hashed_password"
-    user.api_key_hash = None
+    user.created_at = datetime.now(UTC)
+    return user
+
+
+@pytest.fixture
+def mock_admin_user():
+    """Mock admin user object for self-hosted local auth."""
+    user = MagicMock()
+    user.id = str(uuid.uuid4())
+    user.username = "admin"
+    user.is_admin = True
     user.created_at = datetime.now(UTC)
     return user
 
@@ -67,10 +73,9 @@ def mock_user():
 def mock_trader(mock_user):
     """Mock trader object."""
     trader = MagicMock()
-    trader.id = uuid.uuid4()
+    trader.id = str(uuid.uuid4())
     trader.user_id = mock_user.id
-    trader.wallet_address = "0x1234567890123456789012345678901234567890"
-    trader.k8s_name = "trader-12345678"
+    trader.runtime_name = "trader-12345678"
     trader.status = "running"
     trader.image_tag = "latest"
     trader.created_at = datetime.now(UTC)
@@ -85,7 +90,6 @@ def mock_tokens():
     """Mock JWT tokens."""
     return {
         "access_token": "mock_access_token",
-        "refresh_token": "mock_refresh_token",
     }
 
 
