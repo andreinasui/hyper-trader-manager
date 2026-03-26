@@ -62,13 +62,13 @@ dmypy.json
 .env
 .env.local
 .env.production
+.env.development
 .venv
 ENV/
 env/
 venv/
 
 # Keep development template
-!.env.development
 !.env.example
 
 # IDEs

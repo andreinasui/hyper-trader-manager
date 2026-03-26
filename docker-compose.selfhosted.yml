@@ -1,0 +1,90 @@
+# HyperTrader Self-Hosted Stack
+# Usage:
+#   cp deploy/.env.selfhosted.example deploy/.env
+#   # Edit deploy/.env with your settings
+#   docker compose -f docker-compose.selfhosted.yml up -d
+
+services:
+  # ============================================
+  # Traefik reverse proxy
+  # Routes /api/* → api, /* → web
+  # ============================================
+  traefik:
+    image: traefik:v3.3
+    container_name: hypertrader-traefik
+    restart: unless-stopped
+    command:
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.file.watch=true
+      - --entrypoints.web.address=:${PUBLIC_PORT:-80}
+      - --log.level=INFO
+    ports:
+      - "${PUBLIC_PORT:-80}:${PUBLIC_PORT:-80}"
+    volumes:
+      - ./deploy/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - hypertrader
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ============================================
+  # API service (FastAPI + uvicorn)
+  # ============================================
+  api:
+    build:
+      context: .
+      dockerfile: api/docker/Dockerfile.api
+    container_name: hypertrader-api
+    restart: unless-stopped
+    env_file:
+      - deploy/.env
+    environment:
+      - DATA_DIR=/app/data
+      - ENVIRONMENT=production
+    group_add:
+      - "${DOCKER_GID:-999}"
+    volumes:
+      # Persistent data: SQLite database and trader configs
+      - ./data:/app/data
+      # Docker socket access for managing trader containers
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+    networks:
+      - hypertrader
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      traefik:
+        condition: service_healthy
+
+  # ============================================
+  # Web service (nginx + Vite static assets)
+  # ============================================
+  web:
+    build:
+      context: web
+      dockerfile: Dockerfile
+    container_name: hypertrader-web
+    restart: unless-stopped
+    networks:
+      - hypertrader
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      traefik:
+        condition: service_healthy
+
+networks:
+  hypertrader:
+    driver: bridge

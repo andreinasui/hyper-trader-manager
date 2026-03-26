@@ -23,3 +23,8 @@ package-lock.json
 .vinxi/
 dist/
 .vite/
+
+# Coverage and test reports
+coverage/
+test-results/
+playwright-report/

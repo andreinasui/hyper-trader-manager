@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User } from 'lucide-react';
+import { ArrowLeft, User, Shield } from 'lucide-react';
 
 export const Route = createFileRoute('/_authenticated/settings')({
   component: SettingsPage,
@@ -41,14 +41,32 @@ function SettingsPage() {
                 <label className="text-sm font-medium text-muted-foreground">
                   Username
                 </label>
-                <p className="font-mono text-sm mt-1">{user?.username}</p>
+                <p className="text-sm mt-1">{user?.username}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
-                  Email
+                  Role
                 </label>
-                <p className="font-mono text-sm mt-1">{user?.email}</p>
+                <p className="text-sm mt-1">{user?.is_admin ? 'Administrator' : 'User'}</p>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                <CardTitle>Security</CardTitle>
+              </div>
+              <CardDescription>
+                Manage your security settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Your account is secured with username and password authentication.
+                Keep your credentials safe and do not share them.
+              </p>
             </CardContent>
           </Card>
         </div>

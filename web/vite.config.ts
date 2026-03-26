@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import { fileURLToPath, URL } from 'node:url'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -17,6 +18,13 @@ export default defineConfig({
     }),
     viteReact(),
     tailwindcss(),
+    // Add Node.js polyfills for Privy SDK (needs Buffer)
+    nodePolyfills({
+      include: ['buffer'],
+      globals: {
+        Buffer: true,
+      },
+    }),
   ],
   resolve: {
     alias: {

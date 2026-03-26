@@ -8,9 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert } from '@/components/ui/alert';
-import { ArrowLeft, Bot, Info } from 'lucide-react';
+import { ArrowLeft, Bot, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
-import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
 export const Route = createFileRoute('/_authenticated/traders/new')({
   component: CreateTraderPage,
@@ -38,19 +37,12 @@ function CreateTraderPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: TraderFormData) => {
-      // Generate a new secure agent wallet
-      const privateKey = generatePrivateKey();
-      const account = privateKeyToAccount(privateKey);
-      const walletAddress = account.address;
-
       const request: CreateTraderRequest = {
-        wallet_address: walletAddress,
-        private_key: privateKey,
         config: {
           name: data.name,
           exchange: 'hyperliquid',
           self_account: {
-            address: walletAddress,
+            address: '',
             base_url: data.network,
           },
           copy_account: {
@@ -107,16 +99,16 @@ function CreateTraderPage() {
                 </Alert>
               )}
 
-              {/* Educational Info */}
-              <div className="bg-blue-950/30 border border-blue-500/50 rounded-lg p-4">
+              {/* Secure Agent Wallet Info */}
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
                 <div className="flex gap-3">
-                  <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <ShieldCheck className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                   <div className="space-y-2 text-sm">
-                    <p className="font-semibold text-blue-300">Secure Agent Wallet</p>
-                    <p className="text-blue-100">
-                      Your trading bot will use an automatically generated agent wallet for secure, 
-                      isolated trading. You don't need to provide any private keys - we handle 
-                      secure wallet creation for you.
+                    <p className="font-semibold text-primary">Secure Agent Wallet</p>
+                    <p className="text-muted-foreground">
+                      An automatically generated agent wallet will be created for this trader.
+                      Your private key is never required — the agent wallet handles all
+                      transaction signing securely on your behalf.
                     </p>
                   </div>
                 </div>
@@ -127,9 +119,9 @@ function CreateTraderPage() {
                 <Label htmlFor="name">Trader Name *</Label>
                 <Input
                   id="name"
-                  {...register('name', { 
-                    required: 'Trader name is required',
-                    minLength: { value: 3, message: 'Name must be at least 3 characters' }
+                  {...register('name', {
+                    required: 'Name is required',
+                    minLength: { value: 3, message: 'Name must be at least 3 characters' },
                   })}
                   placeholder="My Copy Trader"
                 />
@@ -154,12 +146,12 @@ function CreateTraderPage() {
                 <Label htmlFor="copyAddress">Copy Trader Address *</Label>
                 <Input
                   id="copyAddress"
-                  {...register('copyAddress', { 
+                  {...register('copyAddress', {
                     required: 'Copy address is required',
                     pattern: {
                       value: /^0x[a-fA-F0-9]{40}$/,
-                      message: 'Invalid Ethereum address'
-                    }
+                      message: 'Invalid Ethereum address',
+                    },
                   })}
                   placeholder="0x..."
                 />

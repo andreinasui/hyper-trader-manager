@@ -32,13 +32,13 @@ upgrade:
 # Development
 # ─────────────────────────────────────────────────────────────
 
-# Run API server with hot reload
+# Run API server with hot reload (development mode - DEBUG logging)
 dev:
-    uv run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+    ENV_FILE=.env.development uv run uvicorn hyper_trader_api.main:app --reload --host 0.0.0.0 --port 8000 --log-level debug
 
-# Run API server (production mode, no reload)
+# Run API server (production mode - INFO logging)
 run:
-    uv run uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ENVIRONMENT=production uv run uvicorn hyper_trader_api.main:app --host 0.0.0.0 --port 8000 --log-level info
 
 # ─────────────────────────────────────────────────────────────
 # Testing
@@ -54,7 +54,7 @@ test-v:
 
 # Run tests with coverage
 test-cov:
-    uv run pytest --cov=api --cov-report=html --cov-report=term
+    uv run pytest --cov=hyper_trader_api --cov-report=html --cov-report=term
 
 # ─────────────────────────────────────────────────────────────
 # Code Quality

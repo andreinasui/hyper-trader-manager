@@ -4,8 +4,7 @@ import { RouterProvider, createRouter } from '@tanstack/react-router'
 
 import * as TanStackQueryProvider from './integrations/tanstack-query/root-provider.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
-import { useAuth, type AuthState } from './hooks/useAuth'
-import type { LoginRequest } from './lib/types'
+import { AuthProvider, useAuth, type AuthUser } from './hooks/useAuth'
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
@@ -21,14 +20,17 @@ const router = createRouter({
   context: {
     ...TanStackQueryProviderContext,
     auth: {
+      ready: false,
+      authenticated: false,
       user: null,
       loading: true,
-      authenticated: false,
-      error: null,
+      isInitialized: false,
+      token: null,
       login: async () => {},
-      logout: async () => {},
+      logout: () => {},
+      bootstrap: async () => {},
       checkAuth: async () => {},
-      ready: false,
+      checkSetup: async () => {},
     },
   },
   defaultPreload: 'intent',
@@ -43,11 +45,18 @@ declare module '@tanstack/react-router' {
     router: typeof router
   }
   interface RouterContext {
-    auth: AuthState & {
-      login: (data: LoginRequest) => Promise<void>
-      logout: () => Promise<void>
-      checkAuth: () => Promise<void>
+    auth: {
       ready: boolean
+      authenticated: boolean
+      user: AuthUser | null
+      loading: boolean
+      isInitialized: boolean
+      token: string | null
+      login: (username: string, password: string) => Promise<void>
+      logout: () => void
+      bootstrap: (username: string, password: string) => Promise<void>
+      checkAuth: () => Promise<void>
+      checkSetup: () => Promise<void>
     }
   }
 }
@@ -57,7 +66,6 @@ declare module '@tanstack/react-router' {
  */
 function AppRouter() {
   const auth = useAuth()
-  
   return <RouterProvider router={router} context={{ auth }} />
 }
 
@@ -65,13 +73,15 @@ function AppRouter() {
 const rootElement = document.getElementById('app')
 if (rootElement && !rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement)
-  
+
   root.render(
     <StrictMode>
       <ErrorBoundary>
-        <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
-          <AppRouter />
-        </TanStackQueryProvider.Provider>
+        <AuthProvider>
+          <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
+            <AppRouter />
+          </TanStackQueryProvider.Provider>
+        </AuthProvider>
       </ErrorBoundary>
     </StrictMode>,
   )

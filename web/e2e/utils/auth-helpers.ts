@@ -3,42 +3,16 @@
  */
 
 import type { Page } from '@playwright/test';
-
-/**
- * Mock wallet address for testing
- */
-export const MOCK_WALLET_ADDRESS = '0x1234567890123456789012345678901234567890';
-
-/**
- * Truncate wallet address for display (matches app logic in dashboard)
- * Dashboard uses: `${address.slice(0, 6)}...${address.slice(-4)}`
- * Which for 0x1234567890123456789012345678901234567890 gives: 0x1234...7890
- */
-export function truncateAddress(address: string): string {
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
+import { mockUser } from '../fixtures/api-handlers.js';
 
 /**
  * Setup authenticated state in browser
- * This injects the mock Privy state before navigation
+ * This sets the auth token in localStorage and mocks the auth check
  */
 export async function setupAuthenticatedState(page: Page) {
+  // Set token in localStorage before navigation
   await page.addInitScript(() => {
-    (window as any).__PRIVY_MOCK__ = {
-      enabled: true,
-      authenticated: true,
-      ready: true,
-      user: {
-        id: 'test-privy-user-id',
-        linkedAccounts: [
-          {
-            type: 'wallet',
-            address: '0x1234567890123456789012345678901234567890',
-            walletClientType: 'privy',
-          },
-        ],
-      },
-    };
+    localStorage.setItem('auth_token', 'mock-test-token');
   });
 }
 
@@ -47,12 +21,7 @@ export async function setupAuthenticatedState(page: Page) {
  */
 export async function setupUnauthenticatedState(page: Page) {
   await page.addInitScript(() => {
-    (window as any).__PRIVY_MOCK__ = {
-      enabled: true,
-      authenticated: false,
-      ready: true,
-      user: null,
-    };
+    localStorage.removeItem('auth_token');
   });
 }
 
@@ -60,25 +29,8 @@ export async function setupUnauthenticatedState(page: Page) {
  * Wait for authentication to be ready
  */
 export async function waitForAuthReady(page: Page) {
-  await page.waitForFunction(() => {
-    const mock = (window as any).__PRIVY_MOCK__;
-    return mock && mock.ready === true;
-  }, { timeout: 5000 });
-}
-
-/**
- * Simulate wallet connection (for testing login flow)
- */
-export async function simulateWalletConnection(page: Page) {
-  // Click connect wallet button
-  await page.click('button:has-text("Connect Wallet")');
-  
-  // Wait for Privy modal or connection to complete
-  // In mock mode, this should resolve immediately
-  await page.waitForFunction(() => {
-    const mock = (window as any).__PRIVY_MOCK__;
-    return mock && mock.authenticated === true;
-  }, { timeout: 5000 });
+  // Wait for the auth loading spinner to disappear
+  await page.waitForSelector('.animate-spin', { state: 'detached', timeout: 5000 });
 }
 
 /**
@@ -86,16 +38,13 @@ export async function simulateWalletConnection(page: Page) {
  */
 export async function simulateLogout(page: Page) {
   // Click user menu
-  await page.click('[data-testid="user-menu-trigger"]');
-  
-  // Click logout button
-  await page.click('button:has-text("Logout")');
-  
-  // Wait for logout to complete
-  await page.waitForFunction(() => {
-    const mock = (window as any).__PRIVY_MOCK__;
-    return mock && mock.authenticated === false;
-  }, { timeout: 5000 });
+  const userMenu = page.getByTestId('user-menu-trigger');
+  if (await userMenu.isVisible()) {
+    await userMenu.click();
+    
+    // Click logout button
+    await page.getByText('Logout').click();
+  }
 }
 
 /**
@@ -103,17 +52,13 @@ export async function simulateLogout(page: Page) {
  */
 export async function isAuthenticated(page: Page): Promise<boolean> {
   return await page.evaluate(() => {
-    const mock = (window as any).__PRIVY_MOCK__;
-    return mock && mock.authenticated === true;
+    return !!localStorage.getItem('auth_token');
   });
 }
 
 /**
  * Get current mock user
  */
-export async function getMockUser(page: Page) {
-  return await page.evaluate(() => {
-    const mock = (window as any).__PRIVY_MOCK__;
-    return mock?.user || null;
-  });
+export function getMockUser() {
+  return mockUser;
 }

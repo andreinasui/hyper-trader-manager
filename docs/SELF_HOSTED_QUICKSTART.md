@@ -1,99 +1,72 @@
-# Self-Hosted Quickstart
+# Self-Hosted Quick Start
 
-> This is a draft user guide for the planned self-hosted v1 release.
-> It reflects the approved implementation plan in `docs/plans/2026-03-08-self-hosted-v1-implementation.md`.
-> Some files and commands below are planned deliverables and may not exist yet in the current branch.
+Get HyperTrader Manager running on a VPS in minutes.
 
 ## What You Get
 
-HyperTrader self-hosted v1 is a single-VPS deployment that gives you:
+HyperTrader self-hosted v1 is a single-VPS Docker Compose deployment:
 
-- a web dashboard served directly at `http://your-ip[:port]` or `http://your-hostname[:port]`
-- one local admin account with `username + password`
-- trader creation and management from the UI
-- logs, restart, and delete actions from the dashboard
-- a simple stack built with `Traefik`, `web`, `api`, and `SQLite`
+- Web dashboard at `http://your-server[:port]`
+- Local admin account (username + password)
+- Trader creation and management from the UI
+- Per-trader logs, restart, and delete actions
+- Stack: Traefik + web (nginx) + API (FastAPI) + SQLite
 
 ## V1 Limitations
 
-- `HTTP only`
-- single VPS
-- single local admin is the primary supported mode
-- `SQLite` instead of PostgreSQL
-- no Kubernetes
-- no Privy
+- **HTTP only** — credentials are not encrypted in transit
+- Single VPS only
+- Single local admin account
+- SQLite (not PostgreSQL)
+- No Kubernetes, no Privy / wallet auth
 
 ## Security Warning
 
-V1 is planned as `HTTP only`.
-
-That means login credentials and app traffic are not encrypted in transit.
+V1 serves **plain HTTP**. Login credentials and app traffic are not encrypted in transit.
 
 Recommended usage for v1:
 
-- run it on a private network
-- restrict access with a firewall
-- or place it behind your own secure tunnel / reverse proxy
+- Run on a private network, or
+- Restrict access with a firewall to trusted IPs, or
+- Place behind your own HTTPS reverse proxy or VPN
 
-Do not expose it directly to the public Internet unless you understand and accept the risk.
+Do not expose it to the public Internet without one of the above safeguards.
 
 ## Prerequisites
 
-Before you start, you need:
-
-- a Linux VPS (Ubuntu is the easiest target)
-- Docker installed
-- Docker Compose available (`docker compose`)
+- A Linux VPS (Ubuntu 22.04+ recommended)
+- Docker installed — [get Docker](https://docs.docker.com/engine/install/)
+- Docker Compose plugin (`docker compose version` should work)
 - SSH access to the VPS
-- one open HTTP port for the app (for example `80` or `8080`)
+- One open TCP port for HTTP (e.g. `80` or `8080`)
 
-Optional:
+Optional: a hostname / domain pointed at your VPS.
 
-- a hostname pointed at your VPS
-
-## What You Will Download
-
-The self-hosted release bundle is expected to contain:
-
-- `docker-compose.selfhosted.yml`
-- `deploy/.env.selfhosted.example`
-- `deploy/traefik/traefik.yml`
-- `deploy/traefik/dynamic.yml`
-- `scripts/install-selfhosted.sh`
-- `scripts/upgrade-selfhosted.sh`
-- `scripts/backup-selfhosted.sh`
-
-## Step 1: Connect to Your VPS
-
-SSH into your server:
+## Step 1: SSH into Your VPS
 
 ```bash
 ssh your-user@your-vps-ip
 ```
 
-Verify Docker is available:
+Verify Docker works:
 
 ```bash
 docker --version
 docker compose version
 ```
 
-If needed, install Docker before continuing.
-
-## Step 2: Download the Release Bundle
-
-Example using git:
+## Step 2: Clone the Repository
 
 ```bash
-git clone <your-release-repo-url> hyper-trader-manager
+git clone https://github.com/yourorg/hyper-trader-manager.git
 cd hyper-trader-manager
 ```
 
-Or download and extract the release archive, then `cd` into the extracted directory.
+Or download and extract the release archive, then `cd` into it.
 
-## Step 3: Create Your Self-Hosted Config File
+## Step 3: Configure Environment
 
-Copy the example environment file:
+Copy the example config file:
 
 ```bash
 cp deploy/.env.selfhosted.example .env.selfhosted
@@ -105,52 +78,57 @@ Edit it:
 nano .env.selfhosted
 ```
 
-At minimum, set:
+**Required values to set:**
 
-- `PUBLIC_PORT` - the HTTP port you want to expose
-- `PUBLIC_BASE_URL` - for example `http://YOUR_VPS_IP:8080` or `http://your-hostname.com`
-- `JWT_SECRET_KEY` - a long random secret for login tokens
-- `ENCRYPTION_KEY` - a long random secret used to protect stored trader secrets
-- image tags if you want to pin a specific release
+| Variable        | How to generate / choose               |
+|-----------------|----------------------------------------|
+| `SECRET_KEY`    | `openssl rand -hex 32`                 |
+| `ADMIN_EMAIL`   | Any email address for your admin login |
+| `ADMIN_PASSWORD`| A strong password                      |
+| `DOCKER_GID`    | `getent group docker \| cut -d: -f3`   |
 
-Example values:
+Optional — change `PUBLIC_PORT` if you don't want port 80:
 
 ```env
 PUBLIC_PORT=8080
-PUBLIC_BASE_URL=http://203.0.113.10:8080
-JWT_SECRET_KEY=replace-with-a-long-random-secret
-ENCRYPTION_KEY=replace-with-a-different-long-random-secret
 ```
 
-## Step 4: Open the Firewall Port
+Example minimal config:
 
-Make sure your VPS firewall allows the chosen HTTP port.
+```env
+PUBLIC_PORT=8080
+SECRET_KEY=a1b2c3d4e5f6...    # output of: openssl rand -hex 32
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=StrongP@ssw0rd
+DOCKER_GID=1001                # your server's docker group GID
+```
 
-Example with UFW:
+## Step 4: Open Firewall Port
+
+Allow traffic on the chosen port:
 
 ```bash
+# UFW (Ubuntu)
 sudo ufw allow 8080/tcp
 sudo ufw reload
 ```
 
-If you use cloud firewall rules, open the same port there too.
+If you use a cloud provider (AWS, GCP, DigitalOcean…), also open the port in the cloud firewall / security group.
 
-## Step 5: Start the Stack
-
-Use the install script:
+## Step 5: Run the Installer
 
 ```bash
 ./scripts/install-selfhosted.sh
 ```
 
-Expected stack:
+The script will:
+1. Check Docker is available
+2. Build the `api` and `web` images
+3. Start the full stack (`traefik`, `api`, `web`)
+4. Wait for the API health check to pass
+5. Print the dashboard URL
 
-- `traefik`
-- `web`
-- `api`
-- persistent app data for `SQLite`
-
-If you want to run the stack manually, the equivalent command is expected to be:
+Or start manually:
 
 ```bash
 docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up -d --build
@@ -160,96 +138,81 @@ docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml up -d
 
 In your browser, visit:
 
-- `http://YOUR_VPS_IP:PORT`
-- or `http://YOUR_HOSTNAME:PORT`
+```
+http://YOUR_VPS_IP:PORT
+```
 
 Examples:
-
 - `http://203.0.113.10:8080`
 - `http://trader.example.com:8080`
 
-The dashboard should open directly at `/`.
-
 ## Step 7: Complete First-Run Setup
 
-On the first visit, the app should show a bootstrap screen.
+On the first visit, the app shows a **Setup** screen.
 
-Create your local admin account by entering:
+Enter your chosen admin **email** and **password** and click **Create Account**.
 
-- `username`
-- `password`
-
-After setup is complete, the app switches to the normal login flow.
+After setup, you are redirected to the login screen.
 
 ## Step 8: Log In
 
-Sign in with the username and password you just created.
+Sign in with the email and password you just created.
 
-After login, you should land on the dashboard.
+After login you land on the trader dashboard.
 
 ## Step 9: Create Your First Trader
 
-From the dashboard, create a trader and enter the trading configuration required by the app.
+From the dashboard, click **Add Trader** and provide:
 
-The exact form fields may evolve, but you should expect to provide:
+- Wallet address
+- Private key
+- Copy-trading source account
+- Network and strategy settings
 
-- your trader wallet address
-- your trader private key
-- the source account to copy
-- network and strategy settings
-
-The backend will then:
-
-- store the config
-- encrypt the sensitive secret material at rest
-- create the trader runtime container
-- show status and logs in the UI
+The backend will:
+1. Store the configuration (private key encrypted at rest)
+2. Launch the trader container
+3. Show status and logs in the UI
 
 ## Common Operations
 
-Once the app is running, you should be able to:
+From the dashboard you can:
 
-- view all traders on the dashboard
-- inspect trader status
-- view trader logs
-- restart a trader
-- delete a trader
+- View all traders and their status
+- Inspect trader logs
+- Restart a trader
+- Delete a trader
 
-## Upgrade the App
+## Upgrade
 
-When a new release is available, the expected upgrade flow is:
+When a new version is available:
 
 ```bash
 ./scripts/upgrade-selfhosted.sh
 ```
 
-The upgrade script should:
+This will rebuild images, restart the stack, and run a health check.  
+Your SQLite database and env config are preserved.
 
-- pull updated images
-- apply backend/data changes safely
-- restart the stack
-- preserve your `SQLite` database and app config
-
-## Back Up the App
-
-The expected backup flow is:
+## Backup
 
 ```bash
 ./scripts/backup-selfhosted.sh
 ```
 
-At minimum, your backups should include:
+Saves a timestamped archive to `./backups/` containing:
+- `data/db.sqlite` — the SQLite database
+- `data/traders/` — trader config files
+- `env.backup` — env config (secrets redacted)
 
-- the `SQLite` database file
-- your self-hosted environment file
-- any persistent trader config data written by the stack
+See [SELF_HOSTED_OPERATIONS.md](SELF_HOSTED_OPERATIONS.md) for restore instructions.
 
 ## Troubleshooting
 
 ### Check running containers
 
 ```bash
-docker ps
+docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml ps
 ```
 
 ### Check stack logs
@@ -258,66 +221,43 @@ docker ps
 docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml logs -f
 ```
 
-### Check only the API logs
+### Check API health
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml logs -f api
+curl http://localhost:${PUBLIC_PORT}/health
 ```
 
-### Check only the web logs
+### Check setup status
 
 ```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml logs -f web
-```
-
-### Check only the Traefik logs
-
-```bash
-docker compose --env-file .env.selfhosted -f docker-compose.selfhosted.yml logs -f traefik
+curl http://localhost:${PUBLIC_PORT}/api/v1/auth/setup-status
 ```
 
 ### App does not load in the browser
 
-Check:
-
-- the stack is running
-- the chosen port is open
-- `PUBLIC_PORT` matches the exposed port
-- your VPS firewall and cloud firewall allow that port
+- Check the stack is running: `docker compose ... ps`
+- Check the port is open: `sudo ufw status` or cloud firewall rules
+- Confirm `PUBLIC_PORT` in `.env.selfhosted` matches the port you opened
 
 ### Login fails
 
-Check:
-
-- you completed the bootstrap step successfully
-- you are using the correct username
-- `JWT_SECRET_KEY` is set and stable
+- Make sure you completed the bootstrap step
+- Double-check username and password
+- `SECRET_KEY` must remain stable — changing it invalidates all sessions
 
 ### Trader fails to start
 
-Check:
+- Check the API logs for errors
+- Verify `DOCKER_GID` is correct on your host
+- Confirm the API container can reach the Docker socket
 
-- the trader config is valid
-- the wallet address and private key are correct
-- the API container can reach the Docker engine
-- the API logs for runtime errors
+## Support
 
-## Recommended First Production Use
+When reporting an issue, include:
 
-For your first real deployment:
-
-- use a fresh VPS
-- use a non-default strong password
-- generate long random secrets for token and encryption keys
-- limit network exposure as much as possible
-- start with a small test trader before using larger funds
-
-## Support Notes
-
-If you need to report an issue, include:
-
-- your VPS OS version
-- Docker version
-- chosen public port
-- stack logs from `traefik`, `api`, and `web`
-- the exact step where setup failed
+- VPS OS and version (`lsb_release -a`)
+- Docker version (`docker --version`)
+- Docker Compose version (`docker compose version`)
+- Public port used
+- Logs from all services: `docker compose ... logs`
+- The exact step where the problem occurred

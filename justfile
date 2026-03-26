@@ -50,6 +50,13 @@ api:
 web:
     cd web && just dev
 
+# Generate frontend API client from backend OpenAPI spec
+gen-api:
+    @echo "Generating TypeScript API client from OpenAPI spec..."
+    @echo "Make sure backend is running on port 8000!"
+    cd web && pnpm gen:api
+    @echo "✓ API client generated in web/src/lib/api/generated"
+
 # Install all dependencies
 install:
     cd api && just install-dev

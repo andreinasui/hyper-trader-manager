@@ -98,7 +98,6 @@ describe('Type Validation', () => {
         id: 'uuid-here',
         user_id: 'user-uuid',
         wallet_address: '0x1234567890123456789012345678901234567890',
-        agent_address: '0x...',
         runtime_name: 'trader-12345678',
         status: 'running',
         image_tag: 'latest',
@@ -120,7 +119,6 @@ describe('Type Validation', () => {
           id: 'id',
           user_id: 'user-id',
           wallet_address: '0x123',
-          agent_address: '0x...',
           runtime_name: 'trader-123',
           status: status,
           image_tag: 'latest',
@@ -137,7 +135,6 @@ describe('Type Validation', () => {
         id: 'id',
         user_id: 'user-id',
         wallet_address: '0x123',
-        agent_address: '0x...',
         runtime_name: 'trader-123',
         status: 'pending',
         image_tag: 'latest',
@@ -235,18 +232,14 @@ describe('Type Validation', () => {
   });
 
   describe('User types', () => {
-    it('should accept valid User structure', () => {
+    it('models local auth user shape', () => {
       const user: User = {
         id: 'user-123',
         username: 'testuser',
-        email: 'test@example.com',
-        plan_tier: 'free',
         is_admin: false,
-        created_at: '2024-01-01T00:00:00Z',
       };
 
       expect(user.username).toBe('testuser');
-      expect(user.email).toBe('test@example.com');
       expect(user.is_admin).toBe(false);
     });
 
@@ -263,33 +256,16 @@ describe('Type Validation', () => {
     it('should accept valid LoginResponse', () => {
       const loginResponse: LoginResponse = {
         access_token: 'eyJhbGciOiJIUzI1NiIs...',
-        refresh_token: 'eyJhbGciOiJIUzI1NiIs...',
         token_type: 'bearer',
-        expires_in: 3600,
         user: {
           id: 'user-123',
           username: 'testuser',
-          email: 'test@example.com',
-          plan_tier: 'free',
           is_admin: false,
-          created_at: '2024-01-01T00:00:00Z',
         },
       };
 
       expect(loginResponse.token_type).toBe('bearer');
-      expect(loginResponse.expires_in).toBe(3600);
-      expect(loginResponse.user.email).toBe('test@example.com');
-    });
-
-    it('models local auth user shape', () => {
-      const user: User = { 
-        id: '1', 
-        username: 'admin', 
-        email: 'admin@example.com', 
-        is_admin: true, 
-        created_at: '2026-03-08T00:00:00Z' 
-      }
-      expect(user.username).toBe('admin')
+      expect(loginResponse.user.username).toBe('testuser');
     });
   });
 });

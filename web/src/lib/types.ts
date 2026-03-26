@@ -7,10 +7,7 @@
 export interface User {
   id: string;
   username: string;
-  email: string;
-  plan_tier?: string;
   is_admin: boolean;
-  created_at: string;
 }
 
 export type TraderStatus = "pending" | "approving_agent" | "deploying" | "running" | "stopped" | "error";
@@ -22,7 +19,7 @@ export interface Trader {
   user_id: string;
   name?: string;
   wallet_address: string;
-  agent_address: string;
+  agent_address?: string;
   runtime_name: string;
   status: TraderStatus;
   image_tag: string;
@@ -32,8 +29,8 @@ export interface Trader {
 }
 
 export interface CreateTraderRequest {
-  wallet_address: string;
-  private_key: string;
+  wallet_address?: string; // Optional - auto-generated agent wallet in self-hosted v1
+  private_key?: string; // Deprecated - not used in self-hosted v1
   config: {
     name: string;
     exchange: ExchangeType;
@@ -53,11 +50,10 @@ export interface TraderDetails extends Trader {
 }
 
 export interface RuntimeStatus {
-  status: string;
-  container_id?: string;
-  image_id?: string;
-  restarts: number;
+  state: string;
+  running: boolean;
   started_at?: string;
+  exit_code?: number;
 }
 
 export interface TraderStatusResponse {
@@ -75,8 +71,8 @@ export interface LogLine {
 
 export interface TraderLogsResponse {
   trader_id: string;
-  logs: string; // Backend returns single string
-  tail_lines: number; // Backend uses tail_lines
+  logs: string[];
+  total_lines: number;
 }
 
 export interface SystemStats {
@@ -104,8 +100,6 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   access_token: string;
-  refresh_token: string;
-  token_type: string;
-  expires_in: number;
+  token_type?: string;
   user: User;
 }

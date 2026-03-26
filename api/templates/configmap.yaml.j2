@@ -6,7 +6,7 @@ metadata:
   labels:
     app: hyper-trader
     trader-address: "{{ wallet_address }}"
-    managed-by: api
+    managed-by: hyper-trader-api
 data:
   config.json: |
 {{ config_json | indent(4, first=True) }}

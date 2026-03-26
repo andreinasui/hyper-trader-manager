@@ -1,283 +1,207 @@
 """
-Authentication endpoint tests using mocks.
+Authentication endpoint tests for self-hosted local auth.
+
+Tests for username/password authentication with JWT tokens:
+- GET /api/v1/auth/setup-status
+- POST /api/v1/auth/bootstrap
+- POST /api/v1/auth/login
+- GET /api/v1/auth/me
 """
-import uuid
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
 
-import pytest
-from fastapi.testclient import TestClient
-
-from api.main import app
-from api.database import get_db
+from unittest.mock import patch
 
 
-@pytest.fixture
-def mock_db():
-    return MagicMock()
+class TestSetupStatus:
+    """Tests for GET /api/v1/auth/setup-status"""
+
+    def test_setup_status_returns_uninitialized(self, client, mock_db):
+        """Test setup-status returns initialized=False when no users exist."""
+        # Mock LocalAuthService to return False for system_initialized
+        with patch("hyper_trader_api.routers.auth.LocalAuthService") as MockAuth:
+            mock_auth = MockAuth.return_value
+            mock_auth.system_initialized.return_value = False
+
+            response = client.get("/api/v1/auth/setup-status")
+
+            assert response.status_code == 200
+            assert response.json() == {"initialized": False}
+
+    def test_setup_status_returns_initialized(self, client, mock_db):
+        """Test setup-status returns initialized=True when users exist."""
+        with patch("hyper_trader_api.routers.auth.LocalAuthService") as MockAuth:
+            mock_auth = MockAuth.return_value
+            mock_auth.system_initialized.return_value = True
+
+            response = client.get("/api/v1/auth/setup-status")
+
+            assert response.status_code == 200
+            assert response.json() == {"initialized": True}
 
 
-@pytest.fixture
-def client(mock_db):
-    def override_get_db():
-        yield mock_db
-    
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
+class TestBootstrap:
+    """Tests for POST /api/v1/auth/bootstrap"""
 
+    def test_bootstrap_creates_admin_user(self, client, mock_db, mock_admin_user):
+        """Test bootstrap creates first admin user and returns token."""
+        with (
+            patch("hyper_trader_api.routers.auth.LocalAuthService") as MockAuth,
+            patch("hyper_trader_api.routers.auth.TokenService") as MockToken,
+        ):
+            mock_auth = MockAuth.return_value
+            mock_auth.bootstrap_admin.return_value = mock_admin_user
 
-class TestRegister:
-    """Tests for POST /api/v1/auth/register"""
+            mock_token_service = MockToken.return_value
+            mock_token_service.create_access_token.return_value = "test_jwt_token"
 
-    @patch("api.routers.auth.AuthService.register_user")
-    @patch("api.routers.auth.JWTService.create_access_token")
-    @patch("api.routers.auth.JWTService.create_refresh_token")
-    def test_register_with_password_success(
-        self, mock_refresh, mock_access, mock_register, client, mock_db
-    ):
-        # Setup mocks
-        mock_user = MagicMock()
-        mock_user.id = uuid.uuid4()
-        mock_user.email = "new@example.com"
-        mock_user.plan_tier = "free"
-        mock_user.is_admin = False
-        mock_user.created_at = datetime.now(timezone.utc)
-        
-        mock_register.return_value = (mock_user, None)
-        mock_access.return_value = "access_token_123"
-        mock_refresh.return_value = "refresh_token_123"
+            response = client.post(
+                "/api/v1/auth/bootstrap",
+                json={"username": "admin", "password": "securepassword123"},
+            )
 
-        # Make request
-        response = client.post("/api/v1/auth/register", json={
-            "email": "new@example.com",
-            "password": "securepassword123"
-        })
+            assert response.status_code == 201
+            data = response.json()
+            assert data["access_token"] == "test_jwt_token"
+            assert data["token_type"] == "bearer"
+            assert data["user"]["username"] == "admin"
+            assert data["user"]["is_admin"] is True
 
-        # Assertions
-        assert response.status_code == 201
-        data = response.json()
-        assert data["user"]["email"] == "new@example.com"
-        assert data["access_token"] == "access_token_123"
-        assert data["refresh_token"] == "refresh_token_123"
-        mock_register.assert_called_once()
+    def test_bootstrap_rejects_when_already_initialized(self, client, mock_db):
+        """Test bootstrap fails if system is already initialized."""
+        with patch("hyper_trader_api.routers.auth.LocalAuthService") as MockAuth:
+            mock_auth = MockAuth.return_value
+            mock_auth.bootstrap_admin.side_effect = ValueError("System already initialized")
 
-    @patch("api.routers.auth.AuthService.register_user")
-    def test_register_duplicate_email(self, mock_register, client):
-        mock_register.side_effect = ValueError("Email already registered: test@example.com")
+            response = client.post(
+                "/api/v1/auth/bootstrap",
+                json={"username": "admin", "password": "securepassword123"},
+            )
 
-        response = client.post("/api/v1/auth/register", json={
-            "email": "test@example.com",
-            "password": "password123"
-        })
+            assert response.status_code == 409
+            assert "already initialized" in response.json()["detail"].lower()
 
-        assert response.status_code == 409
-        assert "already registered" in response.json()["detail"]
+    def test_bootstrap_validates_username_length(self, client, mock_db):
+        """Test bootstrap rejects username shorter than 3 characters."""
+        response = client.post(
+            "/api/v1/auth/bootstrap", json={"username": "ab", "password": "securepassword123"}
+        )
 
-    def test_register_invalid_email(self, client):
-        """Test that invalid email format returns 422."""
-        response = client.post("/api/v1/auth/register", json={
-            "email": "not-an-email",
-            "password": "password123"
-        })
         assert response.status_code == 422
 
-    @patch("api.routers.auth.AuthService.register_user")
-    def test_register_with_api_key_backward_compatibility(self, mock_register, client):
-        """Test registration without password (legacy API key mode)."""
-        mock_user = MagicMock()
-        mock_user.id = uuid.uuid4()
-        mock_user.email = "legacy@example.com"
-        mock_user.plan_tier = "free"
-        mock_user.is_admin = False
-        mock_user.created_at = datetime.now(timezone.utc)
-        
-        # Return API key for passwordless registration
-        mock_register.return_value = (mock_user, "api_key_12345")
+    def test_bootstrap_validates_password_length(self, client, mock_db):
+        """Test bootstrap rejects password shorter than 8 characters."""
+        response = client.post(
+            "/api/v1/auth/bootstrap", json={"username": "admin", "password": "short"}
+        )
 
-        response = client.post("/api/v1/auth/register", json={
-            "email": "legacy@example.com"
-        })
-
-        assert response.status_code == 201
-        data = response.json()
-        assert data["user"]["email"] == "legacy@example.com"
-        assert data["api_key"] == "api_key_12345"
-        assert data["access_token"] is None
-        assert data["refresh_token"] is None
+        assert response.status_code == 422
 
 
 class TestLogin:
     """Tests for POST /api/v1/auth/login"""
 
-    @patch("api.routers.auth.AuthService.authenticate_user")
-    @patch("api.routers.auth.JWTService.create_access_token")
-    @patch("api.routers.auth.JWTService.create_refresh_token")
-    def test_login_success(self, mock_refresh, mock_access, mock_auth, client):
-        mock_user = MagicMock()
-        mock_user.id = uuid.uuid4()
-        mock_user.email = "test@example.com"
-        mock_user.plan_tier = "free"
-        mock_user.is_admin = False
-        mock_user.created_at = datetime.now(timezone.utc)
-        
-        mock_auth.return_value = mock_user
-        mock_access.return_value = "access_token_123"
-        mock_refresh.return_value = "refresh_token_123"
+    def test_login_with_valid_credentials(self, client, mock_db, mock_user):
+        """Test login succeeds with valid username and password."""
+        with (
+            patch("hyper_trader_api.routers.auth.LocalAuthService") as MockAuth,
+            patch("hyper_trader_api.routers.auth.TokenService") as MockToken,
+        ):
+            mock_auth = MockAuth.return_value
+            mock_auth.authenticate.return_value = mock_user
 
-        response = client.post("/api/v1/auth/login", json={
-            "email": "test@example.com",
-            "password": "password123"
-        })
+            mock_token_service = MockToken.return_value
+            mock_token_service.create_access_token.return_value = "test_jwt_token"
 
-        assert response.status_code == 200
-        data = response.json()
-        assert "access_token" in data
-        assert "refresh_token" in data
-        assert data["user"]["email"] == "test@example.com"
+            response = client.post(
+                "/api/v1/auth/login", json={"username": "testuser", "password": "password123"}
+            )
 
-    @patch("api.routers.auth.AuthService.authenticate_user")
-    def test_login_invalid_credentials(self, mock_auth, client):
-        mock_auth.return_value = None
+            assert response.status_code == 200
+            data = response.json()
+            assert data["access_token"] == "test_jwt_token"
+            assert data["token_type"] == "bearer"
+            assert data["user"]["username"] == "testuser"
 
-        response = client.post("/api/v1/auth/login", json={
-            "email": "test@example.com",
-            "password": "wrongpassword"
-        })
+    def test_login_with_invalid_credentials(self, client, mock_db):
+        """Test login fails with invalid credentials."""
+        with patch("hyper_trader_api.routers.auth.LocalAuthService") as MockAuth:
+            mock_auth = MockAuth.return_value
+            mock_auth.authenticate.return_value = None
 
-        assert response.status_code == 401
-        assert "incorrect" in response.json()["detail"].lower()
+            response = client.post(
+                "/api/v1/auth/login", json={"username": "testuser", "password": "wrongpassword"}
+            )
 
-    @patch("api.routers.auth.AuthService.authenticate_user")
-    def test_login_nonexistent_user(self, mock_auth, client):
-        mock_auth.return_value = None
+            assert response.status_code == 401
+            assert "invalid credentials" in response.json()["detail"].lower()
 
-        response = client.post("/api/v1/auth/login", json={
-            "email": "nonexistent@example.com",
-            "password": "password123"
-        })
+    def test_login_requires_username(self, client, mock_db):
+        """Test login requires username field."""
+        response = client.post("/api/v1/auth/login", json={"password": "password123"})
 
-        assert response.status_code == 401
+        assert response.status_code == 422
 
+    def test_login_requires_password(self, client, mock_db):
+        """Test login requires password field."""
+        response = client.post("/api/v1/auth/login", json={"username": "testuser"})
 
-class TestRefresh:
-    """Tests for POST /api/v1/auth/refresh"""
-
-    @patch("api.routers.auth.JWTService.verify_refresh_token")
-    @patch("api.routers.auth.JWTService.create_access_token")
-    def test_refresh_token_success(self, mock_create, mock_verify, client, mock_db):
-        user_id = uuid.uuid4()
-        mock_verify.return_value = {"sub": str(user_id), "type": "refresh"}
-        mock_create.return_value = "new_access_token"
-        
-        # Mock the user query
-        mock_user = MagicMock()
-        mock_user.id = user_id
-        mock_user.email = "test@example.com"
-        mock_db.query.return_value.filter.return_value.first.return_value = mock_user
-
-        response = client.post("/api/v1/auth/refresh", json={
-            "refresh_token": "valid_refresh_token"
-        })
-
-        assert response.status_code == 200
-        assert response.json()["access_token"] == "new_access_token"
-
-    @patch("api.routers.auth.JWTService.verify_refresh_token")
-    def test_refresh_token_invalid(self, mock_verify, client):
-        mock_verify.return_value = None
-
-        response = client.post("/api/v1/auth/refresh", json={
-            "refresh_token": "invalid_token"
-        })
-
-        assert response.status_code == 401
-
-    @patch("api.routers.auth.JWTService.verify_refresh_token")
-    def test_refresh_token_user_not_found(self, mock_verify, client, mock_db):
-        """Test refresh with valid token but user no longer exists."""
-        user_id = uuid.uuid4()
-        mock_verify.return_value = {"sub": str(user_id), "type": "refresh"}
-        
-        # User not found in database
-        mock_db.query.return_value.filter.return_value.first.return_value = None
-
-        response = client.post("/api/v1/auth/refresh", json={
-            "refresh_token": "valid_token"
-        })
-
-        assert response.status_code == 401
+        assert response.status_code == 422
 
 
 class TestGetMe:
     """Tests for GET /api/v1/auth/me"""
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    def test_get_me_authenticated(self, mock_get_user, client):
-        mock_user = MagicMock()
-        mock_user.id = uuid.uuid4()
-        mock_user.email = "test@example.com"
-        mock_user.plan_tier = "free"
-        mock_user.is_admin = False
-        mock_user.created_at = datetime.now(timezone.utc)
-        
-        mock_get_user.return_value = mock_user
+    def test_get_me_authenticated(self, client, mock_db, mock_user):
+        """Test /me returns current user info when authenticated."""
+        with patch("hyper_trader_api.middleware.jwt_auth.TokenService") as MockToken:
+            mock_token_service = MockToken.return_value
+            mock_token_service.verify_access_token.return_value = {
+                "sub": mock_user.id,
+                "username": mock_user.username,
+                "is_admin": mock_user.is_admin,
+            }
 
-        response = client.get(
-            "/api/v1/auth/me",
-            headers={"Authorization": "Bearer valid_token"}
-        )
+            # Mock database query to return user
+            mock_db.query.return_value.filter_by.return_value.first.return_value = mock_user
 
-        assert response.status_code == 200
-        assert response.json()["email"] == "test@example.com"
+            response = client.get(
+                "/api/v1/auth/me", headers={"Authorization": "Bearer valid_token"}
+            )
 
-    def test_get_me_unauthenticated(self, client):
+            assert response.status_code == 200
+            data = response.json()
+            assert data["id"] == mock_user.id
+            assert data["username"] == mock_user.username
+            assert data["is_admin"] == mock_user.is_admin
+            assert "created_at" in data
+
+    def test_get_me_missing_auth_header(self, client, mock_db):
+        """Test /me returns 401 when Authorization header is missing."""
         response = client.get("/api/v1/auth/me")
+
         assert response.status_code == 401
+        assert "authorization" in response.json()["detail"].lower()
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.middleware.jwt_auth.get_current_user_from_api_key")
-    def test_get_me_invalid_token(self, mock_api_key, mock_jwt, client):
-        """Test that invalid token returns 401."""
-        mock_jwt.return_value = None
-        mock_api_key.return_value = None
-        
-        response = client.get("/api/v1/auth/me", headers={
-            "Authorization": "Bearer invalid.token.here"
-        })
-        assert response.status_code == 401
+    def test_get_me_invalid_token(self, client, mock_db):
+        """Test /me returns 401 when token is invalid."""
+        with patch("hyper_trader_api.middleware.jwt_auth.TokenService") as MockToken:
+            mock_token_service = MockToken.return_value
+            mock_token_service.verify_access_token.return_value = None
 
+            response = client.get(
+                "/api/v1/auth/me", headers={"Authorization": "Bearer invalid_token"}
+            )
 
-class TestLogout:
-    """Tests for POST /api/v1/auth/logout"""
+            assert response.status_code == 401
+            assert "invalid" in response.json()["detail"].lower()
 
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.auth.JWTService.revoke_refresh_token")
-    def test_logout_success(self, mock_revoke, mock_get_user, client):
-        mock_user = MagicMock()
-        mock_user.id = uuid.uuid4()
-        mock_user.email = "test@example.com"
-        mock_get_user.return_value = mock_user
-        mock_revoke.return_value = True
+    def test_get_me_expired_token(self, client, mock_db):
+        """Test /me returns 401 when token is expired."""
+        with patch("hyper_trader_api.middleware.jwt_auth.TokenService") as MockToken:
+            mock_token_service = MockToken.return_value
+            mock_token_service.verify_access_token.return_value = None
 
-        response = client.post("/api/v1/auth/logout", 
-                              headers={"Authorization": "Bearer valid_token"},
-                              json={"refresh_token": "refresh_token_123"})
+            response = client.get(
+                "/api/v1/auth/me", headers={"Authorization": "Bearer expired_token"}
+            )
 
-        assert response.status_code == 200
-        assert "logged out" in response.json()["message"].lower()
-
-    @patch("api.middleware.jwt_auth.get_current_user_from_jwt")
-    @patch("api.routers.auth.JWTService.revoke_refresh_token")
-    def test_logout_invalid_refresh_token(self, mock_revoke, mock_get_user, client):
-        mock_user = MagicMock()
-        mock_user.email = "test@example.com"
-        mock_get_user.return_value = mock_user
-        mock_revoke.return_value = False
-
-        response = client.post("/api/v1/auth/logout",
-                              headers={"Authorization": "Bearer valid_token"}, 
-                              json={"refresh_token": "invalid.token"})
-
-        assert response.status_code == 404
+            assert response.status_code == 401

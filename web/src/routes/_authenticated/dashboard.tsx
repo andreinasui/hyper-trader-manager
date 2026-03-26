@@ -67,23 +67,23 @@ function DashboardPage() {
           <div className="flex items-center gap-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 px-3">
+                <Button variant="ghost" className="relative h-9 px-3" data-testid="user-menu-trigger">
                   <Avatar className="h-7 w-7 mr-2">
                     <AvatarFallback>
                       {user?.username?.slice(0, 2).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-sm font-mono">
+                  <span className="text-sm">
                     {user?.username || 'User'}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">Account</p>
-                    <p className="text-xs leading-none text-muted-foreground font-mono">
-                      {user?.email}
+                    <p className="text-sm font-medium leading-none">{user?.username}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user?.is_admin ? 'Administrator' : 'User'}
                     </p>
                   </div>
                 </DropdownMenuLabel>
