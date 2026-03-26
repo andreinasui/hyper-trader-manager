@@ -15,8 +15,8 @@ from hyper_trader_api.middleware.jwt_auth import get_current_user
 from hyper_trader_api.models import User
 from hyper_trader_api.schemas.trader import (
     DeleteResponse,
-    K8sStatus,
     RestartResponse,
+    RuntimeStatus,
     TraderCreate,
     TraderListResponse,
     TraderLogsResponse,
@@ -54,7 +54,7 @@ def _trader_to_response(trader) -> TraderResponse:
         id=trader.id,
         user_id=trader.user_id,
         wallet_address=trader.wallet_address,
-        k8s_name=trader.k8s_name,
+        runtime_name=trader.runtime_name,
         status=trader.status,
         image_tag=trader.image_tag,
         created_at=trader.created_at,
@@ -68,7 +68,7 @@ def _trader_to_response(trader) -> TraderResponse:
     response_model=TraderResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new trader",
-    description=("Create a new trading bot. The trader will be deployed to Kubernetes."),
+    description=("Create a new trading bot. The trader will be deployed as a Docker container."),
 )
 async def create_trader(
     trader_data: TraderCreate,
@@ -83,7 +83,7 @@ async def create_trader(
     """
     try:
         trader = service.create_trader(user, trader_data)
-        logger.info(f"Trader created: {trader.k8s_name} for user {user.privy_user_id}")
+        logger.info(f"Trader created: {trader.runtime_name} for user {user.username}")
         return _trader_to_response(trader)
 
     except ValueError as e:
@@ -153,7 +153,7 @@ async def get_trader(
     "/{trader_id}",
     response_model=TraderResponse,
     summary="Update trader configuration",
-    description="Update a trader's configuration. The pod will be restarted to apply changes.",
+    description="Update a trader's configuration. The container will be restarted to apply changes.",
 )
 async def update_trader(
     trader_id: uuid.UUID,
@@ -166,11 +166,11 @@ async def update_trader(
 
     - **config**: New configuration JSON
 
-    The trader pod will be restarted to apply the new configuration.
+    The trader container will be restarted to apply the new configuration.
     """
     try:
         trader = service.update_trader(trader_id, user.id, update_data)
-        logger.info(f"Trader updated: {trader.k8s_name}")
+        logger.info(f"Trader updated: {trader.runtime_name}")
         return _trader_to_response(trader)
 
     except TraderNotFoundError as e:
@@ -195,7 +195,7 @@ async def update_trader(
     "/{trader_id}",
     response_model=DeleteResponse,
     summary="Delete trader",
-    description="Delete a trader. This removes all Kubernetes resources and database records.",
+    description="Delete a trader. This removes the Docker container and all database records.",
 )
 async def delete_trader(
     trader_id: uuid.UUID,
@@ -206,7 +206,7 @@ async def delete_trader(
     Delete a trader.
 
     This will:
-    - Remove the Kubernetes StatefulSet, ConfigMap, and Secret
+    - Stop and remove the Docker container
     - Delete all database records for this trader
     """
     try:
@@ -245,7 +245,7 @@ async def delete_trader(
     "/{trader_id}/restart",
     response_model=RestartResponse,
     summary="Restart trader",
-    description="Restart a trader's pod.",
+    description="Restart a trader's Docker container.",
 )
 async def restart_trader(
     trader_id: uuid.UUID,
@@ -253,19 +253,19 @@ async def restart_trader(
     service: TraderService = Depends(get_trader_service),
 ) -> RestartResponse:
     """
-    Restart a trader's pod.
+    Restart a trader's Docker container.
 
-    The pod will be deleted and recreated by the StatefulSet controller.
+    The container will be restarted using Docker API.
     """
     try:
         trader = service.get_trader(trader_id, user.id)
         service.restart_trader(trader_id, user.id)
-        logger.info(f"Trader restart initiated: {trader.k8s_name}")
+        logger.info(f"Trader restart initiated: {trader.runtime_name}")
 
         return RestartResponse(
             message="Trader restart initiated",
             trader_id=trader_id,
-            k8s_name=trader.k8s_name,
+            runtime_name=trader.runtime_name,
         )
 
     except TraderNotFoundError as e:
@@ -289,8 +289,8 @@ async def restart_trader(
 @router.get(
     "/{trader_id}/status",
     response_model=TraderStatusResponse,
-    summary="Get trader K8s status",
-    description="Get detailed Kubernetes status for a trader.",
+    summary="Get trader runtime status",
+    description="Get detailed Docker runtime status for a trader.",
 )
 async def get_trader_status(
     trader_id: uuid.UUID,
@@ -298,9 +298,9 @@ async def get_trader_status(
     service: TraderService = Depends(get_trader_service),
 ) -> TraderStatusResponse:
     """
-    Get detailed Kubernetes status for a trader.
+    Get detailed Docker runtime status for a trader.
 
-    Returns pod phase, ready status, restart count, and other K8s details.
+    Returns container state, running status, start time, and other runtime details.
     """
     try:
         status_data = service.get_trader_status(trader_id, user.id)
@@ -308,9 +308,9 @@ async def get_trader_status(
         return TraderStatusResponse(
             id=status_data["id"],
             wallet_address=status_data["wallet_address"],
-            k8s_name=status_data["k8s_name"],
+            runtime_name=status_data["runtime_name"],
             status=status_data["status"],
-            k8s_status=K8sStatus(**status_data["k8s_status"]),
+            runtime_status=RuntimeStatus(**status_data["runtime_status"]),
         )
 
     except TraderNotFoundError as e:
@@ -329,7 +329,7 @@ async def get_trader_status(
     "/{trader_id}/logs",
     response_model=TraderLogsResponse,
     summary="Get trader logs",
-    description="Get logs from a trader's pod.",
+    description="Get logs from a trader's Docker container.",
 )
 async def get_trader_logs(
     trader_id: uuid.UUID,
@@ -340,7 +340,7 @@ async def get_trader_logs(
     service: TraderService = Depends(get_trader_service),
 ) -> TraderLogsResponse:
     """
-    Get logs from a trader's pod.
+    Get logs from a trader's Docker container.
 
     - **tail_lines**: Number of log lines to return (1-10000, default: 100)
     """

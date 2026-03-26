@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     public_port: int = 80
     docker_socket: str = "unix:///var/run/docker.sock"
     runtime_mode: Literal["docker"] = "docker"
+    image_tag: str = "latest"  # Docker image tag for trader containers
 
     # ==================== Server ====================
     host: str = "0.0.0.0"

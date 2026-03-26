@@ -22,6 +22,11 @@ class TraderCreate(BaseModel):
             "pattern_description": "Must be a valid Ethereum address (0x + 40 hex characters)"
         },
     )
+    private_key: str = Field(
+        ...,
+        pattern=r"^0x[a-fA-F0-9]{64}$",
+        description="Private key for the wallet (0x followed by 64 hexadecimal characters)",
+    )
     config: dict[str, Any] = Field(..., description="Trader configuration JSON")
 
     model_config = ConfigDict(
@@ -65,7 +70,7 @@ class TraderResponse(BaseModel):
     id: uuid.UUID
     user_id: str
     wallet_address: str
-    k8s_name: str
+    runtime_name: str
     status: str
     image_tag: str
     created_at: datetime
@@ -79,7 +84,7 @@ class TraderResponse(BaseModel):
                 "id": "550e8400-e29b-41d4-a716-446655440000",
                 "user_id": "550e8400-e29b-41d4-a716-446655440001",
                 "wallet_address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a",
-                "k8s_name": "trader-e221ef33",
+                "runtime_name": "trader-e221ef33",
                 "status": "running",
                 "image_tag": "latest",
                 "created_at": "2024-01-15T10:30:00Z",
@@ -101,39 +106,34 @@ class TraderListResponse(BaseModel):
     model_config = ConfigDict(json_schema_extra={"example": {"traders": [], "count": 0}})
 
 
-class K8sStatus(BaseModel):
-    """Kubernetes status details."""
+class RuntimeStatus(BaseModel):
+    """Docker runtime status details."""
 
-    pod_phase: str = Field(description="Pod phase (Pending, Running, Succeeded, Failed, Unknown)")
-    ready: bool = Field(description="Whether the pod is ready")
-    restarts: int = Field(description="Number of container restarts")
-    pod_ip: str | None = None
-    node: str | None = None
-    started_at: str | None = None
+    state: str = Field(description="Container state (running, exited, not_found, etc.)")
+    running: bool = Field(description="Whether the container is running")
+    started_at: str | None = Field(default=None, description="ISO timestamp when container started")
+    exit_code: int | None = Field(default=None, description="Exit code if container exited")
 
 
 class TraderStatusResponse(BaseModel):
-    """Schema for trader status including K8s details."""
+    """Schema for trader status including Docker runtime details."""
 
     id: uuid.UUID
     wallet_address: str
-    k8s_name: str
+    runtime_name: str
     status: str
-    k8s_status: K8sStatus
+    runtime_status: RuntimeStatus
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "id": "550e8400-e29b-41d4-a716-446655440000",
                 "wallet_address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a",
-                "k8s_name": "trader-e221ef33",
+                "runtime_name": "trader-e221ef33",
                 "status": "running",
-                "k8s_status": {
-                    "pod_phase": "Running",
-                    "ready": True,
-                    "restarts": 0,
-                    "pod_ip": "10.42.0.15",
-                    "node": "k3s-node-1",
+                "runtime_status": {
+                    "state": "running",
+                    "running": True,
                     "started_at": "2024-01-15T10:30:00Z",
                 },
             }
@@ -166,14 +166,14 @@ class RestartResponse(BaseModel):
 
     message: str
     trader_id: uuid.UUID
-    k8s_name: str
+    runtime_name: str
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "message": "Trader restart initiated",
                 "trader_id": "550e8400-e29b-41d4-a716-446655440000",
-                "k8s_name": "trader-e221ef33",
+                "runtime_name": "trader-e221ef33",
             }
         }
     )
