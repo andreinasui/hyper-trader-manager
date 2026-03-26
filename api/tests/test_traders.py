@@ -13,9 +13,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from hyper_trader_api.database import get_db
-from hyper_trader_api.middleware.jwt_auth import get_current_user
 from hyper_trader_api.main import app
-from hyper_trader_api.services.trader_service import TraderNotFoundError
+from hyper_trader_api.middleware.jwt_auth import get_current_user
 
 
 @pytest.fixture
@@ -26,21 +25,22 @@ def mock_db():
 @pytest.fixture
 def client(mock_db, mock_user):
     """Test client with mocked database and authentication."""
+
     def override_get_db():
         yield mock_db
-    
+
     def override_get_current_user():
         return mock_user
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
-    
+
     # Mock the engine for health checks
     with patch("hyper_trader_api.main.engine") as mock_engine:
         mock_engine.connect.return_value.__enter__.return_value.execute.return_value = None
         with TestClient(app) as c:
             yield c
-    
+
     app.dependency_overrides.clear()
 
 
@@ -158,9 +158,7 @@ class TestListTradersDockerRuntime:
     """Tests for listing traders with Docker runtime."""
 
     @patch("hyper_trader_api.routers.traders.TraderService")
-    def test_list_returns_runtime_name(
-        self, mock_service_class, client, mock_user, mock_trader
-    ):
+    def test_list_returns_runtime_name(self, mock_service_class, client, mock_user, mock_trader):
         """Test that list endpoint returns runtime_name field."""
         mock_service = MagicMock()
         mock_service.list_traders.return_value = [mock_trader]
@@ -179,9 +177,7 @@ class TestRestartTraderDockerRuntime:
     """Tests for restarting traders with Docker runtime."""
 
     @patch("hyper_trader_api.routers.traders.TraderService")
-    def test_restart_calls_runtime_layer(
-        self, mock_service_class, client, mock_user, mock_trader
-    ):
+    def test_restart_calls_runtime_layer(self, mock_service_class, client, mock_user, mock_trader):
         """Test that restart calls the runtime layer."""
         mock_service = MagicMock()
         mock_service.get_trader.return_value = mock_trader
@@ -205,9 +201,7 @@ class TestDeleteTraderDockerRuntime:
     """Tests for deleting traders with Docker runtime."""
 
     @patch("hyper_trader_api.routers.traders.TraderService")
-    def test_delete_calls_runtime_layer(
-        self, mock_service_class, client, mock_user, mock_trader
-    ):
+    def test_delete_calls_runtime_layer(self, mock_service_class, client, mock_user, mock_trader):
         """Test that delete calls the runtime layer."""
         mock_service = MagicMock()
         mock_service.get_trader.return_value = mock_trader
@@ -262,9 +256,7 @@ class TestGetTraderLogsDockerRuntime:
     """Tests for getting trader logs with Docker runtime."""
 
     @patch("hyper_trader_api.routers.traders.TraderService")
-    def test_logs_come_from_runtime_layer(
-        self, mock_service_class, client, mock_user, mock_trader
-    ):
+    def test_logs_come_from_runtime_layer(self, mock_service_class, client, mock_user, mock_trader):
         """Test that logs come from the runtime layer."""
         mock_service = MagicMock()
         mock_service.get_trader.return_value = mock_trader
@@ -294,14 +286,15 @@ class TestTraderConfigVersionStorage:
         self, mock_encrypt, mock_decrypt, mock_get_runtime, mock_write_config, mock_db
     ):
         """Test that TraderService creates TraderConfig with version=1."""
-        from pathlib import Path
         from hyper_trader_api.models.trader import Trader, TraderConfig, TraderSecret
         from hyper_trader_api.schemas.trader import TraderCreate
         from hyper_trader_api.services.trader_service import TraderService
 
         # Setup mocks
         mock_encrypt.return_value = "encrypted_key_data"
-        mock_decrypt.return_value = "0x1234567890123456789012345678901234567890123456789012345678901234"
+        mock_decrypt.return_value = (
+            "0x1234567890123456789012345678901234567890123456789012345678901234"
+        )
         mock_runtime = MagicMock()
         mock_runtime.deploy_trader.return_value = None
         mock_get_runtime.return_value = mock_runtime
@@ -309,7 +302,7 @@ class TestTraderConfigVersionStorage:
 
         # Mock database session to track what gets added
         added_objects = []
-        
+
         def mock_add(obj):
             added_objects.append(obj)
             # Link trader to its config immediately for relationship access
@@ -321,7 +314,7 @@ class TestTraderConfigVersionStorage:
                     if isinstance(added_obj, Trader):
                         added_obj.configs.append(obj)
                         break
-        
+
         def mock_flush():
             # Simulate ID assignment for all objects
             for obj in added_objects:
@@ -331,7 +324,7 @@ class TestTraderConfigVersionStorage:
                     obj.id = str(uuid.uuid4())
                 elif isinstance(obj, TraderSecret) and not hasattr(obj, "id"):
                     obj.id = str(uuid.uuid4())
-        
+
         # Mock query to return None (no existing trader)
         mock_query = MagicMock()
         mock_query.filter.return_value.first.return_value = None
@@ -344,30 +337,30 @@ class TestTraderConfigVersionStorage:
 
         # Create service and trader (service gets settings internally)
         service = TraderService(mock_db)
-        
+
         # Create mock user object
         mock_user = MagicMock()
         mock_user.id = str(uuid.uuid4())
         mock_user.username = "testuser"
-        
+
         trader_data = TraderCreate(
             wallet_address="0x1234567890123456789012345678901234567890",
             private_key="0x1234567890123456789012345678901234567890123456789012345678901234",
             config={"name": "Test Trader", "exchange": "hyperliquid"},
         )
-        
-        result = service.create_trader(mock_user, trader_data)
+
+        service.create_trader(mock_user, trader_data)
 
         # Verify TraderConfig with version=1 was created
         config_objects = [obj for obj in added_objects if isinstance(obj, TraderConfig)]
         assert len(config_objects) == 1, "Expected one TraderConfig to be created"
-        
+
         config = config_objects[0]
         assert config.version == 1, f"Expected version=1, got {config.version}"
         # Config should have self_account.address added by the service
         assert "self_account" in config.config_json
         assert config.config_json["self_account"]["address"] == trader_data.wallet_address
-        
+
         # Verify TraderSecret was also created (encrypted)
         secret_objects = [obj for obj in added_objects if isinstance(obj, TraderSecret)]
         assert len(secret_objects) == 1, "Expected one TraderSecret to be created"

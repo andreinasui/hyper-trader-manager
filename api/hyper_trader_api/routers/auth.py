@@ -40,7 +40,7 @@ router = APIRouter(
 )
 async def get_setup_status(
     db: Session = Depends(get_db),
-):
+) -> SetupStatusResponse:
     """
     Check if system is initialized.
 
@@ -49,7 +49,7 @@ async def get_setup_status(
     """
     auth_service = LocalAuthService(db)
     initialized = auth_service.system_initialized()
-    
+
     return SetupStatusResponse(initialized=initialized)
 
 
@@ -63,7 +63,7 @@ async def get_setup_status(
 async def bootstrap_admin(
     request: BootstrapRequest,
     db: Session = Depends(get_db),
-):
+) -> AuthResponse:
     """
     Bootstrap the system with the first admin user.
 
@@ -82,29 +82,29 @@ async def bootstrap_admin(
     """
     auth_service = LocalAuthService(db)
     token_service = TokenService(settings.jwt_secret_key)
-    
+
     try:
         # Create admin user
         user = auth_service.bootstrap_admin(request.username, request.password)
-        
+
         # Generate access token
         access_token = token_service.create_access_token(user)
-        
+
         logger.info(f"System bootstrapped with admin user: {user.username}")
-        
+
         return AuthResponse(
             access_token=access_token,
             token_type="bearer",
             user=UserResponse.model_validate(user),
         )
-        
+
     except ValueError as e:
         # System already initialized or validation error
         logger.warning(f"Bootstrap attempt failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e),
-        )
+        ) from e
 
 
 @router.post(
@@ -116,7 +116,7 @@ async def bootstrap_admin(
 async def login(
     request: LoginRequest,
     db: Session = Depends(get_db),
-):
+) -> AuthResponse:
     """
     Authenticate user with username and password.
 
@@ -132,10 +132,10 @@ async def login(
     """
     auth_service = LocalAuthService(db)
     token_service = TokenService(settings.jwt_secret_key)
-    
+
     # Authenticate user
     user = auth_service.authenticate(request.username, request.password)
-    
+
     if not user:
         logger.warning(f"Failed login attempt for username: {request.username}")
         raise HTTPException(
@@ -143,12 +143,12 @@ async def login(
             detail="Invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Generate access token
     access_token = token_service.create_access_token(user)
-    
+
     logger.info(f"User logged in: {user.username}")
-    
+
     return AuthResponse(
         access_token=access_token,
         token_type="bearer",
@@ -164,7 +164,7 @@ async def login(
 )
 async def get_me(
     current_user: User = Depends(get_current_user),
-):
+) -> UserResponse:
     """
     Get current user information.
 

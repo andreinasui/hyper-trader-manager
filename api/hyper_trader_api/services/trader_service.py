@@ -57,7 +57,7 @@ class TraderService:
         self.db = db
         self.settings = get_settings()
         self.runtime = get_runtime()
-        
+
         # Ensure data directory exists for trader configs
         self.config_dir = Path("./data/trader_configs")
         self.config_dir.mkdir(parents=True, exist_ok=True)
@@ -74,13 +74,13 @@ class TraderService:
     def _write_config_file(self, trader: Trader) -> Path:
         """Write trader's latest config to a JSON file."""
         config_path = self._get_config_path(str(trader.id))
-        
+
         if not trader.latest_config:
             raise TraderServiceError(f"Trader {trader.id} has no config")
-        
+
         with open(config_path, "w") as f:
             json.dump(trader.latest_config.config_json, f, indent=2)
-        
+
         return config_path
 
     def create_trader(self, user: User, trader_data: TraderCreate) -> Trader:
@@ -136,10 +136,7 @@ class TraderService:
 
         # Encrypt and store private key
         try:
-            encrypted_key = encrypt_secret(
-                trader_data.private_key,
-                self.settings.encryption_key
-            )
+            encrypted_key = encrypt_secret(trader_data.private_key, self.settings.encryption_key)
             trader_secret = TraderSecret(
                 trader_id=trader.id,
                 private_key_encrypted=encrypted_key,
@@ -162,11 +159,8 @@ class TraderService:
         # Deploy to Docker runtime
         try:
             # Decrypt private key for container environment
-            decrypted_key = decrypt_secret(
-                encrypted_key,
-                self.settings.encryption_key
-            )
-            
+            decrypted_key = decrypt_secret(encrypted_key, self.settings.encryption_key)
+
             secret_env = {
                 "PRIVATE_KEY": decrypted_key,
                 "WALLET_ADDRESS": trader.wallet_address,
@@ -320,7 +314,7 @@ class TraderService:
         # Delete from DB (cascade will delete configs and secret)
         self.db.delete(trader)
         self.db.commit()
-        
+
         logger.info(f"Trader deleted: {trader.runtime_name}")
 
     def restart_trader(self, trader_id: uuid.UUID, user_id: str) -> None:

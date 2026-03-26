@@ -10,13 +10,12 @@ Covers:
 - Bootstrap database creation
 """
 
-import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from hyper_trader_api.database import Base
@@ -340,7 +339,7 @@ class TestSessionTokenModel:
         token = SessionToken(
             user_id=user.id,
             token_hash="hashed_token_value",
-            expires_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(UTC),
             is_revoked=False,
         )
         sqlite_session.add(token)
@@ -360,7 +359,7 @@ class TestSessionTokenModel:
         token = SessionToken(
             user_id=user.id,
             token_hash="token_to_revoke",
-            expires_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(UTC),
             is_revoked=False,
         )
         sqlite_session.add(token)

@@ -8,7 +8,6 @@ during test collection.
 import os
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest

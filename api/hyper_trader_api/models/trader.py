@@ -154,9 +154,7 @@ class TraderConfig(Base):
     )
 
     # Unique constraint on (trader_id, version)
-    __table_args__ = (
-        UniqueConstraint("trader_id", "version", name="uq_trader_config_version"),
-    )
+    __table_args__ = (UniqueConstraint("trader_id", "version", name="uq_trader_config_version"),)
 
     def __repr__(self) -> str:
         return f"<TraderConfig(trader_id={self.trader_id}, version={self.version})>"

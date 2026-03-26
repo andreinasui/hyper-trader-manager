@@ -67,7 +67,7 @@ class TraderUpdate(BaseModel):
 class TraderResponse(BaseModel):
     """Schema for trader response."""
 
-    id: uuid.UUID
+    id: str
     user_id: str
     wallet_address: str
     runtime_name: str

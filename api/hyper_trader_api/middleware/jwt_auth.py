@@ -53,19 +53,19 @@ async def get_current_user(
 
     # Verify token with TokenService
     token_service = TokenService(settings.jwt_secret_key)
-    
+
     try:
         payload = token_service.verify_access_token(token)
-        
+
         if not payload:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         user_id = payload.get("sub")
-        
+
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

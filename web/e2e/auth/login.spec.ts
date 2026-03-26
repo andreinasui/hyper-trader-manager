@@ -6,17 +6,21 @@ test.describe('Authentication Flow', () => {
   
   test.describe('Bootstrap (First Run)', () => {
     test.beforeEach(async ({ page }) => {
-      // Mock setup status as false (not initialized)
+      // Track initialization state: starts false, becomes true after bootstrap
+      let isInitialized = false;
+
+      // Mock setup status - returns current initialization state
       await page.route('**/api/v1/auth/setup-status', async (route) => {
         await route.fulfill({
           status: 200,
-          json: { initialized: false },
+          json: { initialized: isInitialized },
         });
       });
       
-      // Mock bootstrap endpoint
+      // Mock bootstrap endpoint - updates initialized state on success
       await page.route('**/api/v1/auth/bootstrap', async (route) => {
         if (route.request().method() === 'POST') {
+          isInitialized = true;
           await route.fulfill({
             status: 200,
             json: { success: true },

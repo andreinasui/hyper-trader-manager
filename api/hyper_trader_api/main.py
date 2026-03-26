@@ -5,7 +5,9 @@ Multi-tenant trading bot management platform.
 """
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -45,7 +47,7 @@ logger.info(f"Logging configured at {settings.log_level} level")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Application lifespan handler.
 
@@ -92,7 +94,7 @@ async def lifespan(app: FastAPI):
 
     # Stop reconciliation worker
     logger.info("Stopping reconciliation worker...")
-    stop_reconciliation()
+    stop_reconciliation()  # type: ignore[no-untyped-call]
 
     engine.dispose()
     logger.info("HyperTrader API shutdown complete")
@@ -137,7 +139,9 @@ app.add_middleware(
 
 # Custom exception handler for validation errors
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     """
     Custom handler for Pydantic validation errors.
 
@@ -193,7 +197,7 @@ app.include_router(traders_router)
     summary="Health check",
     description="Check if the API is running and database is connected.",
 )
-async def health_check():
+async def health_check() -> dict[str, Any]:
     """
     Health check endpoint.
 
@@ -224,7 +228,7 @@ async def health_check():
     summary="API root",
     include_in_schema=False,
 )
-async def root():
+async def root() -> dict[str, str]:
     """Root endpoint - redirects to docs."""
     return {
         "message": "HyperTrader API",

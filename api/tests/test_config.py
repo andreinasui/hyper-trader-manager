@@ -6,8 +6,6 @@ configuration instead of PostgreSQL/Privy/Kubernetes.
 """
 
 
-
-
 class TestSelfHostedSettings:
     """Tests for self-hosted configuration defaults."""
 

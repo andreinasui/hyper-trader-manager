@@ -19,8 +19,8 @@ test.describe('Sidebar Navigation', () => {
   });
 
   test('displays navigation links', async ({ page }) => {
-    // Check for navigation links
-    await expect(page.locator('aside a[href="/dashboard"]')).toBeVisible();
+    // Check for navigation links (logo and nav link both point to /dashboard, use getByRole for specificity)
+    await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
     await expect(page.locator('aside a[href="/traders"]')).toBeVisible();
     await expect(page.locator('aside a[href="/settings"]')).toBeVisible();
   });

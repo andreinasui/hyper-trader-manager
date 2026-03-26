@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from hyper_trader_api.database import get_db
 from hyper_trader_api.middleware.jwt_auth import get_current_user
 from hyper_trader_api.models import User
+from hyper_trader_api.models.trader import Trader
 from hyper_trader_api.schemas.trader import (
     DeleteResponse,
     RestartResponse,
@@ -44,7 +45,7 @@ def get_trader_service(db: Session = Depends(get_db)) -> TraderService:
     return TraderService(db)
 
 
-def _trader_to_response(trader) -> TraderResponse:
+def _trader_to_response(trader: Trader) -> TraderResponse:
     """Convert Trader model to TraderResponse schema."""
     latest_config = None
     if trader.latest_config:

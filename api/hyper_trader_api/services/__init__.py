@@ -8,7 +8,7 @@ This package exports all business logic services.
 __all__ = []
 
 try:
-    from hyper_trader_api.services.k8s_controller import (
+    from hyper_trader_api.services.k8s_controller import (  # noqa: F401
         KubernetesControllerError,
         KubernetesTraderController,
     )
@@ -18,7 +18,7 @@ except ImportError:
     pass
 
 try:
-    from hyper_trader_api.services.privy_service import (
+    from hyper_trader_api.services.privy_service import (  # noqa: F401
         PrivyError,
         PrivyService,
         get_privy_service,
@@ -29,7 +29,7 @@ except ImportError:
     pass
 
 try:
-    from hyper_trader_api.services.trader_service import (
+    from hyper_trader_api.services.trader_service import (  # noqa: F401
         TraderNotFoundError,
         TraderOwnershipError,
         TraderService,

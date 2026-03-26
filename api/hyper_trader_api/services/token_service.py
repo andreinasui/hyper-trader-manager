@@ -61,7 +61,7 @@ class TokenService:
         token = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
         return token
 
-    def verify_access_token(self, token: str) -> dict | None:
+    def verify_access_token(self, token: str) -> dict[str, object] | None:
         """
         Verify and decode a JWT access token.
 

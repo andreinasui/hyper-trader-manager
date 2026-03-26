@@ -122,15 +122,8 @@ export async function setupApiMocks(page: Page) {
       } else if (method === 'POST') {
         const body = route.request().postDataJSON() as CreateTraderRequest;
         
-        // Validate request
+        // Validate request - only config.name is required in self-hosted v1
         const errors: any[] = [];
-        
-        if (!body.wallet_address) {
-          errors.push({ 
-            field: 'wallet_address', 
-            message: 'Field required' 
-          });
-        }
         
         if (!body.config?.name) {
           errors.push({ 
@@ -151,7 +144,7 @@ export async function setupApiMocks(page: Page) {
         const newTrader: Trader = {
           ...mockTrader,
           id: `trader-${Date.now()}`,
-          wallet_address: body.wallet_address,
+          wallet_address: body.wallet_address || '0x0000000000000000000000000000000000000000',
           latest_config: body.config,
           status: 'pending',
         };
@@ -229,12 +222,18 @@ export async function setupApiMocks(page: Page) {
  * Setup API error responses for testing error handling
  */
 export async function setupApiErrors(page: Page) {
-  await page.route('**/api/v1/traders', async (route) => {
+  // Set up standard auth mocks so authenticated routes work
+  await setupApiMocks(page);
+
+  // Override traders POST to return a server error (registered after setupApiMocks, so takes priority)
+  await page.route(url => url.pathname.match(/\/api\/v1\/traders\/?$/) !== null, async (route) => {
     if (route.request().method() === 'POST') {
       await route.fulfill({
         status: 500,
         json: { detail: 'Internal server error' },
       });
+      return;
     }
+    await route.continue();
   });
 }

@@ -29,8 +29,8 @@ export interface Trader {
 }
 
 export interface CreateTraderRequest {
-  wallet_address: string;
-  private_key: string; // Deprecated - not used with Privy
+  wallet_address?: string; // Optional - auto-generated agent wallet in self-hosted v1
+  private_key?: string; // Deprecated - not used in self-hosted v1
   config: {
     name: string;
     exchange: ExchangeType;
