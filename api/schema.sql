@@ -1,105 +1,78 @@
 -- HyperTrader Database Schema
--- Version: 1.0
+-- Version: 2.0 - Self-Hosted SQLite
 --
 -- This file serves as reference documentation for the database schema.
--- The actual schema is applied via Kubernetes ConfigMap (postgres-init-scripts)
--- during PostgreSQL initialization.
+-- The actual schema is created via SQLAlchemy models and bootstrap.py
+-- for self-hosted SQLite deployment.
 --
 -- Tables:
---   users          - User accounts and API credentials
---   traders        - Trader instances (linked to K8s deployments)
---   trader_configs - Versioned configuration for each trader
---   deployments    - Deployment history and status tracking
---   usage_metrics  - Resource usage for billing/analytics
-
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+--   users            - User accounts with local username/password auth
+--   traders          - Trader instances (linked to Docker containers)
+--   trader_configs   - Versioned configuration for each trader
+--   trader_secrets   - Encrypted private keys for traders
+--   session_tokens   - JWT session tokens for revocation tracking
 
 -- Users table
--- Stores user accounts
+-- Stores user accounts with local authentication
 CREATE TABLE users (
     id VARCHAR(36) PRIMARY KEY,
-    privy_user_id VARCHAR(255) UNIQUE NOT NULL,
-    wallet_address VARCHAR(255) UNIQUE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    username VARCHAR(64) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    is_admin BOOLEAN DEFAULT 0 NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_users_privy_user_id ON users(privy_user_id);
-CREATE INDEX idx_users_wallet_address ON users(wallet_address);
+CREATE INDEX idx_users_username ON users(username);
 
 -- Traders table
--- Each trader maps to a Kubernetes StatefulSet
-CREATE TABLE IF NOT EXISTS traders (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- Each trader maps to a Docker container
+CREATE TABLE traders (
+    id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) REFERENCES users(id) ON DELETE CASCADE,
     wallet_address VARCHAR(42) UNIQUE NOT NULL,
-    k8s_name VARCHAR(255) UNIQUE NOT NULL,
+    runtime_name VARCHAR(255) UNIQUE NOT NULL,
     status VARCHAR(50) DEFAULT 'pending',
     image_tag VARCHAR(100) DEFAULT 'latest',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_traders_user_id ON traders(user_id);
+CREATE INDEX idx_traders_status ON traders(status);
 
 -- Trader configs (versioned)
 -- Stores JSON configuration with version history
-CREATE TABLE IF NOT EXISTS trader_configs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    trader_id UUID REFERENCES traders(id) ON DELETE CASCADE,
-    config_json JSONB NOT NULL,
+CREATE TABLE trader_configs (
+    id VARCHAR(36) PRIMARY KEY,
+    trader_id VARCHAR(36) REFERENCES traders(id) ON DELETE CASCADE,
+    config_json TEXT NOT NULL,  -- JSON stored as TEXT in SQLite
     version INTEGER NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(trader_id, version)
 );
 
--- Deployment history
--- Tracks all deployments for audit and rollback
-CREATE TABLE IF NOT EXISTS deployments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    trader_id UUID REFERENCES traders(id) ON DELETE CASCADE,
-    image_tag VARCHAR(100),
-    status VARCHAR(50),
-    k8s_metadata JSONB,
-    deployed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    completed_at TIMESTAMP WITH TIME ZONE
+-- Trader secrets
+-- Stores encrypted private keys (one per trader)
+CREATE TABLE trader_secrets (
+    id VARCHAR(36) PRIMARY KEY,
+    trader_id VARCHAR(36) UNIQUE REFERENCES traders(id) ON DELETE CASCADE,
+    private_key_encrypted TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Usage metrics
--- Time-series data for billing and analytics
-CREATE TABLE IF NOT EXISTS usage_metrics (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    trader_id UUID REFERENCES traders(id) ON DELETE CASCADE,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    metric_type VARCHAR(50),
-    value NUMERIC,
-    metadata JSONB
+-- Session tokens
+-- Tracks JWT tokens for revocation (logout)
+CREATE TABLE session_tokens (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    is_revoked BOOLEAN DEFAULT 0 NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_traders_user_id ON traders(user_id);
-CREATE INDEX IF NOT EXISTS idx_traders_status ON traders(status);
-CREATE INDEX IF NOT EXISTS idx_deployments_trader_id ON deployments(trader_id);
-CREATE INDEX IF NOT EXISTS idx_usage_metrics_trader_id ON usage_metrics(trader_id);
-CREATE INDEX IF NOT EXISTS idx_usage_metrics_timestamp ON usage_metrics(timestamp);
-
--- Function to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
--- Triggers for updated_at
-DROP TRIGGER IF EXISTS update_users_updated_at ON users;
-CREATE TRIGGER update_users_updated_at
-    BEFORE UPDATE ON users
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
-DROP TRIGGER IF EXISTS update_traders_updated_at ON traders;
-CREATE TRIGGER update_traders_updated_at
-    BEFORE UPDATE ON traders
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+CREATE INDEX idx_session_tokens_user_id ON session_tokens(user_id);
+CREATE INDEX idx_session_tokens_token_hash ON session_tokens(token_hash);
+CREATE INDEX idx_session_tokens_expires_at ON session_tokens(expires_at);

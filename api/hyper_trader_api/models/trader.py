@@ -1,19 +1,18 @@
 """
 Trader-related models for HyperTrader API.
 
-Contains models for traders, their configurations, secrets, deployments,
-and usage metrics.
+Contains models for traders, their configurations, and secrets
+for self-hosted deployment with SQLite.
 """
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
+from sqlalchemy.types import JSON
 
 from hyper_trader_api.database import Base
 
@@ -25,14 +24,14 @@ class Trader(Base):
     """
     Trader instance model.
 
-    Represents a trading bot deployment in Kubernetes.
-    Each trader has a unique wallet address and K8s name.
+    Represents a trading bot deployment in Docker container.
+    Each trader has a unique wallet address and runtime name.
 
     Attributes:
-        id: Unique identifier (UUID)
+        id: Unique identifier (UUID string for SQLite compatibility)
         user_id: Foreign key to owning user
         wallet_address: Ethereum wallet address (unique)
-        k8s_name: Kubernetes resource name (unique)
+        runtime_name: Docker container name (unique)
         status: Current status (pending, running, stopped, failed)
         image_tag: Docker image tag for deployment
         created_at: Creation timestamp
@@ -41,10 +40,10 @@ class Trader(Base):
 
     __tablename__ = "traders"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+    id: Mapped[str] = mapped_column(
+        String(36),
         primary_key=True,
-        default=uuid.uuid4,
+        default=lambda: str(uuid.uuid4()),
     )
     user_id: Mapped[str] = mapped_column(
         String(36),
@@ -57,7 +56,7 @@ class Trader(Base):
         unique=True,
         nullable=False,
     )
-    k8s_name: Mapped[str] = mapped_column(
+    runtime_name: Mapped[str] = mapped_column(
         String(255),
         unique=True,
         nullable=False,
@@ -98,17 +97,6 @@ class Trader(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
-    deployments: Mapped[list["Deployment"]] = relationship(
-        "Deployment",
-        back_populates="trader",
-        cascade="all, delete-orphan",
-        order_by="Deployment.deployed_at.desc()",
-    )
-    usage_metrics: Mapped[list["UsageMetric"]] = relationship(
-        "UsageMetric",
-        back_populates="trader",
-        cascade="all, delete-orphan",
-    )
 
     @property
     def latest_config(self) -> Optional["TraderConfig"]:
@@ -124,29 +112,30 @@ class TraderConfig(Base):
     Versioned trader configuration.
 
     Stores JSON configuration with version history for audit and rollback.
+    Uses SQLite-compatible JSON type instead of PostgreSQL JSONB.
 
     Attributes:
-        id: Unique identifier (UUID)
+        id: Unique identifier (UUID string for SQLite compatibility)
         trader_id: Foreign key to trader
-        config_json: Configuration as JSONB
+        config_json: Configuration as JSON
         version: Configuration version number
         created_at: Creation timestamp
     """
 
     __tablename__ = "trader_configs"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+    id: Mapped[str] = mapped_column(
+        String(36),
         primary_key=True,
-        default=uuid.uuid4,
+        default=lambda: str(uuid.uuid4()),
     )
-    trader_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+    trader_id: Mapped[str] = mapped_column(
+        String(36),
         ForeignKey("traders.id", ondelete="CASCADE"),
         nullable=False,
     )
     config_json: Mapped[dict[str, Any]] = mapped_column(
-        JSONB,
+        JSON,
         nullable=False,
     )
     version: Mapped[int] = mapped_column(
@@ -165,123 +154,61 @@ class TraderConfig(Base):
     )
 
     # Unique constraint on (trader_id, version)
-    __table_args__ = ({"extend_existing": True},)
+    __table_args__ = (
+        UniqueConstraint("trader_id", "version", name="uq_trader_config_version"),
+    )
 
     def __repr__(self) -> str:
         return f"<TraderConfig(trader_id={self.trader_id}, version={self.version})>"
 
 
-class Deployment(Base):
+class TraderSecret(Base):
     """
-    Deployment history record.
+    Encrypted secrets for trader.
 
-    Tracks all deployment attempts for audit and rollback.
+    Stores encrypted private key for the trader's wallet.
+    One secret per trader.
 
     Attributes:
-        id: Unique identifier (UUID)
-        trader_id: Foreign key to trader
-        image_tag: Docker image tag deployed
-        status: Deployment status
-        k8s_metadata: Additional Kubernetes metadata (JSONB)
-        deployed_at: Deployment start timestamp
-        completed_at: Deployment completion timestamp
+        id: Unique identifier (UUID string for SQLite compatibility)
+        trader_id: Foreign key to trader (unique - one secret per trader)
+        private_key_encrypted: Encrypted private key
+        created_at: Creation timestamp
+        updated_at: Last update timestamp
     """
 
-    __tablename__ = "deployments"
+    __tablename__ = "trader_secrets"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+    id: Mapped[str] = mapped_column(
+        String(36),
         primary_key=True,
-        default=uuid.uuid4,
+        default=lambda: str(uuid.uuid4()),
     )
-    trader_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+    trader_id: Mapped[str] = mapped_column(
+        String(36),
         ForeignKey("traders.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
+        unique=True,  # One secret per trader
     )
-    image_tag: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
+    private_key_encrypted: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
     )
-    status: Mapped[str | None] = mapped_column(
-        String(50),
-        nullable=True,
-    )
-    k8s_metadata: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB,
-        nullable=True,
-    )
-    deployed_at: Mapped[datetime] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
     )
-    completed_at: Mapped[datetime | None] = mapped_column(
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        nullable=True,
+        server_default=func.now(),
+        onupdate=func.now(),
     )
 
     # Relationships
     trader: Mapped["Trader"] = relationship(
         "Trader",
-        back_populates="deployments",
+        back_populates="secret",
     )
 
     def __repr__(self) -> str:
-        return f"<Deployment(trader_id={self.trader_id}, status={self.status})>"
-
-
-class UsageMetric(Base):
-    """
-    Usage metrics for billing and analytics.
-
-    Time-series data tracking resource usage per trader.
-
-    Attributes:
-        id: Unique identifier (UUID)
-        trader_id: Foreign key to trader
-        timestamp: Metric timestamp
-        metric_type: Type of metric (cpu_hours, memory_gb_hours, etc.)
-        value: Metric value
-        extra_data: Additional metadata (JSONB)
-    """
-
-    __tablename__ = "usage_metrics"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-    )
-    trader_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("traders.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        index=True,
-    )
-    metric_type: Mapped[str | None] = mapped_column(
-        String(50),
-        nullable=True,
-    )
-    value: Mapped[Decimal | None] = mapped_column(
-        Numeric,
-        nullable=True,
-    )
-    extra_data: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB,
-        nullable=True,
-    )
-
-    # Relationships
-    trader: Mapped["Trader"] = relationship(
-        "Trader",
-        back_populates="usage_metrics",
-    )
-
-    def __repr__(self) -> str:
-        return f"<UsageMetric(trader_id={self.trader_id}, type={self.metric_type})>"
+        return f"<TraderSecret(trader_id={self.trader_id})>"
