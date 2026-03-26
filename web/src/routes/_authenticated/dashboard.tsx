@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, LogOut, Settings, Bot, CheckCircle, Square, AlertCircle, Copy, ExternalLink } from 'lucide-react';
+import { Plus, LogOut, Settings, Bot, CheckCircle, Square, AlertCircle } from 'lucide-react';
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
   component: DashboardPage,
@@ -27,16 +27,6 @@ function DashboardPage() {
     queryKey: ['traders'],
     queryFn: () => api.listTraders(),
   });
-
-  const truncateAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
-  const copyAddress = async () => {
-    if (user?.walletAddress) {
-      await navigator.clipboard.writeText(user.walletAddress);
-    }
-  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -77,42 +67,26 @@ function DashboardPage() {
           <div className="flex items-center gap-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 px-3">
+                <Button variant="ghost" className="relative h-9 px-3" data-testid="user-menu-trigger">
                   <Avatar className="h-7 w-7 mr-2">
                     <AvatarFallback>
-                      {user?.walletAddress?.slice(2, 4).toUpperCase() || 'W'}
+                      {user?.username?.slice(0, 2).toUpperCase() || 'U'}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-sm font-mono">
-                    {user?.walletAddress ? truncateAddress(user.walletAddress) : 'Wallet'}
+                  <span className="text-sm">
+                    {user?.username || 'User'}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">Connected Wallet</p>
-                    <p className="text-xs leading-none text-muted-foreground font-mono">
-                      {user?.walletAddress}
+                    <p className="text-sm font-medium leading-none">{user?.username}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user?.is_admin ? 'Administrator' : 'User'}
                     </p>
                   </div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={copyAddress} className="cursor-pointer">
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy Address
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a
-                    href={`https://arbiscan.io/address/${user?.walletAddress}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="cursor-pointer"
-                  >
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    View on Arbiscan
-                  </a>
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link to="/settings" className="cursor-pointer">

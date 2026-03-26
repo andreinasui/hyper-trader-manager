@@ -21,7 +21,7 @@ export const Route = createFileRoute('/_authenticated')({
 function AuthenticatedLayout() {
   const { ready, authenticated, loading } = useAuth()
 
-  // Show loading state while Privy initializes
+  // Show loading state while checking auth
   if (!ready || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">

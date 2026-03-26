@@ -3,8 +3,8 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { setupApiMocks } from '../fixtures/api-handlers.js';
-import { setupAuthenticatedState, truncateAddress, MOCK_WALLET_ADDRESS } from '../utils/auth-helpers.js';
+import { setupApiMocks, mockUser } from '../fixtures/api-handlers.js';
+import { setupAuthenticatedState } from '../utils/auth-helpers.js';
 
 test.describe('Dashboard - Authenticated', () => {
   test.beforeEach(async ({ page }) => {
@@ -12,15 +12,14 @@ test.describe('Dashboard - Authenticated', () => {
     await setupApiMocks(page);
   });
 
-  test('displays welcome message with wallet address', async ({ page }) => {
+  test('displays welcome message with username', async ({ page }) => {
     await page.goto('/dashboard');
 
     // Check heading - use getByRole to get the main heading, not the header
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 
-    // Check wallet address display
-    const truncated = truncateAddress(MOCK_WALLET_ADDRESS);
-    await expect(page.locator(`text=${truncated}`)).toBeVisible();
+    // Check username display
+    await expect(page.getByText(mockUser.username)).toBeVisible();
   });
 
   test('displays quick action buttons', async ({ page }) => {

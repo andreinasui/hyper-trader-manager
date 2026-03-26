@@ -6,9 +6,8 @@
 
 export interface User {
   id: string;
-  privy_user_id: string;
-  wallet_address: string;
-  created_at: string;
+  username: string;
+  is_admin: boolean;
 }
 
 export type TraderStatus = "pending" | "approving_agent" | "deploying" | "running" | "stopped" | "error";

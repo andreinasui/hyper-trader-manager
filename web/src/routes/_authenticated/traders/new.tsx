@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
-import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import type { CreateTraderRequest } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert } from '@/components/ui/alert';
-import { ArrowLeft, Bot, Info } from 'lucide-react';
+import { ArrowLeft, Bot, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 
 export const Route = createFileRoute('/_authenticated/traders/new')({
@@ -18,12 +17,13 @@ export const Route = createFileRoute('/_authenticated/traders/new')({
 
 interface TraderFormData {
   name: string;
+  walletAddress: string;
+  privateKey: string;
   copyAddress: string;
   network: 'mainnet' | 'testnet';
 }
 
 function CreateTraderPage() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
@@ -39,18 +39,14 @@ function CreateTraderPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: TraderFormData) => {
-      if (!user?.walletAddress) {
-        throw new Error('Wallet address not found');
-      }
-
       const request: CreateTraderRequest = {
-        wallet_address: user.walletAddress,
-        private_key: '', // Not used with Privy - agent wallet auto-generated
+        wallet_address: data.walletAddress,
+        private_key: data.privateKey,
         config: {
           name: data.name,
           exchange: 'hyperliquid',
           self_account: {
-            address: user.walletAddress,
+            address: data.walletAddress,
             base_url: data.network,
           },
           copy_account: {
@@ -107,16 +103,16 @@ function CreateTraderPage() {
                 </Alert>
               )}
 
-              {/* Educational Info */}
-              <div className="bg-blue-950/30 border border-blue-500/50 rounded-lg p-4">
+              {/* Security Info */}
+              <div className="bg-amber-950/30 border border-amber-500/50 rounded-lg p-4">
                 <div className="flex gap-3">
-                  <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
                   <div className="space-y-2 text-sm">
-                    <p className="font-semibold text-blue-300">Secure Agent Wallet</p>
-                    <p className="text-blue-100">
-                      Your trading bot will use an automatically generated agent wallet for secure, 
-                      isolated trading. You don't need to provide any private keys - we handle 
-                      secure wallet creation for you.
+                    <p className="font-semibold text-amber-300">Private Key Security</p>
+                    <p className="text-amber-100">
+                      Your private key is encrypted before storage and is only decrypted when
+                      the trading bot needs to sign transactions. Never share your private key
+                      with anyone.
                     </p>
                   </div>
                 </div>
@@ -136,6 +132,51 @@ function CreateTraderPage() {
                 {errors.name && (
                   <p className="text-sm text-destructive" role="alert">{errors.name.message}</p>
                 )}
+              </div>
+
+              {/* Wallet Address */}
+              <div className="space-y-2">
+                <Label htmlFor="walletAddress">Trading Wallet Address *</Label>
+                <Input
+                  id="walletAddress"
+                  {...register('walletAddress', { 
+                    required: 'Wallet address is required',
+                    pattern: {
+                      value: /^0x[a-fA-F0-9]{40}$/,
+                      message: 'Invalid Ethereum address'
+                    }
+                  })}
+                  placeholder="0x..."
+                />
+                {errors.walletAddress && (
+                  <p className="text-sm text-destructive" role="alert">{errors.walletAddress.message}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  The wallet address that will execute trades
+                </p>
+              </div>
+
+              {/* Private Key */}
+              <div className="space-y-2">
+                <Label htmlFor="privateKey">Private Key *</Label>
+                <Input
+                  id="privateKey"
+                  type="password"
+                  {...register('privateKey', { 
+                    required: 'Private key is required',
+                    pattern: {
+                      value: /^(0x)?[a-fA-F0-9]{64}$/,
+                      message: 'Invalid private key format'
+                    }
+                  })}
+                  placeholder="0x..."
+                />
+                {errors.privateKey && (
+                  <p className="text-sm text-destructive" role="alert">{errors.privateKey.message}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  The private key for signing transactions (will be encrypted)
+                </p>
               </div>
 
               {/* Exchange (read-only) */}

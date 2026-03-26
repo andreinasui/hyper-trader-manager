@@ -33,21 +33,21 @@ function SettingsPage() {
                 <CardTitle>Account Information</CardTitle>
               </div>
               <CardDescription>
-                Your connected wallet details
+                Your account details
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
-                  Wallet Address
+                  Username
                 </label>
-                <p className="font-mono text-sm mt-1">{user?.walletAddress}</p>
+                <p className="text-sm mt-1">{user?.username}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
-                  Privy User ID
+                  Role
                 </label>
-                <p className="font-mono text-sm mt-1">{user?.privyUserId}</p>
+                <p className="text-sm mt-1">{user?.is_admin ? 'Administrator' : 'User'}</p>
               </div>
             </CardContent>
           </Card>
@@ -64,8 +64,8 @@ function SettingsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                Your wallet is managed by your external wallet provider (MetaMask, Rabby, etc.).
-                Your private keys remain under your control.
+                Your account is secured with username and password authentication.
+                Keep your credentials safe and do not share them.
               </p>
             </CardContent>
           </Card>

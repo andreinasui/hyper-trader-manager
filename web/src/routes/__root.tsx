@@ -5,14 +5,22 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import type { QueryClient } from '@tanstack/react-query'
+import type { AuthUser } from '@/hooks/useAuth'
 
 interface MyRouterContext {
   queryClient: QueryClient
   auth: {
     ready: boolean
     authenticated: boolean
-    user: { walletAddress: string; privyUserId: string } | null
+    user: AuthUser | null
     loading: boolean
+    isInitialized: boolean
+    token: string | null
+    login: (username: string, password: string) => Promise<void>
+    logout: () => void
+    bootstrap: (username: string, password: string) => Promise<void>
+    checkAuth: () => Promise<void>
+    checkSetup: () => Promise<void>
   }
 }
 

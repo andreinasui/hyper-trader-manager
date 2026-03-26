@@ -1,38 +1,49 @@
 import { test, expect } from '@playwright/test'
+import { setupApiMocks } from './fixtures/api-handlers.js'
+import { setupUnauthenticatedState, setupAuthenticatedState } from './utils/auth-helpers.js'
 
 test.describe('Authentication', () => {
   test.beforeEach(async ({ page }) => {
-    // Enable mock mode
-    await page.addInitScript(() => {
-      (window as any).__PRIVY_MOCK__ = {
-        enabled: true,
-        authenticated: false,
-        ready: true,
-      }
-    })
+    await setupApiMocks(page)
   })
 
-  test('user can authenticate with Privy', async ({ page }) => {
+  test('user can login with username and password', async ({ page }) => {
+    await setupUnauthenticatedState(page)
     await page.goto('/')
     
-    // Should show connect wallet button
-    await expect(page.getByText(/Connect Wallet/i)).toBeVisible()
+    // Should show login form
+    await expect(page.getByLabel('Username')).toBeVisible()
+    await expect(page.getByLabel('Password')).toBeVisible()
     
-    // Click connect (mocked in test environment)
-    await page.click('button:has-text("Connect Wallet")')
+    // Fill in credentials
+    await page.getByLabel('Username').fill('admin')
+    await page.getByLabel('Password').fill('password123')
     
-    // Should see wallet address after auth (shortened format)
-    await expect(page.locator('text=/0x[a-fA-F0-9]{4}/i')).toBeVisible({ timeout: 5000 })
+    // Submit
+    await page.getByRole('button', { name: 'Sign In' }).click()
+    
+    // Should redirect to dashboard
+    await expect(page).toHaveURL(/\/dashboard/)
   })
   
   test('unauthenticated requests redirect to login', async ({ page }) => {
+    await setupUnauthenticatedState(page)
+    
     // Try to access protected route
-    await page.goto('/traders')
+    await page.goto('/dashboard')
     
-    // Should redirect to login or show login page
-    await expect(page.url()).toMatch(/(login|\/?)/)
+    // Should redirect to login page
+    await expect(page).toHaveURL('/')
     
-    // Should see Connect Wallet button since we're redirected
-    await expect(page.getByText(/Connect Wallet/i)).toBeVisible()
+    // Should see login form
+    await expect(page.getByLabel('Username')).toBeVisible()
+  })
+
+  test('authenticated user can access dashboard', async ({ page }) => {
+    await setupAuthenticatedState(page)
+    await page.goto('/dashboard')
+    
+    // Should stay on dashboard
+    await expect(page).toHaveURL(/\/dashboard/)
   })
 })

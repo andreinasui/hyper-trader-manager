@@ -12,9 +12,8 @@ import type { User, Trader, CreateTraderRequest } from '../../src/lib/types.js';
  */
 export const mockUser: User = {
   id: 'test-user-id',
-  privy_user_id: 'test-privy-user-id',
-  wallet_address: '0x1234567890123456789012345678901234567890',
-  created_at: '2024-01-01T00:00:00Z',
+  username: 'admin',
+  is_admin: true,
 };
 
 /**
@@ -49,6 +48,43 @@ export const mockTrader: Trader = {
  * Setup API route mocking
  */
 export async function setupApiMocks(page: Page) {
+  // Mock auth setup status (default to initialized)
+  await page.route('**/api/v1/auth/setup-status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      json: { initialized: true },
+    });
+  });
+
+  // Mock login
+  await page.route('**/api/v1/auth/login', async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({
+        status: 200,
+        json: {
+          access_token: 'mock-access-token',
+          user: mockUser,
+        },
+      });
+      return;
+    }
+    await route.continue();
+  });
+  
+  // Mock bootstrap
+  await page.route('**/api/v1/auth/bootstrap', async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({
+        status: 200,
+        json: {
+          success: true,
+        },
+      });
+      return;
+    }
+    await route.continue();
+  });
+
   // Mock auth endpoints
   await page.route('**/api/v1/auth/me', async (route) => {
     const authHeader = route.request().headers()['authorization'];
@@ -176,6 +212,7 @@ export async function setupApiMocks(page: Page) {
       } else if (method === 'DELETE') {
         await route.fulfill({
           status: 204,
+          json: { success: true },
         });
       }
       return;
