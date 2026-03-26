@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  VITE_API_URL: z.string().default('/api'),
+  VITE_API_URL: z.string().default('/api'), // Relative path for same-origin proxy
   VITE_PRIVY_APP_ID: z.string().min(1).optional(), // Optional for now as it might be empty in dev
   MODE: z.enum(['development', 'production', 'test']).default('development'),
 });

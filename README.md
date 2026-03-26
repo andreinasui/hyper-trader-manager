@@ -2,9 +2,67 @@
 
 Management application for HyperTrader instances, including Backend API and Frontend Web.
 
-> Draft self-hosted v1 quickstart: `docs/SELF_HOSTED_QUICKSTART.md`
->
-> Note: the current repository state is still largely K8s/Privy-oriented; the quickstart describes the planned self-hosted v1 delivery model.
+## Self-Hosted Deployment (v1)
+
+Run the full HyperTrader stack on a single VPS with Docker Compose and Traefik.
+
+### Stack
+
+| Service | Description | Accessible at |
+|---------|-------------|---------------|
+| `traefik` | Reverse proxy, routes requests | `:80` (configurable via `PUBLIC_PORT`) |
+| `api` | FastAPI backend (uvicorn) | `/api/*` |
+| `web` | React frontend (nginx, static) | `/*` |
+| `data/` | SQLite DB + trader configs (host volume) | — |
+
+### Quick Start
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/yourorg/hyper-trader-manager.git
+cd hyper-trader-manager
+
+# 2. Configure environment
+cp deploy/.env.selfhosted.example deploy/.env
+# Edit deploy/.env — at minimum set SECRET_KEY and ADMIN_PASSWORD
+
+# 3. Start the stack
+docker compose -f docker-compose.selfhosted.yml up -d
+
+# 4. Verify services
+docker compose -f docker-compose.selfhosted.yml ps
+curl http://localhost/health        # → api health check
+curl http://localhost/api/v1/auth/setup-status  # → api (alternative)
+```
+
+### Configuration
+
+All settings are in `deploy/.env` (copied from `deploy/.env.selfhosted.example`):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PUBLIC_PORT` | `80` | Host port to expose |
+| `SECRET_KEY` | — | JWT signing secret (required, generate with `openssl rand -hex 32`) |
+| `ADMIN_EMAIL` | — | Admin user email (created on first start) |
+| `ADMIN_PASSWORD` | — | Admin user password (required) |
+| `LOG_LEVEL` | `INFO` | API log level |
+
+### Data Persistence
+
+All persistent data is stored in `./data/` on the host:
+- `data/db.sqlite` — SQLite database
+- `data/traders/` — Trader configuration files
+
+### Updating
+
+```bash
+docker compose -f docker-compose.selfhosted.yml pull
+docker compose -f docker-compose.selfhosted.yml up -d --build
+```
+
+---
+
+> Note: the legacy K8s/Privy-oriented setup is documented below.
 
 ## Components
 - **api/**: FastAPI backend for trader management and Kubernetes orchestration (includes Jinja2 templates in `api/templates`).

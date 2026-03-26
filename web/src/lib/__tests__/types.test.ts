@@ -243,17 +243,6 @@ describe('Type Validation', () => {
       expect(user.is_admin).toBe(false);
     });
 
-    it('should accept valid User structure', () => {
-      const user: User = {
-        id: 'user-123',
-        username: 'testuser',
-        is_admin: false,
-      };
-
-      expect(user.username).toBe('testuser');
-      expect(user.is_admin).toBe(false);
-    });
-
     it('should accept valid LoginRequest', () => {
       const loginRequest: LoginRequest = {
         username: 'testuser',
