@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("Starting HyperTrader API...")
-    logger.debug(f"Settings loaded: debug={settings.debug}, k8s_enabled={settings.k8s_enabled}")
+    logger.debug(f"Settings loaded: debug={settings.debug}, runtime_mode={settings.runtime_mode}")
 
     # Verify database connection
     try:
@@ -71,10 +71,9 @@ async def lifespan(app: FastAPI):
         logger.error(f"Database connection failed: {e}")
         raise
 
-    # Start reconciliation worker only if K8s is enabled
-    if settings.k8s_enabled:
-        logger.info("Starting reconciliation worker...")
-        logger.debug(f"Reconciliation interval: {settings.reconciliation_interval}s")
+    # Start reconciliation worker for Docker runtime
+    if settings.runtime_mode == "docker":
+        logger.info("Starting reconciliation worker for Docker runtime...")
         try:
             start_reconciliation()
             logger.info("Reconciliation worker started")
@@ -82,7 +81,7 @@ async def lifespan(app: FastAPI):
             logger.error(f"Failed to start reconciliation worker: {e}")
             # Continue startup - reconciliation is not critical for API operation
     else:
-        logger.info("Kubernetes disabled - reconciliation worker not started")
+        logger.warning(f"Unknown runtime_mode: {settings.runtime_mode}")
 
     logger.info("HyperTrader API started successfully")
 
@@ -103,14 +102,19 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="HyperTrader API",
     description=(
-        "Multi-tenant trading bot management platform.\n\n"
+        "Self-hosted trading bot management platform.\n\n"
         "## Authentication\n\n"
-        "All endpoints (except `/health`) require Privy JWT authentication.\n\n"
-        "Include your Privy access token in the `Authorization` header:\n\n"
-        "```\nAuthorization: Bearer <privy_access_token>\n```\n\n"
+        "This API uses local username/password authentication with JWT tokens.\n\n"
+        "### Initial Setup\n\n"
+        "1. Check system status: `GET /api/v1/auth/setup-status`\n"
+        "2. Bootstrap first admin: `POST /api/v1/auth/bootstrap`\n"
+        "3. Login: `POST /api/v1/auth/login`\n\n"
+        "### Using the API\n\n"
+        "Include your access token in the `Authorization` header:\n\n"
+        "```\nAuthorization: Bearer <access_token>\n```\n\n"
         "## Getting Started\n\n"
-        "1. Authenticate with Privy on the frontend\n"
-        "2. Send Privy JWT to backend endpoints\n"
+        "1. Bootstrap the system with an admin user\n"
+        "2. Login to get your access token\n"
         "3. Create a trader at `POST /api/v1/traders/`\n"
         "4. Monitor with `GET /api/v1/traders/{id}/status` and `GET /api/v1/traders/{id}/logs`\n"
     ),

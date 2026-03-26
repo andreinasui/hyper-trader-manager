@@ -1,7 +1,7 @@
 """
-Privy JWT authentication middleware for HyperTrader API.
+Local JWT authentication middleware for HyperTrader API.
 
-Validates Privy JWT tokens and creates/retrieves users.
+Validates JWT tokens issued by the local auth service.
 """
 
 import logging
@@ -9,11 +9,13 @@ import logging
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from hyper_trader_api.config import get_settings
 from hyper_trader_api.database import get_db
 from hyper_trader_api.models import User
-from hyper_trader_api.services.privy_service import PrivyError, get_privy_service
+from hyper_trader_api.services.token_service import TokenService
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 async def get_current_user(
@@ -21,10 +23,10 @@ async def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """
-    Authenticate user using Privy JWT token.
+    Authenticate user using local JWT token.
 
-    Extracts Bearer token from Authorization header, verifies it with Privy,
-    and creates or retrieves the user from the database.
+    Extracts Bearer token from Authorization header, verifies it with TokenService,
+    and retrieves the user from the database.
 
     Args:
         request: FastAPI Request object
@@ -49,64 +51,46 @@ async def get_current_user(
     # Extract token
     token = auth_header.replace("Bearer ", "")
 
-    # Verify token with Privy
-    privy_service = get_privy_service()
-
+    # Verify token with TokenService
+    token_service = TokenService(settings.jwt_secret_key)
+    
     try:
-        payload = privy_service.verify_access_token(token)
-        privy_user_id = payload.get("sub")
-
-        if not privy_user_id:
+        payload = token_service.verify_access_token(token)
+        
+        if not payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        user_id = payload.get("sub")
+        
+        if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token payload",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-    except PrivyError as e:
-        logger.warning(f"Privy token verification failed: {e}")
+    except Exception as e:
+        logger.warning(f"Token verification failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         ) from e
 
-    # Check if user exists
-    user = db.query(User).filter(User.privy_user_id == privy_user_id).first()
+    # Look up user by ID from token
+    user = db.query(User).filter_by(id=user_id).first()
 
-    if user:
-        logger.debug(f"Existing user authenticated: {privy_user_id}")
-        return user
-
-    # User doesn't exist - create new user
-    try:
-        # Fetch wallet address from Privy
-        wallet_address = await privy_service.get_wallet_address(privy_user_id)
-
-        # Create new user
-        user = User(
-            privy_user_id=privy_user_id,
-            wallet_address=wallet_address,
+    if not user:
+        logger.warning(f"User not found for ID in token: {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-        logger.info(f"New user created from Privy: {privy_user_id} - {wallet_address}")
-        return user
-
-    except PrivyError as e:
-        logger.error(f"Failed to fetch user info from Privy: {e}")
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve user information",
-        ) from e
-    except Exception as e:
-        logger.error(f"Failed to create user: {e}")
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create user account",
-        ) from e
+    logger.debug(f"User authenticated: {user.username}")
+    return user
