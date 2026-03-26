@@ -6,8 +6,10 @@
 
 export interface User {
   id: string;
-  privy_user_id: string;
-  wallet_address: string;
+  username: string;
+  email: string;
+  plan_tier?: string;
+  is_admin: boolean;
   created_at: string;
 }
 
@@ -21,7 +23,7 @@ export interface Trader {
   name?: string;
   wallet_address: string;
   agent_address: string;
-  k8s_name: string;
+  runtime_name: string;
   status: TraderStatus;
   image_tag: string;
   created_at: string;
@@ -31,7 +33,7 @@ export interface Trader {
 
 export interface CreateTraderRequest {
   wallet_address: string;
-  private_key: string; // Deprecated - not used with Privy
+  private_key: string;
   config: {
     name: string;
     exchange: ExchangeType;
@@ -50,21 +52,20 @@ export interface TraderDetails extends Trader {
   config?: Record<string, any>;
 }
 
-export interface K8sStatus {
-  pod_phase: string;
-  ready: boolean;
+export interface RuntimeStatus {
+  status: string;
+  container_id?: string;
+  image_id?: string;
   restarts: number;
-  pod_ip?: string;
-  node?: string;
   started_at?: string;
 }
 
 export interface TraderStatusResponse {
   id: string;
   wallet_address: string;
-  k8s_name: string;
+  runtime_name: string;
   status: string;
-  k8s_status: K8sStatus;
+  runtime_status: RuntimeStatus;
 }
 
 export interface LogLine {
@@ -74,8 +75,8 @@ export interface LogLine {
 
 export interface TraderLogsResponse {
   trader_id: string;
-  logs: string[];
-  total_lines: number;
+  logs: string; // Backend returns single string
+  tail_lines: number; // Backend uses tail_lines
 }
 
 export interface SystemStats {
@@ -94,4 +95,17 @@ export interface ValidationError {
 
 export interface ApiError {
   detail: string | ValidationError[];
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+  user: User;
 }
