@@ -35,17 +35,21 @@ function RootComponent() {
   const navigate = useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
 
-  const { data: sslStatus } = useQuery({
+  const { data: sslStatus, isError: isSslError } = useQuery({
     queryKey: ['ssl-status'],
     queryFn: getSSLStatus,
     staleTime: Infinity, // Only check once per session
+    retry: false,
+    refetchOnWindowFocus: false,
   })
 
   useEffect(() => {
+    // If the SSL status check fails, let the app proceed — don't block startup
+    if (isSslError) return
     if (sslStatus && !sslStatus.ssl_configured && !pathname.startsWith('/setup/ssl')) {
       void navigate({ to: '/setup/ssl' })
     }
-  }, [sslStatus, pathname, navigate])
+  }, [sslStatus, isSslError, pathname, navigate])
 
   return (
     <>

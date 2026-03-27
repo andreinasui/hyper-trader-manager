@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getSSLStatus, configureSSL } from '@/api/ssl-setup'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,6 +21,7 @@ export const Route = createFileRoute('/setup/ssl')({
 
 function SSLSetupPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [mode, setMode] = useState<'domain' | 'ip_only'>('domain')
   const [domain, setDomain] = useState('')
   const [email, setEmail] = useState('')
@@ -45,6 +46,8 @@ function SSLSetupPage() {
   const { mutate: submitSSL, isPending, error: mutationError } = useMutation({
     mutationFn: configureSSL,
     onSuccess: (data) => {
+      // Invalidate so the root layout sees the updated SSL status
+      void queryClient.invalidateQueries({ queryKey: ['ssl-status'] })
       if (data.redirect_url) {
         window.location.href = data.redirect_url
       } else {
