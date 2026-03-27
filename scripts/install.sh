@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 # install.sh — First-time install for HyperTrader Manager
-# Usage: ./scripts/install.sh [--port PORT] [--env-file PATH]
+# Usage: ./scripts/install.sh [--port PORT]
+#
+# This script:
+#   1. Checks prerequisites (Docker, Docker Compose)
+#   2. Creates .env from template
+#   3. Sets up initial Traefik config (HTTP mode)
+#   4. Builds and starts the Docker stack
+#   5. Waits for services to be healthy
+#
+# After installation, open the dashboard to:
+#   - Create your admin account
+#   - Configure SSL (Let's Encrypt or self-signed)
+#
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,7 +20,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 ENV_SOURCE="deploy/.env.example"
-ENV_FILE=".env"
+ENV_FILE="deploy/.env"
 COMPOSE_FILE="docker-compose.yml"
 
 # ─── Colours ─────────────────────────────────────────────────────────────────
@@ -27,12 +39,10 @@ error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 while [[ $# -gt 0 ]]; do
   case $1 in
     --port)     shift; PORT="$1" ;;
-    --env-file) shift; ENV_FILE="$1" ;;
     -h|--help)
-      echo "Usage: $0 [--port PORT] [--env-file PATH]"
+      echo "Usage: $0 [--port PORT]"
       echo
-      echo "  --port       Override PUBLIC_PORT in the env file"
-      echo "  --env-file   Path to the env file (default: .env)"
+      echo "  --port       Override PUBLIC_PORT (default: 80)"
       exit 0
       ;;
     *) error "Unknown option: $1"; exit 1 ;;
@@ -72,19 +82,26 @@ else
   fi
   cp "$ENV_SOURCE" "$ENV_FILE"
   success "Created $ENV_FILE from $ENV_SOURCE"
-  echo
-  warn "⚠  IMPORTANT: Edit $ENV_FILE before continuing."
-  warn "   At minimum, set:"
-  warn "     SECRET_KEY      — run: openssl rand -hex 32"
-  warn "     ADMIN_PASSWORD  — choose a strong password"
-  warn "     ADMIN_EMAIL     — your admin email"
-  warn "     DOCKER_GID      — run: getent group docker | cut -d: -f3"
-  echo
-  read -r -p "Have you edited $ENV_FILE? [y/N] " ans
-  if [[ "${ans,,}" != "y" ]]; then
-    info "Open $ENV_FILE, fill in the required values, then re-run this script."
-    exit 0
+
+  # Generate SECRET_KEY if not already set
+  if grep -q "SECRET_KEY=change-me" "$ENV_FILE"; then
+    SECRET_KEY=$(openssl rand -hex 32)
+    sed -i "s/^SECRET_KEY=.*/SECRET_KEY=$SECRET_KEY/" "$ENV_FILE"
+    success "Generated SECRET_KEY automatically"
   fi
+
+  # Detect and set DOCKER_GID
+  if command -v getent &>/dev/null; then
+    DETECTED_GID=$(getent group docker | cut -d: -f3 || echo "")
+    if [[ -n "$DETECTED_GID" ]]; then
+      sed -i "s/^DOCKER_GID=.*/DOCKER_GID=$DETECTED_GID/" "$ENV_FILE"
+      success "Detected DOCKER_GID=$DETECTED_GID"
+    fi
+  fi
+
+  echo
+  info "Environment file created: $ENV_FILE"
+  info "Review settings if needed (SECRET_KEY and DOCKER_GID auto-configured)"
 fi
 
 # Apply optional port override
@@ -98,15 +115,70 @@ if [[ -n "${PORT:-}" ]]; then
   fi
 fi
 
-# ─── Create data directory ────────────────────────────────────────────────────
-if [[ ! -d "data" ]]; then
-  mkdir -p data
-  success "Created data/ directory"
+# ─── Create data directories ─────────────────────────────────────────────────
+info "Setting up data directories..."
+
+mkdir -p data/traefik/certs
+success "Created data/traefik/ structure"
+
+# ─── Initial Traefik config (HTTP mode) ───────────────────────────────────────
+# This is the minimal HTTP-only config for first boot.
+# The SSL setup wizard will reconfigure Traefik for HTTPS.
+if [[ ! -f "data/traefik/traefik.yml" ]]; then
+  cat > data/traefik/traefik.yml << 'EOF'
+# Initial HTTP-only config — SSL setup wizard will reconfigure this
+entryPoints:
+  web:
+    address: ":80"
+
+providers:
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+EOF
+  success "Created initial Traefik static config"
+fi
+
+if [[ ! -f "data/traefik/dynamic.yml" ]]; then
+  cat > data/traefik/dynamic.yml << 'EOF'
+# Initial routing config — SSL setup wizard will update this
+http:
+  routers:
+    health:
+      rule: "Path(`/health`)"
+      service: api
+      entryPoints: [web]
+      priority: 20
+    api:
+      rule: "PathPrefix(`/api`)"
+      service: api
+      entryPoints: [web]
+      priority: 10
+    web:
+      rule: "PathPrefix(`/`)"
+      service: web
+      entryPoints: [web]
+      priority: 1
+  services:
+    api:
+      loadBalancer:
+        servers:
+          - url: "http://api:8000"
+        healthCheck:
+          path: /health
+          interval: 10s
+          timeout: 5s
+    web:
+      loadBalancer:
+        servers:
+          - url: "http://web:80"
+EOF
+  success "Created initial Traefik dynamic config"
 fi
 
 # ─── Build and start ──────────────────────────────────────────────────────────
 info "Building images and starting stack..."
-docker compose --env-file "$ENV_FILE" up -d --build
+docker compose up -d --build
 
 # ─── Smoke test ───────────────────────────────────────────────────────────────
 info "Waiting for services to be healthy..."
@@ -123,7 +195,7 @@ until curl -sf "${BASE_URL}/health" -o /dev/null 2>/dev/null; do
     error "API did not become healthy after $((MAX_RETRIES * RETRY_DELAY))s"
     echo
     error "Check container logs:"
-    echo "  docker compose --env-file $ENV_FILE logs"
+    echo "  docker compose logs"
     exit 1
   fi
   info "Still waiting... ($n/$MAX_RETRIES)"
@@ -132,8 +204,21 @@ done
 
 success "Stack is up and healthy!"
 echo
-info "Dashboard: ${BASE_URL}"
-info "Health:    ${BASE_URL}/health"
-info "Setup:     ${BASE_URL}/api/v1/auth/setup-status"
+echo "════════════════════════════════════════════════════════════════════"
+info "Dashboard:     ${BASE_URL}"
+info "Health check:  ${BASE_URL}/health"
+echo "════════════════════════════════════════════════════════════════════"
 echo
-success "Installation complete. Open ${BASE_URL} in your browser to complete setup."
+success "Installation complete!"
+echo
+info "Next steps:"
+echo "  1. Open ${BASE_URL} in your browser"
+echo "  2. Create your admin account (first-time setup)"
+echo "  3. Configure SSL (Let's Encrypt or self-signed certificate)"
+echo
+info "After SSL setup, your dashboard will be available over HTTPS."
+echo
+info "Useful commands:"
+echo "  docker compose logs -f          # View logs"
+echo "  docker compose restart          # Restart services"
+echo "  docker compose down             # Stop services"
