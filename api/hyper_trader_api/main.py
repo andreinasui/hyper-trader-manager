@@ -19,6 +19,7 @@ from hyper_trader_api.config import get_settings
 from hyper_trader_api.database import engine
 from hyper_trader_api.db.bootstrap import bootstrap_database
 from hyper_trader_api.routers import auth_router, traders_router
+from hyper_trader_api.routers.ssl_setup import router as ssl_setup_router
 from hyper_trader_api.workers import start_reconciliation, stop_reconciliation
 
 settings = get_settings()
@@ -187,6 +188,7 @@ async def validation_exception_handler(
 # Include routers
 app.include_router(auth_router)
 app.include_router(traders_router)
+app.include_router(ssl_setup_router)
 # app.include_router(admin_router)  # Disabled - no admin functionality with Privy auth
 
 
