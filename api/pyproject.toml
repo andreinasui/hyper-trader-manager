@@ -23,7 +23,6 @@ dependencies = [
     "pyyaml>=6.0.0",
     # Security & Auth
     "cryptography>=41.0.0",
-    "PyJWT[crypto]>=2.8.0",
     "passlib[bcrypt]>=1.7.4",
     # HTTP Client
     "httpx>=0.25.0",

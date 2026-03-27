@@ -81,7 +81,7 @@ cp api/.env.example api/.env
 ```
 
 Required variables:
-- `DATABASE_URL` - PostgreSQL connection string
+- `DATABASE_URL` - SQLite connection string (default: `sqlite:///./data/hypertrader.db`)
 - `JWT_SECRET_KEY` - Secret for JWT tokens
 - `ENCRYPTION_KEY` - Fernet key for encrypting sensitive data
 

@@ -39,7 +39,6 @@ class Settings(BaseSettings):
     Application settings loaded from environment variables.
 
     Required for security:
-        JWT_SECRET_KEY: Secret key for JWT token signing
         ENCRYPTION_KEY: Key for encrypting sensitive data (API keys, secrets)
     """
 
@@ -60,7 +59,6 @@ class Settings(BaseSettings):
     # ==================== Security & Authentication ====================
     # IMPORTANT: Generate secure keys with: openssl rand -hex 32
     # For development only, we provide unsafe defaults
-    jwt_secret_key: str = "dev-secret-key-change-in-production"
     encryption_key: str = "dev-encryption-key-change-in-production"
 
     # ==================== Self-Hosted Configuration ====================
@@ -82,7 +80,7 @@ class Settings(BaseSettings):
     # ==================== CORS ====================
     cors_origins: str = "http://localhost:3000"
 
-    @field_validator("jwt_secret_key", "encryption_key")
+    @field_validator("encryption_key")
     @classmethod
     def validate_secrets(cls, v: str, info: ValidationInfo) -> str:
         """Require real secrets in production, allow defaults in development."""

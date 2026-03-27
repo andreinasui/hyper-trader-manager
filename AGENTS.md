@@ -4,7 +4,7 @@
 
 | Directory | Description | Tech Stack |
 |-----------|-------------|------------|
-| `/api` | Backend API | Python 3.11+, FastAPI, SQLAlchemy, PostgreSQL, Jinja2 (K8s templates) |
+| `/api` | Backend API | Python 3.11+, FastAPI, SQLAlchemy, SQLite |
 | `/web` | Frontend App | React 19, TypeScript, TanStack Router/Query, Tailwind CSS |
 
 ## Development Commands

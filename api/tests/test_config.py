@@ -23,21 +23,6 @@ class TestSettings:
         settings = Settings()
         assert settings.database_url.startswith("sqlite")
 
-    def test_jwt_secret_key_required(self, monkeypatch):
-        """JWT secret key should be required for security."""
-        monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
-        monkeypatch.delenv("DATABASE_URL", raising=False)
-        from hyper_trader_api.config import get_settings
-
-        get_settings.cache_clear()
-
-        from hyper_trader_api.config import Settings
-
-        # Should have a way to generate or require JWT secret
-        settings = Settings()
-        # Either has default or validation - we'll implement required validation
-        assert hasattr(settings, "jwt_secret_key")
-
     def test_encryption_key_required(self, monkeypatch):
         """Encryption key should be required for secret storage."""
         monkeypatch.delenv("ENCRYPTION_KEY", raising=False)

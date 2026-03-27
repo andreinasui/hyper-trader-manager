@@ -4,7 +4,7 @@
 
 - **Language**: Python 3.11+
 - **Framework**: FastAPI
-- **Database**: PostgreSQL with SQLAlchemy ORM
+- **Database**: SQLite with SQLAlchemy ORM
 - **Validation**: Pydantic v2
 - **Authentication**: JWT with python-jose, bcrypt
 - **Package Manager**: `uv` (NOT pip)

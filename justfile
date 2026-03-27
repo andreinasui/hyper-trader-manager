@@ -1,4 +1,4 @@
-# HyperTrader Infrastructure - Development Commands
+# HyperTrader Manager - Development Commands
 # Install just: https://github.com/casey/just#installation
 
 set shell := ["bash", "-cu"]
@@ -6,37 +6,6 @@ set shell := ["bash", "-cu"]
 # Default recipe - show help
 default:
     @just --list
-
-# ─────────────────────────────────────────────────────────────
-# Database Commands
-# ─────────────────────────────────────────────────────────────
-
-# Start PostgreSQL and pgAdmin containers
-db:
-    docker compose -f docker-compose.dev.yml up -d
-    @echo ""
-    @echo "✓ PostgreSQL running at localhost:5432"
-    @echo "✓ pgAdmin running at http://localhost:5050"
-    @echo "  Email: admin@hypertrader.local"
-    @echo "  Password: admin"
-
-# Stop database containers
-db-stop:
-    docker compose -f docker-compose.dev.yml down
-
-# Reset database (WARNING: deletes all data)
-db-reset:
-    docker compose -f docker-compose.dev.yml down -v
-    docker compose -f docker-compose.dev.yml up -d
-    @echo "✓ Database reset complete"
-
-# View database logs
-db-logs:
-    docker compose -f docker-compose.dev.yml logs -f postgres
-
-# Connect to PostgreSQL via psql
-db-shell:
-    docker exec -it hypertrader-postgres psql -U hypertrader -d hypertrader
 
 # ─────────────────────────────────────────────────────────────
 # Development Shortcuts (delegate to subdirectories)
@@ -108,22 +77,21 @@ urls:
     @echo "  Backend API: http://localhost:8000"
     @echo "  Swagger:     http://localhost:8000/docs"
     @echo "  ReDoc:       http://localhost:8000/redoc"
-    @echo "  pgAdmin:     http://localhost:5050"
-    @echo "  PostgreSQL:  localhost:5432"
+    @echo "  SQLite DB:   api/data/hypertrader.db"
 
 # Show quick start guide
 quickstart:
-    @echo "Quick Start:"
+    @echo "Quick Start (2 terminals):"
     @echo ""
-    @echo "1. Start database:"
-    @echo "   just db"
-    @echo ""
-    @echo "2. In a new terminal, start backend:"
+    @echo "1. Start backend (creates SQLite DB automatically):"
     @echo "   just api"
     @echo "   # Or: cd api && just dev"
     @echo ""
-    @echo "3. In a new terminal, start frontend:"
+    @echo "2. In a new terminal, start frontend:"
     @echo "   just web"
     @echo "   # Or: cd web && just dev"
     @echo ""
-    @echo "4. Open http://localhost:3000"
+    @echo "3. Open http://localhost:3000"
+    @echo ""
+    @echo "Database: SQLite file at api/data/hypertrader.db"
+    @echo "Reset DB: rm api/data/hypertrader.db && just api"
