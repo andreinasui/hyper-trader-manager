@@ -6,12 +6,11 @@ Local username/password authentication.
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from hyper_trader_api.config import get_settings
 from hyper_trader_api.database import get_db
-from hyper_trader_api.middleware.jwt_auth import get_current_user
+from hyper_trader_api.middleware.session_auth import get_current_user
 from hyper_trader_api.models import User
 from hyper_trader_api.schemas.auth import (
     AuthResponse,
@@ -21,10 +20,9 @@ from hyper_trader_api.schemas.auth import (
     UserResponse,
 )
 from hyper_trader_api.services.local_auth_service import LocalAuthService
-from hyper_trader_api.services.token_service import TokenService
+from hyper_trader_api.services.session_token_service import SessionTokenService
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 router = APIRouter(
     prefix="/api/v1/auth",
@@ -81,14 +79,14 @@ async def bootstrap_admin(
         HTTPException: 409 if system is already initialized
     """
     auth_service = LocalAuthService(db)
-    token_service = TokenService(settings.jwt_secret_key)
+    token_service = SessionTokenService(db)
 
     try:
         # Create admin user
         user = auth_service.bootstrap_admin(request.username, request.password)
 
-        # Generate access token
-        access_token = token_service.create_access_token(user)
+        # Generate session token
+        access_token = token_service.create_session(user)
 
         logger.info(f"System bootstrapped with admin user: {user.username}")
 
@@ -131,7 +129,7 @@ async def login(
         HTTPException: 401 if credentials are invalid
     """
     auth_service = LocalAuthService(db)
-    token_service = TokenService(settings.jwt_secret_key)
+    token_service = SessionTokenService(db)
 
     # Authenticate user
     user = auth_service.authenticate(request.username, request.password)
@@ -144,8 +142,8 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Generate access token
-    access_token = token_service.create_access_token(user)
+    # Generate session token
+    access_token = token_service.create_session(user)
 
     logger.info(f"User logged in: {user.username}")
 
@@ -168,12 +166,34 @@ async def get_me(
     """
     Get current user information.
 
-    Requires valid JWT token in Authorization header.
+    Requires valid session token in Authorization header.
 
     Args:
-        current_user: Current authenticated user (from JWT token)
+        current_user: Current authenticated user (from session token)
 
     Returns:
         UserResponse: Current user information
     """
     return UserResponse.model_validate(current_user)
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Logout and revoke session",
+    description="Revoke the current session token.",
+)
+async def logout(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """Logout and revoke current session token."""
+    auth_header = request.headers.get("Authorization", "")
+    # Extract token using slice (not replace) to handle only the prefix
+    token = auth_header[len("Bearer "):] if auth_header.startswith("Bearer ") else ""
+
+    token_service = SessionTokenService(db)
+    token_service.revoke_session(token)
+
+    logger.info(f"User logged out: {current_user.username}")
