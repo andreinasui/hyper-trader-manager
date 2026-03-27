@@ -11,6 +11,7 @@ from typing import Literal, cast
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from hyper_trader_api.config import get_settings
 from hyper_trader_api.database import get_db
 from hyper_trader_api.schemas.ssl_setup import SSLSetupRequest, SSLSetupResponse, SSLStatusResponse
 from hyper_trader_api.services.ssl_setup_service import SSLSetupError, SSLSetupService
@@ -35,9 +36,17 @@ async def get_ssl_status(
     """
     Check current SSL configuration status.
 
+    In development mode, always returns ssl_configured=True to skip SSL setup.
+
     Returns:
         SSLStatusResponse: ssl_configured flag, mode, domain, and configured_at timestamp
     """
+    settings = get_settings()
+
+    # In development mode, skip SSL setup requirement
+    if settings.environment == "development":
+        return SSLStatusResponse(ssl_configured=True, mode="ip_only")
+
     service = SSLSetupService(db)
     config = service.get_ssl_config()
 

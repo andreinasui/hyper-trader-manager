@@ -9,11 +9,22 @@ Tests for:
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+
+@pytest.fixture
+def mock_production_env():
+    """Mock settings to simulate production environment."""
+    mock_settings = MagicMock()
+    mock_settings.environment = "production"
+    with patch("hyper_trader_api.routers.ssl_setup.get_settings", return_value=mock_settings):
+        yield mock_settings
+
 
 class TestSSLStatus:
     """Tests for GET /api/v1/setup/ssl-status"""
 
-    def test_ssl_status_returns_not_configured(self, client, mock_db):
+    def test_ssl_status_returns_not_configured(self, client, mock_db, mock_production_env):
         """Test ssl-status returns ssl_configured=False when SSL is not configured."""
         with patch("hyper_trader_api.routers.ssl_setup.SSLSetupService") as MockService:
             mock_service = MockService.return_value
@@ -28,7 +39,7 @@ class TestSSLStatus:
             assert data["domain"] is None
             assert data["configured_at"] is None
 
-    def test_ssl_status_returns_domain_mode(self, client, mock_db):
+    def test_ssl_status_returns_domain_mode(self, client, mock_db, mock_production_env):
         """Test ssl-status returns domain mode details when SSL is configured."""
         configured_at = datetime(2026, 3, 27, 12, 0, 0, tzinfo=UTC)
         mock_config = MagicMock()
@@ -49,7 +60,7 @@ class TestSSLStatus:
             assert data["domain"] == "trader.example.com"
             assert data["configured_at"] is not None
 
-    def test_ssl_status_returns_ip_only_mode(self, client, mock_db):
+    def test_ssl_status_returns_ip_only_mode(self, client, mock_db, mock_production_env):
         """Test ssl-status returns ip_only mode when SSL is configured as IP-only."""
         configured_at = datetime(2026, 3, 27, 12, 0, 0, tzinfo=UTC)
         mock_config = MagicMock()
@@ -69,7 +80,7 @@ class TestSSLStatus:
             assert data["mode"] == "ip_only"
             assert data["domain"] is None
 
-    def test_ssl_status_constructs_service_with_db(self, client, mock_db):
+    def test_ssl_status_constructs_service_with_db(self, client, mock_db, mock_production_env):
         """Test ssl-status constructs SSLSetupService with the database session."""
         with patch("hyper_trader_api.routers.ssl_setup.SSLSetupService") as MockService:
             mock_service = MockService.return_value
@@ -79,7 +90,19 @@ class TestSSLStatus:
 
             MockService.assert_called_once_with(mock_db)
 
-    def test_ssl_status_no_auth_required(self, client, mock_db):
+    def test_ssl_status_returns_configured_in_development_mode(self, client, mock_db):
+        """Test ssl-status always returns ssl_configured=True in development mode."""
+        mock_settings = MagicMock()
+        mock_settings.environment = "development"
+        with patch("hyper_trader_api.routers.ssl_setup.get_settings", return_value=mock_settings):
+            response = client.get("/api/v1/setup/ssl-status")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["ssl_configured"] is True
+            assert data["mode"] == "ip_only"
+
+    def test_ssl_status_no_auth_required(self, client, mock_db, mock_production_env):
         """Test ssl-status is accessible without authentication."""
         with patch("hyper_trader_api.routers.ssl_setup.SSLSetupService") as MockService:
             mock_service = MockService.return_value
