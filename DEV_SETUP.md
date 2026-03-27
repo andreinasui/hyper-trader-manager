@@ -166,6 +166,90 @@ just api  # In terminal 1
 just web  # In terminal 2
 ```
 
+## SSL Configuration (Production)
+
+HyperTrader includes an **SSL Setup Wizard** that guides self-hosted users through configuring HTTPS access. SSL is not required for local development but is strongly recommended for any internet-facing deployment.
+
+### How the SSL Setup Wizard Works
+
+On the first access to a production instance where SSL has not yet been configured, users are automatically redirected to `/setup/ssl`. The wizard offers two modes:
+
+| Mode | Use Case | Certificate Type |
+|------|----------|-----------------|
+| **Domain (Let's Encrypt)** | You have a domain name pointing to your server | Trusted by all browsers |
+| **IP-only (Self-Signed)** | No domain — access by IP address only | Triggers browser warning |
+
+**Wizard flow:**
+1. User visits the app for the first time (production).
+2. App redirects to `/setup/ssl`.
+3. User selects a mode and fills in any required fields (domain/email for Let's Encrypt).
+4. Backend writes Traefik configuration, generates certificates if needed, and restarts Traefik.
+5. User is redirected to the HTTPS URL.
+
+### Let's Encrypt Mode Requirements
+
+Before choosing the **Domain (Let's Encrypt)** mode, ensure all of the following are true:
+
+- **Domain name** — You own a domain (or subdomain) and its DNS `A` record points to the public IP address of your server.
+- **Port 80 open** — Let's Encrypt's ACME HTTP-01 challenge requires inbound traffic on port 80. Traefik handles the challenge automatically; you only need the port to be reachable.
+- **Port 443 open** — HTTPS traffic must be reachable on port 443.
+- **No firewall/NAT blocking** — Both ports must be reachable from the public internet (check cloud security groups, router port forwarding, etc.).
+
+> **Note:** Certificate issuance can take up to 60 seconds. Let's Encrypt rate-limits failed attempts, so verify DNS propagation and port accessibility *before* running the wizard.
+
+### Self-Signed Certificate Mode (IP-Only)
+
+When you select IP-only mode, the backend generates a self-signed certificate. This certificate is **not trusted by browsers or operating systems by default**, so users will see a security warning on first visit.
+
+**What to expect:**
+- Chrome/Edge: "Your connection is not private" (NET::ERR_CERT_AUTHORITY_INVALID)
+- Firefox: "Warning: Potential Security Risk Ahead"
+- Safari: "This Connection Is Not Private"
+
+Users can bypass the warning by clicking **Advanced → Proceed** (Chrome/Edge) or **Accept the Risk and Continue** (Firefox). This is acceptable for internal or personal deployments; it is **not** recommended for production systems accessed by untrusting third parties.
+
+Self-signed certificates are stored at `data/traefik/certs/` inside the deployment directory.
+
+### Reconfiguring SSL
+
+If you need to change SSL settings (e.g., switch from self-signed to Let's Encrypt, or update the domain), you must reset the stored SSL configuration:
+
+```bash
+# 1. Open the database
+sqlite3 data/hypertrader.db
+
+# 2. Delete the SSL config record
+DELETE FROM ssl_config;
+.quit
+
+# 3. Restart the application
+docker compose restart app
+
+# 4. Visit the app — you will be redirected to /setup/ssl again
+```
+
+Alternatively, to start completely fresh (including Traefik configs and certs):
+
+```bash
+# Remove SSL-related Traefik files
+rm -rf data/traefik/
+
+# Reset the SSL config in the database
+sqlite3 data/hypertrader.db "DELETE FROM ssl_config;"
+
+# Restart the stack
+docker compose restart
+```
+
+### SSL File Locations (Production)
+
+| File / Directory | Purpose |
+|-----------------|---------|
+| `data/traefik/traefik.yml` | Main Traefik static config |
+| `data/traefik/dynamic/` | Traefik dynamic routing config |
+| `data/traefik/certs/` | Self-signed certificate files |
+| `data/traefik/acme.json` | Let's Encrypt certificate store (mode 600) |
+
 ## Production Deployment
 
 See [README.md](README.md) for production deployment with Docker Compose.
