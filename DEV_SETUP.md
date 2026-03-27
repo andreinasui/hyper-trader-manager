@@ -38,7 +38,7 @@ just install        # Install all dependencies
 ### 3. Configure Environment
 ```bash
 cd api
-just gen-keys  # Generates JWT_SECRET_KEY and ENCRYPTION_KEY
+just gen-keys  # Generates ENCRYPTION_KEY
 # Copy output to api/.env.development
 ```
 
@@ -86,7 +86,7 @@ just test        # Run tests
 just lint        # Lint code
 just format      # Format code
 just check       # Run all checks
-just gen-keys    # Generate JWT/encryption keys
+just gen-keys    # Generate encryption keys
 ```
 
 ### Frontend Development
@@ -147,7 +147,7 @@ cd web && rm -rf node_modules && pnpm install
 
 ### Authentication Issues
 ```bash
-# Check JWT secret is set
+# Check encryption key is set
 cd api && just dev  # Look for config loading in logs
 
 # Clear browser storage
@@ -300,7 +300,7 @@ hyper-trader-manager/
 | **Backend** | Python 3.11+, FastAPI, SQLAlchemy, SQLite |
 | **Frontend** | React 19, TypeScript, TanStack Router/Query, Tailwind CSS |
 | **Production** | Docker Compose, Traefik, SQLite |
-| **Auth** | JWT tokens, password hashing (bcrypt) |
+| **Auth** | Session tokens, password hashing (bcrypt) |
 
 ## Resources
 

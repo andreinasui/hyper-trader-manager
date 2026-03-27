@@ -34,7 +34,7 @@ Or do it manually:
 ```bash
 # 2a. Copy and edit environment file
 cp deploy/.env.example .env
-#    Edit .env — set SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, DOCKER_GID
+#    Edit .env — set ENCRYPTION_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, DOCKER_GID
 
 # 2b. Start the stack
 docker compose up -d --build
@@ -53,7 +53,7 @@ All settings live in `.env` (copied from `deploy/.env.example`):
 | Variable                   | Default                   | Description                                                    |
 |----------------------------|---------------------------|----------------------------------------------------------------|
 | `PUBLIC_PORT`              | `80`                      | Host port to expose                                            |
-| `SECRET_KEY`               | —                         | JWT signing secret (**required** — `openssl rand -hex 32`)    |
+| `ENCRYPTION_KEY`           | —                         | Encryption key for wallet private keys (**required** — `openssl rand -hex 32`) |
 | `ADMIN_EMAIL`              | `admin@example.com`       | Admin account email (created on first start)                   |
 | `ADMIN_PASSWORD`           | —                         | Admin account password (**required**)                          |
 | `DOCKER_GID`               | `999`                     | Docker group GID on the host (`getent group docker | cut -d: -f3`) |
@@ -119,7 +119,7 @@ See [DEV_SETUP.md](DEV_SETUP.md) for local development setup.
 
 ### Components
 
-- **api/**: FastAPI backend for trader management (SQLite, JWT auth, Docker runtime)
+- **api/**: FastAPI backend for trader management (SQLite, session token auth, Docker runtime)
 - **web/**: React/Vite frontend for monitoring and controlling traders
 - **deploy/traefik/**: Traefik dynamic routing configuration
 - **scripts/**: Install, upgrade, and backup automation

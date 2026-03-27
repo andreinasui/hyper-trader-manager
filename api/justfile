@@ -91,16 +91,11 @@ check: lint format-check typecheck test
 gen-encryption-key:
     @uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
-# Generate a JWT secret key
-gen-jwt-secret:
-    @openssl rand -hex 32
-
-# Generate both keys and show .env format
+# Generate keys and show .env format
 gen-keys:
     @echo "Add these to your .env.development file:"
     @echo ""
     @echo "ENCRYPTION_KEY=$(uv run python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
-    @echo "JWT_SECRET_KEY=$(openssl rand -hex 32)"
 
 # Clean up cache files
 clean:

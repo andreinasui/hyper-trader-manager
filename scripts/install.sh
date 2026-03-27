@@ -83,11 +83,11 @@ else
   cp "$ENV_SOURCE" "$ENV_FILE"
   success "Created $ENV_FILE from $ENV_SOURCE"
 
-  # Generate SECRET_KEY if not already set
-  if grep -q "SECRET_KEY=change-me" "$ENV_FILE"; then
-    SECRET_KEY=$(openssl rand -hex 32)
-    sed -i "s/^SECRET_KEY=.*/SECRET_KEY=$SECRET_KEY/" "$ENV_FILE"
-    success "Generated SECRET_KEY automatically"
+  # Generate ENCRYPTION_KEY if not already set
+  if grep -q "ENCRYPTION_KEY=change-me" "$ENV_FILE"; then
+    ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" 2>/dev/null || openssl rand -base64 32)
+    sed -i "s|^ENCRYPTION_KEY=.*|ENCRYPTION_KEY=$ENCRYPTION_KEY|" "$ENV_FILE"
+    success "Generated ENCRYPTION_KEY automatically"
   fi
 
   # Detect and set DOCKER_GID
@@ -101,7 +101,7 @@ else
 
   echo
   info "Environment file created: $ENV_FILE"
-  info "Review settings if needed (SECRET_KEY and DOCKER_GID auto-configured)"
+  info "Review settings if needed (ENCRYPTION_KEY and DOCKER_GID auto-configured)"
 fi
 
 # Apply optional port override
