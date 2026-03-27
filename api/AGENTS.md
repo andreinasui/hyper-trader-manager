@@ -6,7 +6,7 @@
 - **Framework**: FastAPI
 - **Database**: SQLite with SQLAlchemy ORM
 - **Validation**: Pydantic v2
-- **Authentication**: JWT with python-jose, bcrypt
+- **Authentication**: Session tokens with bcrypt
 - **Package Manager**: `uv` (NOT pip)
 - **Testing**: pytest with pytest-asyncio
 
@@ -117,4 +117,4 @@ just test-cov                # Run with coverage
 ## Environment Setup
 - **Local config**: Use `.env.development` (auto-loaded by justfile)
 - **Example file**: `.env.example` shows required variables
-- **Generate secrets**: Run `just gen-keys` for encryption/JWT keys
+- **Generate secrets**: Run `just gen-keys` for encryption keys

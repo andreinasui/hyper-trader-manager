@@ -86,13 +86,13 @@ def mock_trader(mock_user):
 
 @pytest.fixture
 def mock_tokens():
-    """Mock JWT tokens."""
+    """Mock session tokens."""
     return {
-        "access_token": "mock_access_token",
+        "access_token": "htk_mock_session_token",
     }
 
 
 @pytest.fixture
 def auth_headers():
-    """Authorization headers with mock token."""
-    return {"Authorization": "Bearer mock_access_token"}
+    """Authorization headers with mock session token."""
+    return {"Authorization": "Bearer htk_mock_session_token"}
