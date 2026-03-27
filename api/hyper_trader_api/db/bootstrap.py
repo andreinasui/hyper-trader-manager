@@ -27,6 +27,7 @@ def bootstrap_database(engine: Engine) -> None:
         User,
     )
     from hyper_trader_api.models.session_token import SessionToken  # noqa: F401
+    from hyper_trader_api.models.ssl_config import SSLConfig  # noqa: F401
     from hyper_trader_api.models.trader import TraderSecret  # noqa: F401
 
     # Create all tables

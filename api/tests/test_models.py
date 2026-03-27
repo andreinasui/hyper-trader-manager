@@ -7,6 +7,7 @@ Covers:
 - TraderConfig with JSON instead of JSONB
 - TraderSecret model
 - SessionToken model (if needed for v1)
+- SSLConfig model (singleton SSL configuration)
 - Bootstrap database creation
 """
 
@@ -22,6 +23,7 @@ from hyper_trader_api.database import Base
 from hyper_trader_api.db.bootstrap import bootstrap_database
 from hyper_trader_api.models import Trader, TraderConfig, User
 from hyper_trader_api.models.session_token import SessionToken
+from hyper_trader_api.models.ssl_config import SSLConfig
 from hyper_trader_api.models.trader import TraderSecret
 
 
@@ -371,3 +373,104 @@ class TestSessionTokenModel:
 
         retrieved = sqlite_session.get(SessionToken, token.id)
         assert retrieved.is_revoked is True
+
+
+class TestSSLConfigModel:
+    """Test SSLConfig singleton model for SSL setup configuration."""
+
+    def test_ssl_config_table_exists_after_bootstrap(self):
+        """Bootstrap should create the ssl_config table."""
+        engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        bootstrap_database(engine)
+
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+
+        assert "ssl_config" in tables, "ssl_config table should exist after bootstrap"
+        engine.dispose()
+
+    def test_ssl_config_creation_with_domain_mode(self, sqlite_session):
+        """SSLConfig can be created with domain (Let's Encrypt) mode."""
+        config = SSLConfig(
+            id=1,
+            mode="domain",
+            domain="example.com",
+            email="admin@example.com",
+            configured_at=datetime.now(UTC),
+        )
+        sqlite_session.add(config)
+        sqlite_session.commit()
+
+        assert config.id == 1
+        assert config.mode == "domain"
+        assert config.domain == "example.com"
+        assert config.email == "admin@example.com"
+        assert config.configured_at is not None
+        assert config.created_at is not None
+        assert config.updated_at is not None
+
+    def test_ssl_config_creation_with_ip_only_mode(self, sqlite_session):
+        """SSLConfig can be created with ip_only (self-signed) mode."""
+        config = SSLConfig(
+            id=1,
+            mode="ip_only",
+        )
+        sqlite_session.add(config)
+        sqlite_session.commit()
+
+        assert config.id == 1
+        assert config.mode == "ip_only"
+        assert config.domain is None
+        assert config.email is None
+        assert config.configured_at is None
+
+    def test_ssl_config_all_optional_fields_nullable(self, sqlite_session):
+        """SSLConfig can be created with only id set (all optional fields null)."""
+        config = SSLConfig(id=1)
+        sqlite_session.add(config)
+        sqlite_session.commit()
+
+        retrieved = sqlite_session.get(SSLConfig, 1)
+        assert retrieved is not None
+        assert retrieved.mode is None
+        assert retrieved.domain is None
+        assert retrieved.email is None
+        assert retrieved.configured_at is None
+
+    def test_ssl_config_singleton_only_one_row(self, sqlite_session):
+        """SSLConfig is a singleton - only one row with id=1 should exist."""
+        config1 = SSLConfig(id=1, mode="domain", domain="first.com")
+        sqlite_session.add(config1)
+        sqlite_session.commit()
+
+        # Attempting to add a second row with the same id should fail
+        config2 = SSLConfig(id=1, mode="ip_only")
+        sqlite_session.add(config2)
+        with pytest.raises(IntegrityError):
+            sqlite_session.commit()
+
+    def test_ssl_config_update_mode(self, sqlite_session):
+        """SSLConfig mode can be updated."""
+        config = SSLConfig(id=1, mode="ip_only")
+        sqlite_session.add(config)
+        sqlite_session.commit()
+
+        config.mode = "domain"
+        config.domain = "updated.com"
+        config.email = "new@updated.com"
+        sqlite_session.commit()
+
+        retrieved = sqlite_session.get(SSLConfig, 1)
+        assert retrieved.mode == "domain"
+        assert retrieved.domain == "updated.com"
+        assert retrieved.email == "new@updated.com"
+
+    def test_ssl_config_exported_from_models_package(self):
+        """SSLConfig should be importable from the models package."""
+        from hyper_trader_api.models import SSLConfig as ImportedSSLConfig
+
+        assert ImportedSSLConfig is SSLConfig
