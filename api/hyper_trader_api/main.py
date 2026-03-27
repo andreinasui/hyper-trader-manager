@@ -17,6 +17,7 @@ from sqlalchemy import text
 
 from hyper_trader_api.config import get_settings
 from hyper_trader_api.database import engine
+from hyper_trader_api.db.bootstrap import bootstrap_database
 from hyper_trader_api.routers import auth_router, traders_router
 from hyper_trader_api.workers import start_reconciliation, stop_reconciliation
 
@@ -63,14 +64,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting HyperTrader API...")
     logger.debug(f"Settings loaded: debug={settings.debug}, runtime_mode={settings.runtime_mode}")
 
-    # Verify database connection
+    # Initialize database (create tables if they don't exist)
     try:
-        logger.debug("Attempting database connection...")
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        logger.info("Database connection verified")
+        logger.debug("Bootstrapping database...")
+        bootstrap_database(engine)
+        logger.info("Database initialized successfully")
     except Exception as e:
-        logger.error(f"Database connection failed: {e}")
+        logger.error(f"Database initialization failed: {e}")
         raise
 
     # Start reconciliation worker for Docker runtime

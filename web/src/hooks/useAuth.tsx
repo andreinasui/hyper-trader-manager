@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
 import { config } from '@/config'
+import { api } from '@/lib/api'
 
 export interface AuthUser {
   id: string
@@ -105,6 +106,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialize
   useEffect(() => {
+    // Configure the API client to use our auth token
+    api.setAuthTokenGetter(async () => localStorage.getItem('auth_token'))
+    
     const init = async () => {
       await checkSetup()
       await checkAuth()
