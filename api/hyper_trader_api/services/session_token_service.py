@@ -106,7 +106,12 @@ class SessionTokenService:
         if session.is_revoked:
             return None
 
-        if session.expires_at <= now:
+        # Handle timezone-naive datetimes from SQLite (assumes UTC storage)
+        expires_at = session.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+
+        if expires_at <= now:
             return None
 
         return session.user_id

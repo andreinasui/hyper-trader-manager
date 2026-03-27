@@ -125,16 +125,22 @@ def test_create_session_is_not_revoked_by_default(service, mock_user):
 # ---------------------------------------------------------------------------
 
 
-def _make_session_token(user_id: str, token: str, *, revoked: bool = False, expired: bool = False):
+def _make_session_token(user_id: str, token: str, *, revoked: bool = False, expired: bool = False, naive_tz: bool = False):
     """Helper: build a mock SessionToken ORM object."""
     session = MagicMock()
     session.user_id = user_id
     session.token_hash = hashlib.sha256(token.encode()).hexdigest()
     session.is_revoked = revoked
     if expired:
-        session.expires_at = datetime.now(UTC) - timedelta(hours=1)
+        if naive_tz:
+            session.expires_at = datetime.utcnow() - timedelta(hours=1)
+        else:
+            session.expires_at = datetime.now(UTC) - timedelta(hours=1)
     else:
-        session.expires_at = datetime.now(UTC) + timedelta(days=30)
+        if naive_tz:
+            session.expires_at = datetime.utcnow() + timedelta(days=30)
+        else:
+            session.expires_at = datetime.now(UTC) + timedelta(days=30)
     return session
 
 
@@ -212,6 +218,20 @@ def test_verify_session_empty_token_returns_none(service):
     result = service.verify_session("")
 
     assert result is None
+
+
+def test_verify_session_handles_timezone_naive_expires_at(service, mock_user, mock_db):
+    """verify_session must handle timezone-naive expires_at from SQLite."""
+    token = "htk_naivetoken"
+    # SQLite returns timezone-naive datetimes; simulate this
+    mock_session = _make_session_token(mock_user.id, token, naive_tz=True)
+
+    mock_db.query.return_value.filter.return_value.first.return_value = mock_session
+
+    result = service.verify_session(token)
+
+    # Should succeed - the service normalizes naive datetimes to UTC
+    assert result == mock_user.id
 
 
 # ---------------------------------------------------------------------------
