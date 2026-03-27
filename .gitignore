@@ -16,3 +16,7 @@ deploy/.env
 # Note: Frontend-specific ignores could be added to web/.gitignore if needed
 
 .worktrees/
+
+# Traefik SSL data (generated at runtime)
+data/traefik/acme.json
+data/traefik/certs/

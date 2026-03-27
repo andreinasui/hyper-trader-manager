@@ -1,0 +1,10 @@
+# Initial Traefik config - HTTP only
+# This will be overwritten by SSL setup wizard
+entryPoints:
+  web:
+    address: ":80"
+
+providers:
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
