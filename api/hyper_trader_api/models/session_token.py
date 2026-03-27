@@ -1,5 +1,5 @@
 """
-Session token model for JWT token revocation.
+Session token model for stateful authentication.
 
 Tracks active session tokens to support logout and token revocation.
 """
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 class SessionToken(Base):
     """
-    Session token for JWT revocation tracking.
+    Session token for stateful authentication.
 
     Stores hashed tokens to enable logout and token invalidation
     for local authentication.
@@ -28,7 +28,7 @@ class SessionToken(Base):
     Attributes:
         id: Unique identifier (UUID string)
         user_id: Foreign key to user
-        token_hash: Hash of the JWT token (for lookup on verification)
+        token_hash: Hash of the session token (for lookup on verification)
         expires_at: Token expiration timestamp
         is_revoked: Whether token has been manually revoked
         created_at: Creation timestamp

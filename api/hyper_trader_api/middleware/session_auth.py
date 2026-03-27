@@ -54,7 +54,7 @@ async def get_current_user(
 
     # Verify token using SessionTokenService
     service = SessionTokenService(db=db)
-    
+
     try:
         user_id = service.verify_session(token)
     except Exception as e:

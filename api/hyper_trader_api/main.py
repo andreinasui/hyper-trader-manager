@@ -106,7 +106,7 @@ app = FastAPI(
     description=(
         "Self-hosted trading bot management platform.\n\n"
         "## Authentication\n\n"
-        "This API uses local username/password authentication with JWT tokens.\n\n"
+        "This API uses local username/password authentication with session tokens.\n\n"
         "### Initial Setup\n\n"
         "1. Check system status: `GET /api/v1/auth/setup-status`\n"
         "2. Bootstrap first admin: `POST /api/v1/auth/bootstrap`\n"
