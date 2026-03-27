@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from hyper_trader_api.database import get_db
-from hyper_trader_api.middleware.jwt_auth import get_current_user
+from hyper_trader_api.middleware.session_auth import get_current_user
 from hyper_trader_api.models import User
 from hyper_trader_api.models.trader import Trader
 from hyper_trader_api.schemas.trader import (

@@ -65,6 +65,7 @@ class TestPrivyService:
         assert wallet == "0x1234567890abcdef1234567890abcdef12345678"
 
 
+@pytest.mark.skip(reason="Auth middleware tests moved to test_session_auth.py")
 class TestAuthMiddleware:
     """Test authentication middleware."""
 
@@ -73,7 +74,7 @@ class TestAuthMiddleware:
         """Test that missing Authorization header returns 401."""
         from fastapi import Request
 
-        from hyper_trader_api.middleware.jwt_auth import get_current_user
+        from hyper_trader_api.middleware.session_auth import get_current_user
 
         request = MagicMock(spec=Request)
         request.headers.get.return_value = None
@@ -90,7 +91,7 @@ class TestAuthMiddleware:
         """Test that invalid Authorization format returns 401."""
         from fastapi import Request
 
-        from hyper_trader_api.middleware.jwt_auth import get_current_user
+        from hyper_trader_api.middleware.session_auth import get_current_user
 
         request = MagicMock(spec=Request)
         request.headers.get.return_value = "InvalidFormat token"

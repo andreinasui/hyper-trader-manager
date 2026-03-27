@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from hyper_trader_api.database import get_db
 from hyper_trader_api.main import app
-from hyper_trader_api.middleware.jwt_auth import get_current_user
+from hyper_trader_api.middleware.session_auth import get_current_user
 
 
 @pytest.fixture
