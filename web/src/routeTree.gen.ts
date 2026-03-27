@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as SetupSslRouteImport } from './routes/setup/ssl'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -22,6 +23,11 @@ const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SetupSslRoute = SetupSslRouteImport.update({
+  id: '/setup/ssl',
+  path: '/ssl',
+  getParentRoute: () => SetupRoute,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -62,6 +68,7 @@ const AuthenticatedTradersIdRoute = AuthenticatedTradersIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/setup': typeof SetupRoute
+  '/setup/ssl': typeof SetupSslRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/traders/$id': typeof AuthenticatedTradersIdRoute
@@ -71,6 +78,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/setup': typeof SetupRoute
+  '/setup/ssl': typeof SetupSslRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/traders/$id': typeof AuthenticatedTradersIdRoute
@@ -81,7 +89,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/setup': typeof SetupRoute
+  '/setup': typeof SetupRouteWithChildren
+  '/setup/ssl': typeof SetupSslRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/traders/$id': typeof AuthenticatedTradersIdRoute
@@ -93,6 +102,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/setup'
+    | '/setup/ssl'
     | '/dashboard'
     | '/settings'
     | '/traders/$id'
@@ -102,6 +112,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/setup'
+    | '/setup/ssl'
     | '/dashboard'
     | '/settings'
     | '/traders/$id'
@@ -112,6 +123,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/setup'
+    | '/setup/ssl'
     | '/_authenticated/dashboard'
     | '/_authenticated/settings'
     | '/_authenticated/traders/$id'
@@ -122,7 +134,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
-  SetupRoute: typeof SetupRoute
+  SetupRoute: typeof SetupRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -133,6 +145,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/setup/ssl': {
+      id: '/setup/ssl'
+      path: '/ssl'
+      fullPath: '/setup/ssl'
+      preLoaderRoute: typeof SetupSslRouteImport
+      parentRoute: typeof SetupRoute
     }
     '/_authenticated': {
       id: '/_authenticated'
@@ -206,10 +225,20 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface SetupRouteChildren {
+  SetupSslRoute: typeof SetupSslRoute
+}
+
+const SetupRouteChildren: SetupRouteChildren = {
+  SetupSslRoute: SetupSslRoute,
+}
+
+const SetupRouteWithChildren = SetupRoute._addFileChildren(SetupRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
-  SetupRoute: SetupRoute,
+  SetupRoute: SetupRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
