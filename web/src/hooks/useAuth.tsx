@@ -18,7 +18,7 @@ interface AuthState {
 
 interface AuthContextType extends AuthState {
   login: (username: string, password: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   bootstrap: (username: string, password: string) => Promise<void>
   checkAuth: () => Promise<void>
   checkSetup: () => Promise<void>
@@ -134,7 +134,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const token = localStorage.getItem('auth_token')
+    
+    // Call logout API to revoke the session token server-side
+    if (token) {
+      try {
+        await apiRequest('/api/v1/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+      } catch (error) {
+        // Log but don't block logout - clear local state regardless
+        console.error('Logout API call failed:', error)
+      }
+    }
+    
     localStorage.removeItem('auth_token')
     setState(s => ({
       ...s,
