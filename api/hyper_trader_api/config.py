@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     docker_socket: str = "unix:///var/run/docker.sock"
     runtime_mode: Literal["docker"] = "docker"
     image_tag: str = "latest"  # Docker image tag for trader containers
+    data_dir: str = "./data"  # Base directory for app data (traefik config, certs, etc.)
 
     # ==================== Server ====================
     host: str = "0.0.0.0"
