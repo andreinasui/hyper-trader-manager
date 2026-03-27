@@ -5,12 +5,11 @@ Tracks active session tokens to support logout and token revocation.
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
 
 from hyper_trader_api.database import Base
 
@@ -64,7 +63,7 @@ class SessionToken(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
+        default=lambda: datetime.now(UTC),
     )
 
     # Relationships
