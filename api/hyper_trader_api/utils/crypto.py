@@ -1,13 +1,10 @@
 """
-Cryptography utilities for password hashing and secret encryption.
+Cryptography utilities for password hashing.
 
-Uses:
-- bcrypt for password hashing
-- cryptography Fernet for symmetric secret encryption
+Uses bcrypt for password hashing.
 """
 
 import bcrypt
-from cryptography.fernet import Fernet
 
 
 def hash_password(password: str) -> str:
@@ -44,59 +41,3 @@ def verify_password(password: str, password_hash: str) -> bool:
     except Exception:
         # Invalid hash format or other verification errors
         return False
-
-
-def encrypt_secret(plaintext: str, key: str) -> str:
-    """
-    Encrypt a secret using Fernet symmetric encryption.
-
-    Args:
-        plaintext: Plain text secret to encrypt
-        key: Base64-encoded 32-byte encryption key
-
-    Returns:
-        Encrypted ciphertext as base64 string
-
-    Raises:
-        ValueError: If key is invalid format
-    """
-    try:
-        # Ensure key is bytes
-        if isinstance(key, str):
-            key_bytes = key.encode()
-        else:
-            key_bytes = key
-
-        f = Fernet(key_bytes)
-        ciphertext_bytes = f.encrypt(plaintext.encode())
-        return ciphertext_bytes.decode()
-    except Exception as e:
-        raise ValueError(f"Encryption failed: {e}") from e
-
-
-def decrypt_secret(ciphertext: str, key: str) -> str:
-    """
-    Decrypt a secret using Fernet symmetric encryption.
-
-    Args:
-        ciphertext: Encrypted ciphertext as base64 string
-        key: Base64-encoded 32-byte encryption key
-
-    Returns:
-        Decrypted plaintext string
-
-    Raises:
-        ValueError: If key is invalid or decryption fails
-    """
-    try:
-        # Ensure key is bytes
-        if isinstance(key, str):
-            key_bytes = key.encode()
-        else:
-            key_bytes = key
-
-        f = Fernet(key_bytes)
-        plaintext_bytes = f.decrypt(ciphertext.encode())
-        return plaintext_bytes.decode()
-    except Exception as e:
-        raise ValueError(f"Decryption failed: {e}") from e

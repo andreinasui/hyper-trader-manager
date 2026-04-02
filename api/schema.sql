@@ -9,7 +9,6 @@
 --   users            - User accounts with local username/password auth
 --   traders          - Trader instances (linked to Docker containers)
 --   trader_configs   - Versioned configuration for each trader
---   trader_secrets   - Encrypted private keys for traders
 --   session_tokens   - JWT session tokens for revocation tracking
 
 -- Users table
@@ -50,16 +49,6 @@ CREATE TABLE trader_configs (
     version INTEGER NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(trader_id, version)
-);
-
--- Trader secrets
--- Stores encrypted private keys (one per trader)
-CREATE TABLE trader_secrets (
-    id VARCHAR(36) PRIMARY KEY,
-    trader_id VARCHAR(36) UNIQUE REFERENCES traders(id) ON DELETE CASCADE,
-    private_key_encrypted TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Session tokens

@@ -37,10 +37,8 @@ cd hyper-trader-manager
 # 2. Install all dependencies (backend + frontend)
 just install
 
-# 3. Generate encryption keys for the backend
-cd api && just gen-keys
-# Copy the output to api/.env.development
-cd ..
+# 3. Configure environment (defaults work for local dev)
+cp api/.env.example api/.env.development
 
 # 4. Start the backend (Terminal 1)
 just api
@@ -153,9 +151,8 @@ If you prefer manual setup:
 # 1. Create environment file
 cp deploy/.env.example deploy/.env
 
-# 2. Generate a secure encryption key
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Copy the output to ENCRYPTION_KEY in deploy/.env
+# 2. Edit deploy/.env — set ADMIN_PASSWORD, DOCKER_GID, and any other required values
+#    (No encryption key needed — private keys are stored as Docker Swarm secrets)
 
 # 3. Get your Docker group ID
 getent group docker | cut -d: -f3
@@ -229,10 +226,11 @@ Key settings in `deploy/.env`:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ENCRYPTION_KEY` | Wallet private key encryption (required) | *auto-generated* |
 | `DOCKER_GID` | Docker group ID | *auto-detected* |
 | `PUBLIC_PORT` | HTTP port | `80` |
 | `LOG_LEVEL` | Logging verbosity | `INFO` |
+
+> **Note:** Private keys for trader instances are stored as Docker Swarm secrets — no `ENCRYPTION_KEY` is needed. Docker Swarm mode is initialized automatically by the API when the first trader is created.
 
 ### SSL Configuration
 

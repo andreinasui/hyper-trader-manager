@@ -33,3 +33,4 @@ pnpm test:e2e     # Run Playwright e2e tests
 4. **Use the right package manager** - `uv` for Python, `pnpm` for Node
 5. **Check `justfile`** - Common tasks are defined there
 6. **Refer to `DEV_SETUP.md`** - For environment setup details
+7. **Git commits**: - if doing git commits, prefix commits with "api" or "web". if commit contains code from both, do not prefix

@@ -82,7 +82,9 @@ cp api/.env.example api/.env
 
 Required variables:
 - `DATABASE_URL` - SQLite connection string (default: `sqlite:///./data/hypertrader.db`)
-- `ENCRYPTION_KEY` - Fernet key for encrypting wallet private keys
+
+> **Note:** No encryption key is needed. Trader private keys are stored as Docker Swarm secrets,
+> mounted at `/run/secrets/private_key` inside each trader service.
 
 ## API Documentation
 

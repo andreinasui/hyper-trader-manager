@@ -23,8 +23,6 @@ class User(Base):
     """
     User account model with local authentication.
 
-    Uses username/password instead of Privy.
-
     Attributes:
         id: Unique identifier (UUID string)
         username: Username for login (unique, indexed)

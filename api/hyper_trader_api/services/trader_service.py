@@ -13,10 +13,9 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from hyper_trader_api.config import get_settings
-from hyper_trader_api.models import Trader, TraderConfig, TraderSecret, User
+from hyper_trader_api.models import Trader, TraderConfig, User
 from hyper_trader_api.runtime.factory import get_runtime
 from hyper_trader_api.schemas.trader import TraderCreate, TraderUpdate
-from hyper_trader_api.utils.crypto import decrypt_secret, encrypt_secret
 
 logger = logging.getLogger(__name__)
 
@@ -133,20 +132,6 @@ class TraderService:
             version=1,
         )
         self.db.add(trader_config)
-
-        # Encrypt and store private key
-        try:
-            encrypted_key = encrypt_secret(trader_data.private_key, self.settings.encryption_key)
-            trader_secret = TraderSecret(
-                trader_id=trader.id,
-                private_key_encrypted=encrypted_key,
-            )
-            self.db.add(trader_secret)
-        except ValueError as e:
-            self.db.rollback()
-            raise TraderServiceError(f"Failed to encrypt private key: {e}") from e
-
-        # Flush to ensure trader has configs and secret populated
         self.db.flush()
 
         # Write config file
@@ -156,17 +141,9 @@ class TraderService:
             self.db.rollback()
             raise TraderServiceError(f"Failed to write config file: {e}") from e
 
-        # Deploy to Docker runtime
+        # Deploy to Docker runtime with private key as Docker secret
         try:
-            # Decrypt private key for container environment
-            decrypted_key = decrypt_secret(encrypted_key, self.settings.encryption_key)
-
-            secret_env = {
-                "PRIVATE_KEY": decrypted_key,
-                "WALLET_ADDRESS": trader.wallet_address,
-            }
-
-            self.runtime.create_trader(trader, config_path, secret_env)
+            self.runtime.create_trader(trader, config_path, trader_data.private_key)
 
             # Update status to running
             trader.status = "running"
@@ -299,19 +276,19 @@ class TraderService:
         """
         trader = self.get_trader(trader_id, user_id)
 
-        # Remove from Docker runtime
+        # Remove from Docker runtime (service + secret)
         try:
-            self.runtime.remove_trader(trader.runtime_name)
+            self.runtime.remove_trader(trader.runtime_name, trader.id)
         except Exception as e:
             logger.error(f"Failed to remove trader {trader.runtime_name} from runtime: {e}")
-            raise TraderServiceError(f"Container deletion failed: {e}") from e
+            raise TraderServiceError(f"Service deletion failed: {e}") from e
 
         # Delete config file
         config_path = self._get_config_path(str(trader.id))
         if config_path.exists():
             config_path.unlink()
 
-        # Delete from DB (cascade will delete configs and secret)
+        # Delete from DB (cascade will delete configs)
         self.db.delete(trader)
         self.db.commit()
 

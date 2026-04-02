@@ -2,7 +2,7 @@
 Configuration tests.
 
 These tests verify the Settings class defaults to SQLite and local
-configuration instead of PostgreSQL/Privy/Kubernetes.
+configuration instead of PostgreSQL or Kubernetes.
 """
 
 
@@ -22,19 +22,6 @@ class TestSettings:
 
         settings = Settings()
         assert settings.database_url.startswith("sqlite")
-
-    def test_encryption_key_required(self, monkeypatch):
-        """Encryption key should be required for secret storage."""
-        monkeypatch.delenv("ENCRYPTION_KEY", raising=False)
-        monkeypatch.delenv("DATABASE_URL", raising=False)
-        from hyper_trader_api.config import get_settings
-
-        get_settings.cache_clear()
-
-        from hyper_trader_api.config import Settings
-
-        settings = Settings()
-        assert hasattr(settings, "encryption_key")
 
     def test_public_base_url_default(self, monkeypatch):
         """Public base URL should default to localhost:80."""

@@ -13,7 +13,7 @@ import os
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import ValidationInfo, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,9 +37,6 @@ def _get_env_file() -> str:
 class Settings(BaseSettings):
     """
     Application settings loaded from environment variables.
-
-    Required for security:
-        ENCRYPTION_KEY: Key for encrypting sensitive data (API keys, secrets)
     """
 
     model_config = SettingsConfigDict(
@@ -55,11 +52,6 @@ class Settings(BaseSettings):
 
     # ==================== Database ====================
     database_url: str = "sqlite:///./data/hypertrader.db"
-
-    # ==================== Security & Authentication ====================
-    # IMPORTANT: Generate secure keys with: openssl rand -hex 32
-    # For development only, we provide unsafe defaults
-    encryption_key: str = "dev-encryption-key-change-in-production"
 
     # ==================== Self-Hosted Configuration ====================
     public_base_url: str = "http://localhost:80"
@@ -80,15 +72,6 @@ class Settings(BaseSettings):
 
     # ==================== CORS ====================
     cors_origins: str = "http://localhost:3000"
-
-    @field_validator("encryption_key")
-    @classmethod
-    def validate_secrets(cls, v: str, info: ValidationInfo) -> str:
-        """Require real secrets in production, allow defaults in development."""
-        env = os.getenv("ENVIRONMENT", "development")
-        if env == "production" and v.startswith("dev-"):
-            raise ValueError(f"{info.field_name} must be set to a secure value in production")
-        return v
 
     @field_validator("cors_origins", mode="after")
     @classmethod

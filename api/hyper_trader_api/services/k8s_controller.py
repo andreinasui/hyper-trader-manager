@@ -78,13 +78,12 @@ class KubernetesTraderController:
             lstrip_blocks=True,
         )
 
-    def deploy_trader(self, trader: Trader, privy_user_id: str) -> dict[str, Any]:
+    def deploy_trader(self, trader: Trader) -> dict[str, Any]:
         """
         Deploy trader to Kubernetes using replace strategy.
 
         Args:
             trader: Trader model with configuration
-            privy_user_id: Privy user ID to pass to the Rust pod
 
         Returns:
             Dict with deployment status and k8s_name
@@ -99,8 +98,8 @@ class KubernetesTraderController:
             # 2. Create ConfigMap
             self._create_configmap(trader)
 
-            # 3. Create StatefulSet (secrets auto-injected by Privy)
-            self._create_statefulset(trader, privy_user_id)
+            # 3. Create StatefulSet
+            self._create_statefulset(trader)
 
             logger.info(f"Successfully deployed trader {trader.k8s_name}")
             return {"status": "deployed", "k8s_name": trader.k8s_name}
@@ -285,9 +284,6 @@ class KubernetesTraderController:
         Delete all K8s resources for trader, ignoring 404 errors.
 
         Deletes in order: StatefulSet (with foreground propagation), ConfigMap.
-
-        Note:
-            Secrets are no longer managed as they're auto-injected by Privy.
         """
         # Delete StatefulSet first (with foreground propagation to wait for pods)
         try:
@@ -357,13 +353,12 @@ class KubernetesTraderController:
         )
         logger.info(f"Created ConfigMap {trader.k8s_name}-config")
 
-    def _create_statefulset(self, trader: Trader, privy_user_id: str) -> None:
+    def _create_statefulset(self, trader: Trader) -> None:
         """
         Create Kubernetes StatefulSet for trader.
 
         Args:
             trader: Trader model with image_tag
-            privy_user_id: Privy user ID to pass to the Rust pod
         """
         template = self.jinja_env.get_template("statefulset.yaml.j2")
         manifest = template.render(
@@ -372,7 +367,6 @@ class KubernetesTraderController:
             wallet_address=trader.wallet_address,
             github_repo=self.github_repo,
             image_tag=self.settings.image_tag,
-            privy_user_id=privy_user_id,
         )
 
         sts_dict = yaml.safe_load(manifest)

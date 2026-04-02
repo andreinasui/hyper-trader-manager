@@ -18,6 +18,8 @@ Run the full HyperTrader stack on a single VPS with Docker Compose and Traefik.
 | `web`     | React frontend (nginx, static assets)  | `/*`                      |
 | `data/`   | SQLite DB + trader configs (host volume) | —                       |
 
+> **Note:** Trader instances run as Docker Swarm services with private keys stored as Docker Swarm secrets (mounted at `/run/secrets/private_key` inside each service). Docker Swarm mode is initialized automatically on first trader creation.
+
 ### Quick Start
 
 ```bash
@@ -34,7 +36,7 @@ Or do it manually:
 ```bash
 # 2a. Copy and edit environment file
 cp deploy/.env.example .env
-#    Edit .env — set ENCRYPTION_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, DOCKER_GID
+#    Edit .env — set ADMIN_EMAIL, ADMIN_PASSWORD, DOCKER_GID
 
 # 2b. Start the stack
 docker compose up -d --build
@@ -53,12 +55,11 @@ All settings live in `.env` (copied from `deploy/.env.example`):
 | Variable                   | Default                   | Description                                                    |
 |----------------------------|---------------------------|----------------------------------------------------------------|
 | `PUBLIC_PORT`              | `80`                      | Host port to expose                                            |
-| `ENCRYPTION_KEY`           | —                         | Encryption key for wallet private keys (**required** — `openssl rand -hex 32`) |
 | `ADMIN_EMAIL`              | `admin@example.com`       | Admin account email (created on first start)                   |
 | `ADMIN_PASSWORD`           | —                         | Admin account password (**required**)                          |
 | `DOCKER_GID`               | `999`                     | Docker group GID on the host (`getent group docker | cut -d: -f3`) |
 | `DOCKER_SOCKET`            | `/var/run/docker.sock`    | Docker socket path                                             |
-| `TRADER_NETWORK`           | `hypertrader_default`     | Docker network for trader containers                           |
+| `TRADER_NETWORK`           | `hypertrader_default`     | Docker network for trader services (Swarm overlay)             |
 | `LOG_LEVEL`                | `INFO`                    | API log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`)            |
 
 ### Data Persistence

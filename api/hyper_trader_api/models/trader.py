@@ -1,7 +1,7 @@
 """
 Trader-related models for HyperTrader API.
 
-Contains models for traders, their configurations, and secrets
+Contains models for traders and their configurations
 with SQLite compatibility.
 """
 
@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from sqlalchemy.types import JSON
@@ -91,12 +91,6 @@ class Trader(Base):
         cascade="all, delete-orphan",
         order_by="TraderConfig.version.desc()",
     )
-    secret: Mapped[Optional["TraderSecret"]] = relationship(
-        "TraderSecret",
-        back_populates="trader",
-        uselist=False,
-        cascade="all, delete-orphan",
-    )
 
     @property
     def latest_config(self) -> Optional["TraderConfig"]:
@@ -159,54 +153,3 @@ class TraderConfig(Base):
     def __repr__(self) -> str:
         return f"<TraderConfig(trader_id={self.trader_id}, version={self.version})>"
 
-
-class TraderSecret(Base):
-    """
-    Encrypted secrets for trader.
-
-    Stores encrypted private key for the trader's wallet.
-    One secret per trader.
-
-    Attributes:
-        id: Unique identifier (UUID string for SQLite compatibility)
-        trader_id: Foreign key to trader (unique - one secret per trader)
-        private_key_encrypted: Encrypted private key
-        created_at: Creation timestamp
-        updated_at: Last update timestamp
-    """
-
-    __tablename__ = "trader_secrets"
-
-    id: Mapped[str] = mapped_column(
-        String(36),
-        primary_key=True,
-        default=lambda: str(uuid.uuid4()),
-    )
-    trader_id: Mapped[str] = mapped_column(
-        String(36),
-        ForeignKey("traders.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,  # One secret per trader
-    )
-    private_key_encrypted: Mapped[str] = mapped_column(
-        Text,
-        nullable=False,
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-    )
-
-    # Relationships
-    trader: Mapped["Trader"] = relationship(
-        "Trader",
-        back_populates="secret",
-    )
-
-    def __repr__(self) -> str:
-        return f"<TraderSecret(trader_id={self.trader_id})>"

@@ -8,7 +8,7 @@ Covers:
 """
 
 import ipaddress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -36,7 +36,6 @@ class TestGenerateSelfSignedCert:
 
     def test_cert_file_is_valid_pem(self, tmp_path: Path):
         """cert.pem file contains a valid PEM-encoded X.509 certificate."""
-        from cryptography.hazmat.primitives.serialization import load_pem_private_key
         from cryptography.x509 import load_pem_x509_certificate
 
         cert_path = tmp_path / "cert.pem"
@@ -179,9 +178,9 @@ class TestGenerateSelfSignedCert:
         key_path = tmp_path / "key.pem"
 
         # X.509 stores timestamps at second precision - truncate microseconds
-        before = datetime.now(timezone.utc).replace(microsecond=0)
+        before = datetime.now(UTC).replace(microsecond=0)
         generate_self_signed_cert(cert_path, key_path)
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
 
         cert = load_pem_x509_certificate(cert_path.read_bytes())
         assert before <= cert.not_valid_before_utc <= after

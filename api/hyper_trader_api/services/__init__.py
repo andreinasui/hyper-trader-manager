@@ -18,17 +18,6 @@ except ImportError:
     pass
 
 try:
-    from hyper_trader_api.services.privy_service import (  # noqa: F401
-        PrivyError,
-        PrivyService,
-        get_privy_service,
-    )
-
-    __all__.extend(["PrivyService", "PrivyError", "get_privy_service"])
-except ImportError:
-    pass
-
-try:
     from hyper_trader_api.services.trader_service import (  # noqa: F401
         TraderNotFoundError,
         TraderOwnershipError,

@@ -5,7 +5,6 @@ Covers:
 - User model with username/password authentication
 - Trader model with runtime_name (docker container) instead of k8s_name
 - TraderConfig with JSON instead of JSONB
-- TraderSecret model
 - SessionToken model (if needed for v1)
 - SSLConfig model (singleton SSL configuration)
 - Bootstrap database creation
@@ -24,7 +23,6 @@ from hyper_trader_api.db.bootstrap import bootstrap_database
 from hyper_trader_api.models import Trader, TraderConfig, User
 from hyper_trader_api.models.session_token import SessionToken
 from hyper_trader_api.models.ssl_config import SSLConfig
-from hyper_trader_api.models.trader import TraderSecret
 
 
 @pytest.fixture
@@ -74,7 +72,6 @@ class TestBootstrap:
             "users",
             "traders",
             "trader_configs",
-            "trader_secrets",
             "session_tokens",
         }
 
@@ -266,65 +263,6 @@ class TestTraderConfigModel:
             version=1,  # Same version
         )
         sqlite_session.add(config2)
-        with pytest.raises(IntegrityError):
-            sqlite_session.commit()
-
-
-class TestTraderSecretModel:
-    """Test TraderSecret model."""
-
-    def test_secret_creation(self, sqlite_session):
-        """TraderSecret can be created and linked to trader."""
-        user = User(username="secret_user", password_hash="hash", is_admin=False)
-        sqlite_session.add(user)
-        sqlite_session.commit()
-
-        trader = Trader(
-            user_id=user.id,
-            wallet_address="0x6666666666666666666666666666666666666666",
-            runtime_name="trader-secret-test",
-        )
-        sqlite_session.add(trader)
-        sqlite_session.commit()
-
-        secret = TraderSecret(
-            trader_id=trader.id,
-            private_key_encrypted="encrypted_private_key_data",
-        )
-        sqlite_session.add(secret)
-        sqlite_session.commit()
-
-        assert secret.id is not None
-        assert secret.trader_id == trader.id
-        assert secret.private_key_encrypted == "encrypted_private_key_data"
-
-    def test_secret_one_per_trader(self, sqlite_session):
-        """Each trader should have only one secret."""
-        user = User(username="one_secret_user", password_hash="hash", is_admin=False)
-        sqlite_session.add(user)
-        sqlite_session.commit()
-
-        trader = Trader(
-            user_id=user.id,
-            wallet_address="0x7777777777777777777777777777777777777777",
-            runtime_name="trader-one-secret",
-        )
-        sqlite_session.add(trader)
-        sqlite_session.commit()
-
-        secret1 = TraderSecret(
-            trader_id=trader.id,
-            private_key_encrypted="secret1",
-        )
-        sqlite_session.add(secret1)
-        sqlite_session.commit()
-
-        # Try to add another secret for same trader
-        secret2 = TraderSecret(
-            trader_id=trader.id,
-            private_key_encrypted="secret2",
-        )
-        sqlite_session.add(secret2)
         with pytest.raises(IntegrityError):
             sqlite_session.commit()
 

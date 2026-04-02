@@ -1,320 +1,153 @@
 """
-Tests for Docker runtime abstraction layer.
+Tests for Docker Swarm runtime implementation.
 
-Covers:
-- Container creation with proper network, restart policy, and mounts
-- Container lifecycle operations (restart, remove, status, logs)
-- Secret environment variable injection
-- Config file mounting behavior
-- Error handling for missing containers
+Tests the DockerRuntime class with mocked Docker client.
 """
 
 from unittest.mock import MagicMock, patch
 
-import pytest
+from docker.errors import APIError, NotFound
 
-from hyper_trader_api.models.trader import Trader
-from hyper_trader_api.runtime.docker_runtime import DockerRuntime
 
+class TestDockerRuntimeSwarmInit:
+    """Tests for Swarm initialization."""
 
-@pytest.fixture
-def mock_docker_client():
-    """Mock Docker client."""
-    client = MagicMock()
-    client.networks = MagicMock()
-    client.containers = MagicMock()
-    return client
-
-
-@pytest.fixture
-def mock_trader():
-    """Mock trader instance."""
-    trader = MagicMock(spec=Trader)
-    trader.runtime_name = "trader-abc123"
-    trader.image_tag = "v1.2.3"
-    trader.wallet_address = "0x1234567890abcdef"
-    return trader
-
-
-@pytest.fixture
-def config_path(tmp_path):
-    """Create a temporary config file."""
-    config_file = tmp_path / "config.json"
-    config_file.write_text('{"exchange": "hyperliquid"}')
-    return config_file
-
-
-@pytest.fixture
-def secret_env():
-    """Sample secret environment variables."""
-    return {
-        "TRADER_PRIVATE_KEY": "0xsecret123",
-        "API_KEY": "test-api-key",
-    }
-
-
-class TestDockerRuntimeCreation:
-    """Tests for container creation."""
-
-    def test_create_trader_uses_internal_network(
-        self, mock_docker_client, mock_trader, config_path, secret_env
-    ):
-        """Test that trader containers are created on internal network."""
-        runtime = DockerRuntime(mock_docker_client)
-        runtime.create_trader(mock_trader, config_path, secret_env)
-
-        # Verify container was created with correct network
-        mock_docker_client.containers.run.assert_called_once()
-        call_kwargs = mock_docker_client.containers.run.call_args[1]
-        assert call_kwargs["network"] == "hyper-trader-internal"
-
-    def test_create_trader_uses_unless_stopped_restart_policy(
-        self, mock_docker_client, mock_trader, config_path, secret_env
-    ):
-        """Test that containers use unless-stopped restart policy."""
-        runtime = DockerRuntime(mock_docker_client)
-        runtime.create_trader(mock_trader, config_path, secret_env)
-
-        call_kwargs = mock_docker_client.containers.run.call_args[1]
-        assert call_kwargs["restart_policy"] == {"Name": "unless-stopped"}
-
-    def test_create_trader_mounts_config_readonly(
-        self, mock_docker_client, mock_trader, config_path, secret_env
-    ):
-        """Test that config file is mounted read-only to /app/config.json."""
-        runtime = DockerRuntime(mock_docker_client)
-        runtime.create_trader(mock_trader, config_path, secret_env)
-
-        call_kwargs = mock_docker_client.containers.run.call_args[1]
-        volumes = call_kwargs["volumes"]
-
-        # Check that config is mounted
-        assert str(config_path) in volumes
-        mount_config = volumes[str(config_path)]
-        assert mount_config["bind"] == "/app/config.json"
-        assert mount_config["mode"] == "ro"
-
-    def test_create_trader_sets_environment_variables(
-        self, mock_docker_client, mock_trader, config_path, secret_env
-    ):
-        """Test that secret environment variables are passed to container."""
-        runtime = DockerRuntime(mock_docker_client)
-        runtime.create_trader(mock_trader, config_path, secret_env)
-
-        call_kwargs = mock_docker_client.containers.run.call_args[1]
-        environment = call_kwargs["environment"]
-
-        assert environment["TRADER_PRIVATE_KEY"] == "0xsecret123"
-        assert environment["API_KEY"] == "test-api-key"
-
-    def test_create_trader_uses_correct_image_and_name(
-        self, mock_docker_client, mock_trader, config_path, secret_env
-    ):
-        """Test that correct image tag and container name are used."""
-        runtime = DockerRuntime(mock_docker_client)
-        runtime.create_trader(mock_trader, config_path, secret_env)
-
-        # Check image
-        call_args = mock_docker_client.containers.run.call_args[0]
-        assert "hyper-trader:v1.2.3" in call_args[0]
-
-        # Check container name
-        call_kwargs = mock_docker_client.containers.run.call_args[1]
-        assert call_kwargs["name"] == "trader-abc123"
-
-    def test_create_trader_runs_in_detached_mode(
-        self, mock_docker_client, mock_trader, config_path, secret_env
-    ):
-        """Test that container runs in detached mode."""
-        runtime = DockerRuntime(mock_docker_client)
-        runtime.create_trader(mock_trader, config_path, secret_env)
-
-        call_kwargs = mock_docker_client.containers.run.call_args[1]
-        assert call_kwargs["detach"] is True
-
-    def test_create_trader_creates_network_if_not_exists(
-        self, mock_docker_client, mock_trader, config_path, secret_env
-    ):
-        """Test that internal network is created if it doesn't exist."""
-        # Simulate network not found
-        from docker.errors import NotFound
-
-        mock_docker_client.networks.get.side_effect = NotFound("network not found")
-
-        runtime = DockerRuntime(mock_docker_client)
-        runtime.create_trader(mock_trader, config_path, secret_env)
-
-        # Verify network creation was attempted
-        mock_docker_client.networks.create.assert_called_once_with(
-            "hyper-trader-internal",
-            driver="bridge",
-        )
-
-    def test_create_trader_raises_if_config_missing(
-        self, mock_docker_client, mock_trader, secret_env, tmp_path
-    ):
-        """Test that creation fails if config file doesn't exist."""
-        nonexistent_config = tmp_path / "missing.json"
-
-        runtime = DockerRuntime(mock_docker_client)
-
-        with pytest.raises(OSError, match="Config file not found"):
-            runtime.create_trader(mock_trader, nonexistent_config, secret_env)
-
-    def test_create_trader_raises_if_container_exists(
-        self, mock_docker_client, mock_trader, config_path, secret_env
-    ):
-        """Test that creation fails if container already exists."""
-        from docker.errors import APIError
-
-        mock_docker_client.containers.run.side_effect = APIError("Conflict")
-
-        runtime = DockerRuntime(mock_docker_client)
-
-        with pytest.raises(APIError):
-            runtime.create_trader(mock_trader, config_path, secret_env)
-
-
-class TestDockerRuntimeLifecycle:
-    """Tests for container lifecycle operations."""
-
-    def test_restart_trader_restarts_container(self, mock_docker_client):
-        """Test that restart operation works."""
-        mock_container = MagicMock()
-        mock_docker_client.containers.get.return_value = mock_container
-
-        runtime = DockerRuntime(mock_docker_client)
-        runtime.restart_trader("trader-abc123")
-
-        mock_docker_client.containers.get.assert_called_once_with("trader-abc123")
-        mock_container.restart.assert_called_once()
-
-    def test_restart_trader_raises_if_not_found(self, mock_docker_client):
-        """Test that restart fails if container doesn't exist."""
-        from docker.errors import NotFound
-
-        mock_docker_client.containers.get.side_effect = NotFound("not found")
-
-        runtime = DockerRuntime(mock_docker_client)
-
-        with pytest.raises(NotFound):
-            runtime.restart_trader("nonexistent")
-
-    def test_remove_trader_stops_and_removes_container(self, mock_docker_client):
-        """Test that remove operation stops and removes container."""
-        mock_container = MagicMock()
-        mock_docker_client.containers.get.return_value = mock_container
-
-        runtime = DockerRuntime(mock_docker_client)
-        runtime.remove_trader("trader-abc123")
-
-        mock_docker_client.containers.get.assert_called_once_with("trader-abc123")
-        mock_container.stop.assert_called_once()
-        mock_container.remove.assert_called_once()
-
-    def test_remove_trader_raises_if_not_found(self, mock_docker_client):
-        """Test that remove fails if container doesn't exist."""
-        from docker.errors import NotFound
-
-        mock_docker_client.containers.get.side_effect = NotFound("not found")
-
-        runtime = DockerRuntime(mock_docker_client)
-
-        with pytest.raises(NotFound):
-            runtime.remove_trader("nonexistent")
-
-
-class TestDockerRuntimeStatus:
-    """Tests for container status retrieval."""
-
-    def test_get_status_returns_running_container_info(self, mock_docker_client):
-        """Test status retrieval for running container."""
-        mock_container = MagicMock()
-        mock_container.status = "running"
-        mock_container.attrs = {
-            "State": {
-                "Status": "running",
-                "Running": True,
-                "StartedAt": "2026-03-26T10:00:00Z",
-            }
-        }
-        mock_docker_client.containers.get.return_value = mock_container
-
-        runtime = DockerRuntime(mock_docker_client)
-        status = runtime.get_status("trader-abc123")
-
-        assert status["state"] == "running"
-        assert status["running"] is True
-        assert "started_at" in status
-
-    def test_get_status_returns_stopped_container_info(self, mock_docker_client):
-        """Test status retrieval for stopped container."""
-        mock_container = MagicMock()
-        mock_container.status = "exited"
-        mock_container.attrs = {
-            "State": {
-                "Status": "exited",
-                "Running": False,
-                "ExitCode": 1,
-            }
-        }
-        mock_docker_client.containers.get.return_value = mock_container
-
-        runtime = DockerRuntime(mock_docker_client)
-        status = runtime.get_status("trader-abc123")
-
-        assert status["state"] == "exited"
-        assert status["running"] is False
-        assert status["exit_code"] == 1
-
-    def test_get_status_returns_not_found_for_missing_container(self, mock_docker_client):
-        """Test that status returns not_found state for missing container."""
-        from docker.errors import NotFound
-
-        mock_docker_client.containers.get.side_effect = NotFound("not found")
-
-        runtime = DockerRuntime(mock_docker_client)
-        status = runtime.get_status("nonexistent")
-
-        assert status["state"] == "not_found"
-        assert status["running"] is False
-
-    def test_get_logs_returns_container_logs(self, mock_docker_client):
-        """Test log retrieval from container."""
-        mock_container = MagicMock()
-        mock_container.logs.return_value = b"Log line 1\nLog line 2\nLog line 3\n"
-        mock_docker_client.containers.get.return_value = mock_container
-
-        runtime = DockerRuntime(mock_docker_client)
-        logs = runtime.get_logs("trader-abc123", tail_lines=10)
-
-        mock_container.logs.assert_called_once_with(tail=10)
-        assert logs == "Log line 1\nLog line 2\nLog line 3\n"
-
-    def test_get_logs_returns_empty_for_missing_container(self, mock_docker_client):
-        """Test that logs returns empty string for missing container."""
-        from docker.errors import NotFound
-
-        mock_docker_client.containers.get.side_effect = NotFound("not found")
-
-        runtime = DockerRuntime(mock_docker_client)
-        logs = runtime.get_logs("nonexistent", tail_lines=10)
-
-        assert logs == ""
-
-
-class TestDockerRuntimeFactory:
-    """Tests for runtime factory."""
-
-    @patch("hyper_trader_api.runtime.factory.docker.from_env")
-    def test_get_runtime_returns_docker_runtime(self, mock_from_env):
-        """Test that factory returns DockerRuntime instance."""
-        from hyper_trader_api.runtime.factory import get_runtime
-
+    @patch("hyper_trader_api.runtime.docker_runtime.docker")
+    def test_initializes_swarm_if_not_active(self, mock_docker):
+        """Runtime should initialize swarm if not already active."""
         mock_client = MagicMock()
-        mock_from_env.return_value = mock_client
+        # Simulate not in swarm mode
+        mock_client.swarm.attrs.__getitem__.side_effect = APIError("not in swarm")
+        mock_docker.from_env.return_value = mock_client
 
-        runtime = get_runtime()
+        from hyper_trader_api.runtime.docker_runtime import DockerRuntime
 
-        assert isinstance(runtime, DockerRuntime)
-        mock_from_env.assert_called_once()
+        DockerRuntime(mock_client)
+
+        mock_client.swarm.init.assert_called_once()
+
+    @patch("hyper_trader_api.runtime.docker_runtime.docker")
+    def test_skips_swarm_init_if_already_active(self, mock_docker):
+        """Runtime should not reinitialize if already in swarm mode."""
+        mock_client = MagicMock()
+        # Simulate already in swarm mode
+        mock_client.swarm.attrs = {"ID": "swarm-id"}
+        mock_docker.from_env.return_value = mock_client
+
+        from hyper_trader_api.runtime.docker_runtime import DockerRuntime
+
+        DockerRuntime(mock_client)
+
+        mock_client.swarm.init.assert_not_called()
+
+
+class TestDockerRuntimeCreateTrader:
+    """Tests for creating trader services."""
+
+    @patch("hyper_trader_api.runtime.docker_runtime.docker")
+    def test_create_trader_creates_secret(self, mock_docker, tmp_path):
+        """create_trader should create a Docker secret for private key."""
+        mock_client = MagicMock()
+        mock_client.swarm.attrs = {"ID": "swarm-id"}
+        mock_secret = MagicMock()
+        mock_secret.id = "secret-123"
+        mock_client.secrets.create.return_value = mock_secret
+        mock_docker.from_env.return_value = mock_client
+
+        from hyper_trader_api.runtime.docker_runtime import DockerRuntime
+
+        runtime = DockerRuntime(mock_client)
+
+        # Create config file
+        config_path = tmp_path / "config.json"
+        config_path.write_text("{}")
+
+        # Mock trader
+        trader = MagicMock()
+        trader.id = "trader-123"
+        trader.runtime_name = "trader-abc"
+        trader.image_tag = "latest"
+        trader.wallet_address = "0x1234"
+
+        runtime.create_trader(trader, config_path, "0xprivatekey")
+
+        # Verify secret was created
+        mock_client.secrets.create.assert_called_once()
+        call_kwargs = mock_client.secrets.create.call_args.kwargs
+        assert call_kwargs["name"] == "ht_trader-123_private_key"
+        assert call_kwargs["data"] == b"0xprivatekey"
+        assert call_kwargs["labels"]["trader_id"] == "trader-123"
+
+    @patch("hyper_trader_api.runtime.docker_runtime.docker")
+    def test_create_trader_creates_service_with_secret(self, mock_docker, tmp_path):
+        """create_trader should create a service with secret attached."""
+        mock_client = MagicMock()
+        mock_client.swarm.attrs = {"ID": "swarm-id"}
+        mock_secret = MagicMock()
+        mock_secret.id = "secret-123"
+        mock_client.secrets.create.return_value = mock_secret
+        mock_docker.from_env.return_value = mock_client
+
+        from hyper_trader_api.runtime.docker_runtime import DockerRuntime
+
+        runtime = DockerRuntime(mock_client)
+
+        config_path = tmp_path / "config.json"
+        config_path.write_text("{}")
+
+        trader = MagicMock()
+        trader.id = "trader-123"
+        trader.runtime_name = "trader-abc"
+        trader.image_tag = "v1.0"
+        trader.wallet_address = "0x1234"
+
+        runtime.create_trader(trader, config_path, "0xprivatekey")
+
+        # Verify service was created
+        mock_client.services.create.assert_called_once()
+        call_kwargs = mock_client.services.create.call_args.kwargs
+        assert call_kwargs["name"] == "trader-abc"
+        assert call_kwargs["image"] == "hyper-trader:v1.0"
+        assert len(call_kwargs["secrets"]) == 1
+
+
+class TestDockerRuntimeRemoveTrader:
+    """Tests for removing trader services."""
+
+    @patch("hyper_trader_api.runtime.docker_runtime.docker")
+    def test_remove_trader_removes_service_and_secret(self, mock_docker):
+        """remove_trader should remove both service and secret."""
+        mock_client = MagicMock()
+        mock_client.swarm.attrs = {"ID": "swarm-id"}
+        mock_service = MagicMock()
+        mock_client.services.get.return_value = mock_service
+        mock_secret = MagicMock()
+        mock_client.secrets.get.return_value = mock_secret
+        mock_docker.from_env.return_value = mock_client
+
+        from hyper_trader_api.runtime.docker_runtime import DockerRuntime
+
+        runtime = DockerRuntime(mock_client)
+        runtime.remove_trader("trader-abc", "trader-123")
+
+        mock_service.remove.assert_called_once()
+        mock_secret.remove.assert_called_once()
+
+    @patch("hyper_trader_api.runtime.docker_runtime.docker")
+    def test_remove_trader_handles_missing_secret(self, mock_docker):
+        """remove_trader should not fail if secret already removed."""
+        mock_client = MagicMock()
+        mock_client.swarm.attrs = {"ID": "swarm-id"}
+        mock_service = MagicMock()
+        mock_client.services.get.return_value = mock_service
+        mock_client.secrets.get.side_effect = NotFound("not found")
+        mock_docker.from_env.return_value = mock_client
+
+        from hyper_trader_api.runtime.docker_runtime import DockerRuntime
+
+        runtime = DockerRuntime(mock_client)
+
+        # Should not raise
+        runtime.remove_trader("trader-abc", "trader-123")
+
+        mock_service.remove.assert_called_once()

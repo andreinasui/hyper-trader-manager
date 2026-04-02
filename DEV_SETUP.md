@@ -38,8 +38,8 @@ just install        # Install all dependencies
 ### 3. Configure Environment
 ```bash
 cd api
-just gen-keys  # Generates ENCRYPTION_KEY
-# Copy output to api/.env.development
+cp .env.example .env.development
+# Edit api/.env.development if needed (defaults work for local dev)
 ```
 
 ### 4. Start Services (2 terminals)
@@ -86,7 +86,6 @@ just test        # Run tests
 just lint        # Lint code
 just format      # Format code
 just check       # Run all checks
-just gen-keys    # Generate encryption keys
 ```
 
 ### Frontend Development
@@ -147,8 +146,8 @@ cd web && rm -rf node_modules && pnpm install
 
 ### Authentication Issues
 ```bash
-# Check encryption key is set
-cd api && just dev  # Look for config loading in logs
+# Check environment config
+cat api/.env.development
 
 # Clear browser storage
 # In browser console: localStorage.clear()
@@ -299,8 +298,9 @@ hyper-trader-manager/
 |-------|------------|
 | **Backend** | Python 3.11+, FastAPI, SQLAlchemy, SQLite |
 | **Frontend** | React 19, TypeScript, TanStack Router/Query, Tailwind CSS |
-| **Production** | Docker Compose, Traefik, SQLite |
+| **Production** | Docker Compose, Docker Swarm, Traefik, SQLite |
 | **Auth** | Session tokens, password hashing (bcrypt) |
+| **Secrets** | Docker Swarm secrets (private keys at `/run/secrets/private_key`) |
 
 ## Resources
 

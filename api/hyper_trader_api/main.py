@@ -20,7 +20,6 @@ from hyper_trader_api.database import engine
 from hyper_trader_api.db.bootstrap import bootstrap_database
 from hyper_trader_api.routers import auth_router, traders_router
 from hyper_trader_api.routers.ssl_setup import router as ssl_setup_router
-from hyper_trader_api.workers import start_reconciliation, stop_reconciliation
 
 settings = get_settings()
 
@@ -78,6 +77,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if settings.runtime_mode == "docker":
         logger.info("Starting reconciliation worker for Docker runtime...")
         try:
+            from hyper_trader_api.workers import (  # noqa: PLC0415
+                start_reconciliation,
+                stop_reconciliation,
+            )
+
             start_reconciliation()
             logger.info("Reconciliation worker started")
         except Exception as e:
@@ -95,7 +99,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Stop reconciliation worker
     logger.info("Stopping reconciliation worker...")
-    stop_reconciliation()  # type: ignore[no-untyped-call]
+    try:
+        from hyper_trader_api.workers import stop_reconciliation  # noqa: PLC0415
+
+        stop_reconciliation()  # type: ignore[no-untyped-call]
+    except Exception as e:
+        logger.warning(f"Failed to stop reconciliation worker: {e}")
 
     engine.dispose()
     logger.info("HyperTrader API shutdown complete")
@@ -189,7 +198,7 @@ async def validation_exception_handler(
 app.include_router(auth_router)
 app.include_router(traders_router)
 app.include_router(ssl_setup_router)
-# app.include_router(admin_router)  # Disabled - no admin functionality with Privy auth
+# app.include_router(admin_router)  # Disabled - no admin functionality currently implemented
 
 
 @app.get(

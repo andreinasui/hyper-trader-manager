@@ -117,4 +117,4 @@ just test-cov                # Run with coverage
 ## Environment Setup
 - **Local config**: Use `.env.development` (auto-loaded by justfile)
 - **Example file**: `.env.example` shows required variables
-- **Generate secrets**: Run `just gen-keys` for encryption keys
+- **Note**: No encryption key needed — private keys are stored as Docker Swarm secrets
