@@ -22,9 +22,9 @@ web:
 # Generate frontend API client from backend OpenAPI spec
 gen-api:
     @echo "Generating TypeScript API client from OpenAPI spec..."
-    @echo "Make sure backend is running on port 8000!"
+    cd api && uv run python scripts/export_openapi.py ../web/openapi.json
     cd web && pnpm gen:api
-    @echo "✓ API client generated in web/src/lib/api/generated"
+    @echo "✓ OpenAPI schema exported and API client generated in web/src/lib/api/generated"
 
 # Install all dependencies
 install:

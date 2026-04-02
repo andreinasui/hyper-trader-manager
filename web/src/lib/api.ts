@@ -49,22 +49,10 @@ export const api = {
 
   // Auth
   async login(username: string, password: string): Promise<LoginResponse> {
-    const formData = new URLSearchParams();
-    formData.append("username", username);
-    formData.append("password", password);
-
-    const response = await fetch(`${baseUrl}/v1/auth/login`, {
+    return fetchJson("/v1/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formData,
+      body: JSON.stringify({ username, password }),
     });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.detail || "Login failed");
-    }
-
-    return response.json();
   },
 
   async logout(): Promise<void> {

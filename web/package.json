@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "generate-api": "openapi-ts"
+    "gen:api": "openapi-ts"
   },
   "dependencies": {
     "solid-js": "^1.9.12",

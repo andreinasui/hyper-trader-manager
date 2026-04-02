@@ -28,3 +28,7 @@ dist/
 coverage/
 test-results/
 playwright-report/
+
+# Generated files
+openapi.json
+src/lib/api/generated/

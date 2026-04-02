@@ -11,6 +11,9 @@ function createAuthStore() {
   const authenticated = () => !!user() && !!token();
   const ready = () => !loading();
 
+  // Register token getter with API client
+  api.setAuthTokenGetter(async () => token());
+
   // Persist token to localStorage
   createEffect(() => {
     const currentToken = token();
