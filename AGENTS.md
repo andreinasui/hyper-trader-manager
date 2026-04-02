@@ -5,7 +5,7 @@
 | Directory | Description | Tech Stack |
 |-----------|-------------|------------|
 | `/api` | Backend API | Python 3.11+, FastAPI, SQLAlchemy, SQLite |
-| `/web` | Frontend App | React 19, TypeScript, TanStack Router/Query, Tailwind CSS |
+| `/web` | Frontend App | SolidJS, TypeScript, TanStack Solid Query, Tailwind CSS |
 
 ## Development Commands
 

@@ -3,11 +3,11 @@
 ## Technology Stack
 
 - **Language**: TypeScript 5.7+
-- **Framework**: React 19
-- **Routing**: TanStack Router v1
-- **State Management**: TanStack Query v5 (server state)
+- **Framework**: SolidJS 1.9+
+- **Routing**: @solidjs/router v0.15
+- **State Management**: TanStack Solid Query v5 (server state), SolidJS signals (client state)
 - **Styling**: Tailwind CSS v4
-- **UI Components**: Radix UI primitives + shadcn/ui
+- **UI Components**: Kobalte primitives + shadcn-solid
 - **Build Tool**: Vite 7
 - **Package Manager**: `pnpm` (NOT npm/yarn)
 - **Node Version**: >=22.12.0
@@ -17,16 +17,33 @@
 ```
 web/
 ├── src/
-│   ├── routes/          # Route components (TanStack Router file-based)
-│   │   ├── admin/       # Admin section routes
-│   │   ├── traders/     # Trader management routes
-│   │   └── settings/    # Settings routes
-│   ├── components/      # React components
-│   │   └── ui/          # shadcn/ui components
+│   ├── routes/          # Page components
+│   │   ├── dashboard.tsx
+│   │   ├── login.tsx
+│   │   ├── settings.tsx
+│   │   ├── setup.tsx
+│   │   ├── setup-ssl.tsx
+│   │   ├── trader-detail.tsx
+│   │   ├── traders.tsx
+│   │   └── traders-new.tsx
+│   ├── components/      # SolidJS components
+│   │   ├── ui/          # shadcn-solid components (Kobalte-based)
+│   │   ├── auth/        # Authentication forms
+│   │   ├── layout/      # App shell, sidebar
+│   │   └── traders/     # Trader-specific components
 │   ├── lib/             # Utilities and helpers
-│   │   └── __tests__/   # Unit tests for lib
+│   │   ├── api.ts       # Typed API wrapper
+│   │   ├── api/         # API client with token management
+│   │   ├── types.ts     # TypeScript interfaces
+│   │   ├── query-keys.ts # TanStack Query key factories
+│   │   └── utils.ts     # cn() helper and utilities
+│   ├── stores/          # SolidJS signal-based stores
+│   │   └── auth.ts      # Authentication store
 │   ├── test/            # Test setup and utilities
-│   └── ...
+│   ├── index.tsx        # App entry point
+│   ├── App.tsx          # Root component with auth guard
+│   ├── config.ts        # Zod-validated configuration
+│   └── styles.css       # Tailwind v4 styles
 ├── e2e/                 # Playwright end-to-end tests
 ├── public/              # Static assets
 └── dist/                # Production build output
@@ -68,30 +85,35 @@ pnpm test:e2e:ui      # Run e2e tests with Playwright UI
 - **TypeScript**: Strict mode enabled
 - **Linting**: TypeScript compiler checks (no ESLint configured yet)
 - **Formatting**: Use editor formatters (Prettier recommended)
-- **Path aliases**: Use `@/*` for `./src/*` imports
+- **Path aliases**: Use `~/*` for `./src/*` imports
 
 ### TypeScript Configuration
 From `tsconfig.json`:
 - **Target**: ES2022
 - **Strict mode**: Enabled
+- **JSX**: `preserve` with `jsxImportSource: "solid-js"`
 - **Unused variables**: Error
 - **No fallthrough cases**: Error
-- **Path mapping**: `@/*` → `src/*`
+- **Path mapping**: `~/*` → `src/*`
 
 ### Best Practices
 1. **Use TypeScript strict mode** - No implicit `any`, strict null checks
-2. **Prefer function components** - Use React 19 features (use hook, etc.)
-3. **TanStack Router** - File-based routing in `src/routes/`
-4. **TanStack Query** - Server state management, not useState for API data
-5. **Tailwind CSS** - Utility-first styling, use `cn()` helper for conditional classes
-6. **Component composition** - Radix UI + shadcn/ui patterns
-7. **Path imports** - Use `@/components/...` instead of relative paths
+2. **Prefer function components** - SolidJS components are plain functions
+3. **SolidJS Router** - Route definitions in `src/index.tsx`
+4. **TanStack Solid Query** - Server state management with `createQuery`/`createMutation`
+5. **Signals for client state** - Use `createSignal` and `createStore` for reactive state
+6. **Tailwind CSS** - Utility-first styling, use `cn()` helper for conditional classes
+7. **Component composition** - Kobalte + shadcn-solid patterns
+8. **Path imports** - Use `~/components/...` instead of relative paths
 
-### React Conventions
+### SolidJS Conventions
 - **Components**: PascalCase filenames (e.g., `UserProfile.tsx`)
-- **Hooks**: Custom hooks start with `use` (e.g., `useAuth.ts`)
+- **Signals**: Destructure as `[getter, setter]` (e.g., `const [count, setCount] = createSignal(0)`)
+- **Derived state**: Use functions, not memoization by default
+- **Props**: Use `splitProps` for separating component props from pass-through props
+- **Conditional rendering**: Use `<Show>` component with `when` and `fallback` props
+- **List rendering**: Use `<For>` component with `each` prop
 - **Types**: Define in same file or `types.ts` if shared
-- **Props**: Use TypeScript interfaces for component props
 
 ## Testing
 
@@ -100,29 +122,6 @@ From `tsconfig.json`:
 - **Component tests**: `src/components/**/*.test.tsx` (when needed)
 - **E2E tests**: `e2e/*.spec.ts`
 - **Test setup**: `src/test/setup.ts`
-
-### Unit Tests (Vitest)
-```typescript
-// src/lib/__tests__/example.test.ts
-import { describe, it, expect } from 'vitest'
-
-describe('Feature', () => {
-  it('should work correctly', () => {
-    expect(true).toBe(true)
-  })
-})
-```
-
-### E2E Tests (Playwright)
-```typescript
-// e2e/example.spec.ts
-import { test, expect } from '@playwright/test'
-
-test('user can login', async ({ page }) => {
-  await page.goto('http://localhost:3000')
-  // ... test steps
-})
-```
 
 ### Running Tests
 ```bash
@@ -133,26 +132,32 @@ pnpm test:e2e:headed     # Run e2e in headed mode
 ```
 
 ### Test Configuration
-- **Unit tests**: `vitest.config.ts` (jsdom environment)
+- **Unit tests**: `vitest.config.ts` (jsdom environment, excludes e2e/)
 - **E2E tests**: `playwright.config.ts`
 - **Test utilities**: `src/test/setup.ts`
 
 ## Key Libraries
 
-### TanStack Router
-- **File-based routing**: Routes defined in `src/routes/`
+### @solidjs/router
+- **Declarative routing**: Routes defined in `src/index.tsx` with `<Router>` and `<Route>`
 - **Type-safe**: Full TypeScript support for routes and params
-- **Devtools**: Enabled in development
+- **Navigation**: Use `<A>` component or `useNavigate()` hook
 
-### TanStack Query
-- **Server state**: Use for all API calls
+### TanStack Solid Query
+- **Server state**: Use `createQuery` for all API calls
+- **Mutations**: Use `createMutation` for POST/PUT/DELETE
 - **Caching**: Automatic background refetching
-- **Devtools**: Enabled in development
+- **Query keys**: Defined in `src/lib/query-keys.ts`
 
-### shadcn/ui
+### Kobalte + shadcn-solid
 - **Component registry**: `components.json`
-- **Add components**: Copy from shadcn/ui docs (components live in `src/components/ui/`)
-- **Customization**: Edit components directly, they're your code
+- **Primitives**: Kobalte provides accessible, unstyled primitives
+- **Styling**: shadcn-solid adds Tailwind styles on top
+- **Customization**: Edit components directly in `src/components/ui/`
+
+### SolidJS Stores
+- **Auth store**: `src/stores/auth.ts` - Token and user state management
+- **Signals**: Fine-grained reactivity without re-renders
 
 ## Development URLs
 - **Frontend**: http://localhost:3000
