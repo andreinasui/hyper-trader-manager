@@ -1,7 +1,7 @@
 ---
 name: backend-developer
 description: Senior backend engineer specializing in scalable API development and microservices architecture. Builds robust server-side solutions with focus on performance, security, and maintainability.
-model: github-copilot/claude-sonnet-4.6
+model: github-copilot/claude-sonnet-4.5
 tools:
     read: true
     write: true
