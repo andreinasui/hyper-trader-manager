@@ -1,15 +1,15 @@
 # HyperTrader Web Dockerfile
-# Multi-stage build: Vite build → nginx static serving
+# Multi-stage build: SolidStart with Node.js runtime
 
 # ============================================
 # Build stage
 # ============================================
-FROM node:22.12.0-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm@10.11.0
+RUN npm install -g pnpm@10
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
@@ -20,29 +20,24 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Build the Vite application (outputs to dist/)
+# Set default environment variables (can be overridden by docker-compose env_file)
+ENV API_URL=http://api:8000
+
+# Build the SolidStart application
 RUN pnpm build
 
 # ============================================
-# Runtime stage - serve static files with nginx
+# Runtime stage
 # ============================================
-FROM nginx:1.27-alpine AS runner
+FROM node:22-alpine AS runner
 
-# Remove default nginx config
-RUN rm /etc/nginx/conf.d/default.conf
+WORKDIR /app
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copy built static assets from builder
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy built output from builder
+COPY --from=builder /app/.output /app/.output
 
 # Expose port
-EXPOSE 80
+EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
-
-# nginx runs as root by default; it drops to www-data for workers
-CMD ["nginx", "-g", "daemon off;"]
+# Run the server
+CMD ["node", ".output/server/index.mjs"]

@@ -53,16 +53,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Application lifespan handler.
 
     Runs on startup:
-    - Verify database connection
-    - Start reconciliation worker if K8s is enabled
+    - Initialize database tables
 
     Runs on shutdown:
-    - Stop reconciliation worker
     - Cleanup resources
     """
     # Startup
     logger.info("Starting HyperTrader API...")
-    logger.debug(f"Settings loaded: debug={settings.debug}, runtime_mode={settings.runtime_mode}")
+    logger.debug(f"Settings loaded: debug={settings.debug}")
 
     # Initialize database (create tables if they don't exist)
     try:
@@ -73,38 +71,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.error(f"Database initialization failed: {e}")
         raise
 
-    # Start reconciliation worker for Docker runtime
-    if settings.runtime_mode == "docker":
-        logger.info("Starting reconciliation worker for Docker runtime...")
-        try:
-            from hyper_trader_api.workers import (  # noqa: PLC0415
-                start_reconciliation,
-                stop_reconciliation,
-            )
-
-            start_reconciliation()
-            logger.info("Reconciliation worker started")
-        except Exception as e:
-            logger.error(f"Failed to start reconciliation worker: {e}")
-            # Continue startup - reconciliation is not critical for API operation
-    else:
-        logger.warning(f"Unknown runtime_mode: {settings.runtime_mode}")
-
     logger.info("HyperTrader API started successfully")
 
     yield
 
     # Shutdown
     logger.info("Shutting down HyperTrader API...")
-
-    # Stop reconciliation worker
-    logger.info("Stopping reconciliation worker...")
-    try:
-        from hyper_trader_api.workers import stop_reconciliation  # noqa: PLC0415
-
-        stop_reconciliation()  # type: ignore[no-untyped-call]
-    except Exception as e:
-        logger.warning(f"Failed to stop reconciliation worker: {e}")
 
     engine.dispose()
     logger.info("HyperTrader API shutdown complete")

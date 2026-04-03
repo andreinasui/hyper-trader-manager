@@ -31,7 +31,7 @@ def _get_env_file() -> str:
     elif environment == "staging":
         return ".env.staging"
     else:
-        return ".env.dev"
+        return ".env.development"
 
 
 class Settings(BaseSettings):
@@ -54,12 +54,12 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/hypertrader.db"
 
     # ==================== Self-Hosted Configuration ====================
-    public_base_url: str = "http://localhost:80"
+    public_base_url: str = "http://localhost"
     public_port: int = 80
-    docker_socket: str = "unix:///var/run/docker.sock"
-    runtime_mode: Literal["docker"] = "docker"
     image_tag: str = "latest"  # Docker image tag for trader containers
-    data_dir: str = "./data"  # Base directory for app data (traefik config, certs, etc.)
+    data_dir: str = (
+        "./data"  # Base directory for app data (traefik config, certs, etc.)
+    )
 
     # ==================== Server ====================
     host: str = "0.0.0.0"
@@ -81,17 +81,14 @@ class Settings(BaseSettings):
             return []
         return [origin.strip() for origin in v.split(",") if origin.strip()]
 
-    # ==================== Rate Limiting ====================
-    rate_limit_enabled: bool = False
-    rate_limit_requests: int = 100  # requests per window
-    rate_limit_window: int = 60  # seconds
-
     # ==================== HTTP Client ====================
     http_timeout: float = 10.0
 
     # ==================== API Metadata ====================
-    api_title: str = "HyperTrader API"
-    api_version: str = "1.0.0"
+    api_title: str = (
+        f'HyperTrader API {"(Development)" if environment == "development" else ""}'
+    )
+    api_version: str = f'1.0.0{"-dev" if environment == "development" else ""}'
 
 
 @lru_cache

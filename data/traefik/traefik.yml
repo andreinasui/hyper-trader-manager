@@ -4,6 +4,9 @@ entryPoints:
   web:
     address: ":80"
 
+# Enable ping endpoint for healthcheck
+ping: {}
+
 providers:
   file:
     filename: /etc/traefik/dynamic.yml

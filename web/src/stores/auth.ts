@@ -1,10 +1,18 @@
 import { createSignal, createRoot, createEffect } from "solid-js";
 import { api } from "~/lib/api";
 import type { User } from "~/lib/types";
+import {
+  getLocalStorage,
+  setLocalStorage,
+  removeLocalStorage,
+  getSessionStorage,
+  setSessionStorage,
+  removeSessionStorage,
+} from "~/lib/storage";
 
 function createAuthStore() {
   const [user, setUser] = createSignal<User | null>(null);
-  const [token, setToken] = createSignal<string | null>(localStorage.getItem("auth_token"));
+  const [token, setToken] = createSignal<string | null>(getLocalStorage("auth_token"));
   const [loading, setLoading] = createSignal(true);
   const [isInitialized, setIsInitialized] = createSignal(false);
 
@@ -18,9 +26,9 @@ function createAuthStore() {
   createEffect(() => {
     const currentToken = token();
     if (currentToken) {
-      localStorage.setItem("auth_token", currentToken);
+      setLocalStorage("auth_token", currentToken);
     } else {
-      localStorage.removeItem("auth_token");
+      removeLocalStorage("auth_token");
     }
   });
 
@@ -79,12 +87,12 @@ function createAuthStore() {
 
   // Save return URL for redirect after login
   function saveReturnUrl(url: string): void {
-    sessionStorage.setItem("auth_return_url", url);
+    setSessionStorage("auth_return_url", url);
   }
 
   function getReturnUrl(): string | null {
-    const url = sessionStorage.getItem("auth_return_url");
-    sessionStorage.removeItem("auth_return_url");
+    const url = getSessionStorage("auth_return_url");
+    removeSessionStorage("auth_return_url");
     return url;
   }
 

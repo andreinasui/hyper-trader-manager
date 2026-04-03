@@ -12,10 +12,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  
+
   // Test output
   reporter: process.env.CI ? 'github' : 'html',
-  
+
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
@@ -49,7 +49,6 @@ export default defineConfig({
     timeout: 120000,
     env: {
       // Use test environment variables
-      VITE_PRIVY_APP_ID: 'test_mock_privy_app_id',
       VITE_API_URL: 'http://localhost:8000',
     },
   },

@@ -1,0 +1,88 @@
+# HyperTrader Manager Stack
+
+services:
+  # ============================================
+  # Traefik reverse proxy
+  # Routes /api/* → api, /* → web
+  # ============================================
+  traefik:
+    image: traefik:v3.3
+    container_name: hypertrader-traefik
+    restart: unless-stopped
+    ports:
+      - "${PUBLIC_PORT:-80}:80"
+      - "3443:443"
+    volumes:
+      - ../data/traefik:/etc/traefik:ro
+      - ../data/traefik/certs:/certs:ro
+      - ../data/traefik/acme.json:/letsencrypt/acme.json
+    networks:
+      - hypertrader
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ============================================
+  # API service (FastAPI + uvicorn)
+  # ============================================
+  api:
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    container_name: hypertrader-api
+    restart: unless-stopped
+    env_file:
+      - .env.api.development
+    group_add:
+      - ${DOCKER_GID}
+    volumes:
+      # Persistent data: SQLite database and trader configs
+      - ../data/sqlitedb/:/app/data
+      # Docker socket access for managing trader containers
+      - ${DOCKER_SOCK}:/var/run/docker.sock
+    networks:
+      - hypertrader
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ============================================
+  # Web service
+  # ============================================
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    container_name: hypertrader-web
+    restart: unless-stopped
+    env_file:
+      - .env.web.development
+    networks:
+      - hypertrader
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      api:
+        condition: service_healthy
+
+networks:
+  hypertrader:
+    driver: bridge

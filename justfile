@@ -19,13 +19,6 @@ api:
 web:
     cd web && just dev
 
-# Generate frontend API client from backend OpenAPI spec
-gen-api:
-    @echo "Generating TypeScript API client from OpenAPI spec..."
-    cd api && uv run python scripts/export_openapi.py ../web/openapi.json
-    cd web && pnpm gen:api
-    @echo "✓ OpenAPI schema exported and API client generated in web/src/lib/api/generated"
-
 # Install all dependencies
 install:
     cd api && just install-dev

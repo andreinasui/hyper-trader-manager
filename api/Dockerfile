@@ -20,9 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files from api/ subdirectory
-COPY api/pyproject.toml api/uv.lock ./
+COPY pyproject.toml uv.lock ./
 # README.md is referenced in pyproject.toml by hatchling
-COPY api/README.md ./
+COPY README.md ./
 
 # Create virtual environment and install dependencies
 # --frozen: use exact versions from lockfile
@@ -34,7 +34,7 @@ ENV UV_LINK_MODE=copy
 RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy application code
-COPY api/hyper_trader_api /app/hyper_trader_api
+COPY hyper_trader_api /app/hyper_trader_api
 
 # Install the project itself
 RUN uv sync --frozen --no-dev

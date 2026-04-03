@@ -5,18 +5,7 @@
 *.swo
 .DS_Store
 
-# Environment files
-.env
-.env.local
-.env.production
-.env.development
-deploy/.env
-
 # Note: Python-specific ignores are in api/.gitignore
 # Note: Frontend-specific ignores could be added to web/.gitignore if needed
 
 .worktrees/
-
-# Traefik SSL data (generated at runtime)
-data/traefik/acme.json
-data/traefik/certs/

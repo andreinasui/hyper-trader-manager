@@ -2,6 +2,7 @@ import { type Component, Show, For, Suspense } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { A } from "@solidjs/router";
 import { Plus } from "lucide-solid";
+import { ProtectedRoute } from "~/components/auth/ProtectedRoute";
 import { AppShell } from "~/components/layout/AppShell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -78,44 +79,46 @@ const DashboardPage: Component = () => {
   }));
 
   return (
-    <AppShell>
-      <div class="space-y-6">
-        <div class="flex items-center justify-between">
-          <div>
-            <h1 class="text-2xl font-bold">Dashboard</h1>
-            <p class="text-muted-foreground">Manage your trading bots</p>
-          </div>
-          <A href="/traders/new">
-            <Button>
-              <Plus class="h-4 w-4 mr-2" />
-              New Trader
-            </Button>
-          </A>
-        </div>
-
-        <Suspense fallback={<LoadingSkeleton />}>
-          <Show
-            when={tradersQuery.data && tradersQuery.data.length > 0}
-            fallback={
-              <Card>
-                <CardContent class="py-12 text-center">
-                  <p class="text-muted-foreground mb-4">No traders yet</p>
-                  <A href="/traders/new">
-                    <Button>Create your first trader</Button>
-                  </A>
-                </CardContent>
-              </Card>
-            }
-          >
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <For each={tradersQuery.data}>
-                {(trader) => <TraderCard trader={trader} />}
-              </For>
+    <ProtectedRoute>
+      <AppShell>
+        <div class="space-y-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-2xl font-bold">Dashboard</h1>
+              <p class="text-muted-foreground">Manage your trading bots</p>
             </div>
-          </Show>
-        </Suspense>
-      </div>
-    </AppShell>
+            <A href="/traders/new">
+              <Button>
+                <Plus class="h-4 w-4 mr-2" />
+                New Trader
+              </Button>
+            </A>
+          </div>
+
+          <Suspense fallback={<LoadingSkeleton />}>
+            <Show
+              when={tradersQuery.data && tradersQuery.data.length > 0}
+              fallback={
+                <Card>
+                  <CardContent class="py-12 text-center">
+                    <p class="text-muted-foreground mb-4">No traders yet</p>
+                    <A href="/traders/new">
+                      <Button>Create your first trader</Button>
+                    </A>
+                  </CardContent>
+                </Card>
+              }
+            >
+              <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <For each={tradersQuery.data}>
+                  {(trader) => <TraderCard trader={trader} />}
+                </For>
+              </div>
+            </Show>
+          </Suspense>
+        </div>
+      </AppShell>
+    </ProtectedRoute>
   );
 };
 

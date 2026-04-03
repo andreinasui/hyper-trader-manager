@@ -40,33 +40,6 @@ class TestSettings:
             or "127.0.0.1" in settings.public_base_url
         )
 
-    def test_runtime_mode_default(self, monkeypatch):
-        """Runtime mode should default to docker."""
-        monkeypatch.delenv("DATABASE_URL", raising=False)
-        from hyper_trader_api.config import get_settings
-
-        get_settings.cache_clear()
-
-        from hyper_trader_api.config import Settings
-
-        settings = Settings()
-        assert hasattr(settings, "runtime_mode")
-        assert settings.runtime_mode == "docker"
-
-    def test_docker_socket_default(self, monkeypatch):
-        """Docker socket should default to unix socket."""
-        monkeypatch.delenv("DOCKER_SOCKET", raising=False)
-        monkeypatch.delenv("DATABASE_URL", raising=False)
-        from hyper_trader_api.config import get_settings
-
-        get_settings.cache_clear()
-
-        from hyper_trader_api.config import Settings
-
-        settings = Settings()
-        assert hasattr(settings, "docker_socket")
-        assert "docker.sock" in settings.docker_socket
-
 
 class TestDatabaseEngine:
     """Tests for database engine configuration."""

@@ -1,18 +1,11 @@
-# Initial routing config - copied from deploy/traefik/dynamic.yml
 http:
   routers:
     health:
       rule: "Path(`/health`)"
-      service: api
+      service: web
       entryPoints:
         - web
       priority: 20
-    api:
-      rule: "PathPrefix(`/api`)"
-      service: api
-      entryPoints:
-        - web
-      priority: 10
     web:
       rule: "PathPrefix(`/`)"
       service: web
@@ -21,19 +14,11 @@ http:
       priority: 1
 
   services:
-    api:
-      loadBalancer:
-        servers:
-          - url: "http://api:8000"
-        healthCheck:
-          path: /health
-          interval: "10s"
-          timeout: "5s"
     web:
       loadBalancer:
         servers:
-          - url: "http://web:80"
+          - url: "http://web:3000"
         healthCheck:
-          path: /health
+          path: /
           interval: "10s"
           timeout: "5s"

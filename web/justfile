@@ -18,16 +18,12 @@ install:
 
 # Clean install (remove node_modules first)
 install-clean:
-    rm -rf node_modules
+    rm -rf node_modules .vinxi .output dist
     pnpm install
 
 # Update dependencies
 update:
     pnpm update
-
-# Update dependencies interactively
-update-interactive:
-    pnpm update --interactive
 
 # ─────────────────────────────────────────────────────────────
 # Development
@@ -37,10 +33,6 @@ update-interactive:
 dev:
     pnpm dev
 
-# Run dev server on specific port
-dev-port port="3000":
-    pnpm dev --port {{port}}
-
 # ─────────────────────────────────────────────────────────────
 # Build
 # ─────────────────────────────────────────────────────────────
@@ -48,10 +40,6 @@ dev-port port="3000":
 # Build for production
 build:
     pnpm build
-
-# Preview production build locally
-preview:
-    pnpm preview
 
 # ─────────────────────────────────────────────────────────────
 # Testing

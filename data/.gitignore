@@ -1,0 +1,9 @@
+# Generated when using local development docker containers
+sqlitedb/
+
+deploy/.env
+
+# Traefik SSL data (generated at runtime)
+traefik/acme.json
+traefik/certs/
+
