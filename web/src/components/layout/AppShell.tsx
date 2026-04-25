@@ -9,7 +9,7 @@ export const AppShell: Component<AppShellProps> = (props) => {
   const [expanded, setExpanded] = createSignal(true);
 
   return (
-    <div class="min-h-screen bg-[#08090a]">
+    <div class="min-h-screen bg-surface-base">
       <Sidebar expanded={expanded()} onToggle={() => setExpanded((v) => !v)} />
       <main
         class="transition-all duration-200 min-h-screen flex flex-col"
