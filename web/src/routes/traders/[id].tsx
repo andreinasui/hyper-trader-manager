@@ -114,6 +114,8 @@ const TraderDetailPage: Component = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: traderKeys.detail(params.id) });
       queryClient.invalidateQueries({ queryKey: traderKeys.status(params.id) });
+      // Invalidate all trader queries so list view updates when navigating back
+      queryClient.invalidateQueries({ queryKey: traderKeys.all });
     },
   }));
 
@@ -130,6 +132,8 @@ const TraderDetailPage: Component = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: traderKeys.detail(params.id) });
       queryClient.invalidateQueries({ queryKey: traderKeys.status(params.id) });
+      // Invalidate all trader queries so list view updates when navigating back
+      queryClient.invalidateQueries({ queryKey: traderKeys.all });
     },
   }));
 
@@ -146,6 +150,8 @@ const TraderDetailPage: Component = () => {
       queryClient.removeQueries({ queryKey: traderKeys.status(params.id) });
       // Kick off a background refetch to confirm the server-side state.
       queryClient.invalidateQueries({ queryKey: traderKeys.detail(params.id) });
+      // Invalidate all trader queries so list view updates when navigating back
+      queryClient.invalidateQueries({ queryKey: traderKeys.all });
     },
   }));
 

@@ -80,16 +80,16 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
         private_key: "",
         name: "",
         description: "",
-            config: {
-              provider_settings: {
-                exchange: "hyperliquid",
-                network: "mainnet",
-                self_account: { address: "", is_sub: false },
-                copy_account: { address: "" },
-                slippage_bps: DEFAULTS.slippageBps,
-              },
-              trader_settings: {
-                trading_strategy: {
+        config: {
+          provider_settings: {
+            exchange: "hyperliquid",
+            network: "mainnet",
+            self_account: { address: "", is_sub: false },
+            copy_account: { address: "" },
+            slippage_bps: DEFAULTS.slippageBps,
+          },
+          trader_settings: {
+            trading_strategy: {
               type: "order_based",
               risk_parameters: {
                 blocked_assets: [],
@@ -136,7 +136,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
         <PanelHeader
           icon={Wallet}
           title="Account Settings"
-          description="Wallet, copy target & funds"
+          description="Wallet, copy target"
         />
         <PanelBody class="space-y-4">
           {/* Name + Description — create mode only; edit mode uses Overview tab */}
@@ -305,43 +305,6 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
             </FormField>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
-            <FormField name="config.trader_settings.min_self_funds" type="number">
-              {(field, fieldProps) => (
-                <div class="space-y-1.5">
-                  <Label for="min_self_funds" class="text-xs text-text-muted">Min Self Funds (USDC)</Label>
-                  <Input
-                    {...fieldProps}
-                    id="min_self_funds"
-                    type="number"
-                    value={field.value ?? ""}
-                    placeholder="e.g., 100"
-                  />
-                  <Show when={field.error}>
-                    <p class="text-xs text-error">{field.error}</p>
-                  </Show>
-                </div>
-              )}
-            </FormField>
-
-            <FormField name="config.trader_settings.min_copy_funds" type="number">
-              {(field, fieldProps) => (
-                <div class="space-y-1.5">
-                  <Label for="min_copy_funds" class="text-xs text-text-muted">Min Copy Funds (USDC)</Label>
-                  <Input
-                    {...fieldProps}
-                    id="min_copy_funds"
-                    type="number"
-                    value={field.value ?? ""}
-                    placeholder="e.g., 100"
-                  />
-                  <Show when={field.error}>
-                    <p class="text-xs text-error">{field.error}</p>
-                  </Show>
-                </div>
-              )}
-            </FormField>
-          </div>
         </PanelBody>
       </Panel>
 
@@ -595,7 +558,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     <div class="space-y-1.5">
                       <div class="flex items-center justify-between">
                         <Label for="width_percent" class="text-xs text-text-muted">Width Percent</Label>
-                          <button type="button" title={`Restore default (${DEFAULTS.widthPercent})`} class="text-text-faint hover:text-text-muted transition-colors" onClick={() => setValue(form, "config.trader_settings.trading_strategy.bucket_config.manual.width_percent" as never, DEFAULTS.widthPercent as never)}>
+                        <button type="button" title={`Restore default (${DEFAULTS.widthPercent})`} class="text-text-faint hover:text-text-muted transition-colors" onClick={() => setValue(form, "config.trader_settings.trading_strategy.bucket_config.manual.width_percent" as never, DEFAULTS.widthPercent as never)}>
                           <RotateCcw class="h-3 w-3" />
                         </button>
                       </div>
