@@ -1,9 +1,7 @@
-import { type Component, For, createSignal } from "solid-js";
+import { type Component, For, createSignal, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { RefreshCw } from "lucide-solid";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Skeleton } from "~/components/ui/skeleton";
 import { api } from "~/lib/api";
 import { traderKeys } from "~/lib/query-keys";
 
@@ -17,13 +15,13 @@ export const LogViewer: Component<LogViewerProps> = (props) => {
   const logsQuery = createQuery(() => ({
     queryKey: traderKeys.logs(props.traderId),
     queryFn: () => api.getTraderLogs(props.traderId, lines()),
-    refetchInterval: 5000, // Auto-refresh every 5 seconds
+    refetchInterval: 5000,
   }));
 
   return (
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between">
-        <CardTitle>Logs</CardTitle>
+    <div>
+      <div class="flex items-center justify-between px-5 py-3.5 border-b border-border-default">
+        <h3 class="text-sm font-medium text-text-secondary">Logs</h3>
         <Button
           variant="outline"
           size="sm"
@@ -33,28 +31,32 @@ export const LogViewer: Component<LogViewerProps> = (props) => {
           <RefreshCw class={`h-4 w-4 mr-2 ${logsQuery.isFetching ? "animate-spin" : ""}`} />
           Refresh
         </Button>
-      </CardHeader>
-      <CardContent>
-        {logsQuery.isLoading ? (
-          <div class="space-y-2">
-            <For each={[1, 2, 3, 4, 5]}>
-              {() => <Skeleton class="h-4 w-full" />}
-            </For>
-          </div>
-        ) : (
-          <div class="bg-muted rounded-md p-4 max-h-96 overflow-auto">
-            <pre class="text-xs font-mono whitespace-pre-wrap">
-              {logsQuery.data?.length ? (
+      </div>
+      <div class="p-4">
+        <Show
+          when={!logsQuery.isLoading}
+          fallback={
+            <div class="space-y-2">
+              <For each={[1, 2, 3, 4, 5]}>
+                {() => <div class="h-4 w-full bg-surface-overlay rounded animate-pulse" />}
+              </For>
+            </div>
+          }
+        >
+          <div class="bg-surface-base rounded-md p-4 max-h-96 overflow-auto">
+            <pre class="text-xs font-mono whitespace-pre-wrap text-text-muted">
+              <Show
+                when={logsQuery.data?.length}
+                fallback={<span class="text-text-subtle">No logs available</span>}
+              >
                 <For each={logsQuery.data}>
                   {(line) => <div>{line}</div>}
                 </For>
-              ) : (
-                <span class="text-muted-foreground">No logs available</span>
-              )}
+              </Show>
             </pre>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </Show>
+      </div>
+    </div>
   );
 };
