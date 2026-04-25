@@ -7,6 +7,7 @@ export * from "./dialog";
 export * from "./dropdown-menu";
 export * from "./input";
 export * from "./label";
+export * from "./panel";
 export * from "./separator";
 export * from "./skeleton";
 export * from "./table";
