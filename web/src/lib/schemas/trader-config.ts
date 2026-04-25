@@ -44,7 +44,7 @@ export const openOnLowPnlSchema = z.object({
 export const riskParametersSchema = z.object({
   allowed_assets: z.array(z.string()).nullable().optional(),
   blocked_assets: z.array(z.string()).default([]),
-  max_leverage: z.number().int().min(1).max(50).nullable().optional(),
+  max_leverage: z.number().int().min(1).max(40).nullable().optional(),
   self_proportionality_multiplier: z.number().min(0.01).max(10).default(1.0),
   open_on_low_pnl: openOnLowPnlSchema.default({}),
 });
