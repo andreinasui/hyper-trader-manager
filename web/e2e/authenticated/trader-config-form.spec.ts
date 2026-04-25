@@ -95,6 +95,9 @@ test.describe('Trader Config Form - Create Flow', () => {
   test('strategy type selector works', async ({ page }) => {
     // Wait for form to be ready
     await expect(page.getByText('Account Settings')).toBeVisible();
+
+    // Expand Advanced Settings collapsible to reveal Strategy Type
+    await page.getByRole('button', { name: 'Advanced Settings' }).click();
     
     const strategySelect = page.getByLabel('Strategy Type');
     

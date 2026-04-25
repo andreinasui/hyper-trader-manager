@@ -70,7 +70,7 @@ export const bucketConfigSchema = z
   });
 
 export const tradingStrategySchema = z.object({
-  type: z.literal("order_based").default("order_based"),
+  type: z.enum(["order_based", "position_based"]).default("order_based"),
   risk_parameters: riskParametersSchema.default({}),
   bucket_config: bucketConfigSchema.default({ pricing_strategy: "vwap" }),
 });
@@ -78,7 +78,7 @@ export const tradingStrategySchema = z.object({
 export const traderSettingsSchema = z.object({
   min_self_funds: z.number().int().min(1).default(1),
   min_copy_funds: z.number().int().min(1).default(1),
-  trading_strategy: tradingStrategySchema,
+  trading_strategy: tradingStrategySchema.default({}),
 });
 
 export const traderConfigSchema = z.object({

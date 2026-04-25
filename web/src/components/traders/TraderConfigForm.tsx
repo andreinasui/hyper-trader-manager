@@ -263,6 +263,46 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
           </FormField>
 
           <div class="grid grid-cols-2 gap-4">
+            <FormField name="config.trader_settings.min_self_funds" type="number">
+              {(field, fieldProps) => (
+                <div class="space-y-2">
+                  <Label for="min_self_funds">Min Self Funds (USDC)</Label>
+                  <Input
+                    {...fieldProps}
+                    id="min_self_funds"
+                    type="number"
+                    value={field.value ?? 1}
+                    min={1}
+                    step={1}
+                  />
+                  <Show when={field.error}>
+                    <p class="text-sm text-destructive">{field.error}</p>
+                  </Show>
+                </div>
+              )}
+            </FormField>
+
+            <FormField name="config.trader_settings.min_copy_funds" type="number">
+              {(field, fieldProps) => (
+                <div class="space-y-2">
+                  <Label for="min_copy_funds">Min Copy Funds (USDC)</Label>
+                  <Input
+                    {...fieldProps}
+                    id="min_copy_funds"
+                    type="number"
+                    value={field.value ?? 1}
+                    min={1}
+                    step={1}
+                  />
+                  <Show when={field.error}>
+                    <p class="text-sm text-destructive">{field.error}</p>
+                  </Show>
+                </div>
+              )}
+            </FormField>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
             <FormField name="config.provider_settings.network">
               {(field, fieldProps) => (
                 <div class="space-y-2">
@@ -306,6 +346,28 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
       {/* Advanced Settings */}
       <Collapsible title="Advanced Settings" defaultOpen={false}>
         <div class="space-y-6">
+          {/* Strategy Type */}
+          <div class="space-y-4">
+            <FormField name="config.trader_settings.trading_strategy.type">
+              {(field, fieldProps) => (
+                <div class="space-y-2">
+                  <Label for="strategy_type">Strategy Type</Label>
+                  <Select
+                    id="strategy_type"
+                    name={fieldProps.name}
+                    ref={fieldProps.ref}
+                    value={(field.value as string | undefined) ?? "order_based"}
+                    onChange={(value) => setValue(form, "config.trader_settings.trading_strategy.type", value as "order_based" | "position_based")}
+                    options={[
+                      { value: "order_based", label: "Order Based" },
+                      { value: "position_based", label: "Position Based" },
+                    ]}
+                  />
+                </div>
+              )}
+            </FormField>
+          </div>
+
           {/* Risk Parameters */}
           <div class="space-y-4">
             <h4 class="font-medium">Risk Parameters</h4>
