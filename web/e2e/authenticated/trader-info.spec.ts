@@ -101,8 +101,8 @@ test.describe('Trader Info - Name/Description Editing', () => {
     // Wait for page to load
     await expect(page.getByRole('heading', { name: 'Traders' })).toBeVisible();
 
-    // Check that display_name is shown in the table
-    const displayName = page.locator('td').filter({ hasText: mockTrader.display_name });
+    // Check that display_name is shown in the list (div-based rows, no table)
+    const displayName = page.getByText(mockTrader.display_name).first();
     await expect(displayName).toBeVisible();
   });
 

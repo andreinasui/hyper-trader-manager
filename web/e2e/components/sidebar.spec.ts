@@ -19,12 +19,11 @@ test.describe('Sidebar Navigation', () => {
 
   test('displays HyperTrader logo', async ({ page }) => {
     // Check for brand/logo in desktop sidebar
-    await expect(page.locator(desktopSidebar).getByText('Hyper Trader')).toBeVisible();
+    await expect(page.locator(desktopSidebar).getByText('HyperTrader')).toBeVisible();
   });
 
   test('displays navigation links', async ({ page }) => {
-    // Check for navigation links in desktop sidebar
-    await expect(page.locator(desktopSidebar).getByRole('link', { name: 'Dashboard' })).toBeVisible();
+    // Check for navigation links in desktop sidebar (Dashboard removed; only Traders + Settings)
     await expect(page.locator(desktopSidebar).getByRole('link', { name: 'Traders' })).toBeVisible();
     await expect(page.locator(desktopSidebar).getByRole('link', { name: 'Settings' })).toBeVisible();
   });

@@ -1,18 +1,26 @@
-import { type Component, Show, createSignal, For } from "solid-js";
+import { type Component, type JSX, Show, createSignal, For } from "solid-js";
 import { A, useLocation, useNavigate } from "@solidjs/router";
-import { LayoutDashboard, Bot, Settings, LogOut, Menu, X } from "lucide-solid";
-import { Button } from "~/components/ui/button";
-import { Separator } from "~/components/ui/separator";
+import { Bot, Settings, LogOut, ChevronLeft, Menu, X } from "lucide-solid";
 import { authStore } from "~/stores/auth";
 import { cn } from "~/lib/utils";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: Component<{ class?: string }>;
+}
+
+const navItems: NavItem[] = [
   { href: "/traders", label: "Traders", icon: Bot },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-export const Sidebar: Component = () => {
+interface SidebarProps {
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+export const Sidebar: Component<SidebarProps> = (props) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = createSignal(false);
@@ -22,54 +30,126 @@ export const Sidebar: Component = () => {
     navigate("/");
   }
 
-  const NavContent = () => (
-    <div class="flex flex-col h-full">
-      <div class="p-4">
-        <h1 class="text-lg font-bold">Hyper Trader</h1>
+  const isActive = (href: string): boolean => {
+    return location.pathname === href || location.pathname.startsWith(href + "/");
+  };
+
+  const NavContent = (contentProps: { expanded: boolean; mobile?: boolean }): JSX.Element => (
+    <div class="flex flex-col h-full bg-[#111214] border-r border-[#222426]">
+      {/* Logo section */}
+      <div
+        class={cn(
+          "flex items-center gap-3 p-4 border-b border-[#222426]",
+          !contentProps.expanded && !contentProps.mobile && "justify-center"
+        )}
+        style={{ height: "56px" }}
+      >
+        <div class="w-8 h-8 rounded-md bg-[#5e6ad2] flex items-center justify-center flex-shrink-0">
+          <span class="text-white font-bold text-sm font-mono">HT</span>
+        </div>
+        <Show when={contentProps.expanded || contentProps.mobile}>
+          <span class="text-zinc-50 font-semibold text-base">HyperTrader</span>
+        </Show>
       </div>
 
-      <Separator />
-
-      <nav class="flex-1 p-4 space-y-1">
+      {/* Navigation */}
+      <nav class="flex-1 p-3 space-y-1">
         <For each={navItems}>
           {(item) => (
             <A
               href={item.href}
               class={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                location.pathname === item.href || location.pathname.startsWith(item.href + "/")
-                  ? "bg-secondary text-secondary-foreground"
-                  : "hover:bg-secondary/50"
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150",
+                isActive(item.href)
+                  ? "text-[#5e6ad2] bg-[#1a1b1e]"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-[#111214]",
+                !contentProps.expanded && !contentProps.mobile && "justify-center"
               )}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => contentProps.mobile && setMobileOpen(false)}
+              title={!contentProps.expanded && !contentProps.mobile ? item.label : undefined}
             >
-              <item.icon class="h-4 w-4" />
-              {item.label}
+              <item.icon class="h-4 w-4 flex-shrink-0" />
+              <Show when={contentProps.expanded || contentProps.mobile}>
+                <span>{item.label}</span>
+              </Show>
             </A>
           )}
         </For>
       </nav>
 
-      <Separator />
+      {/* Collapse toggle (desktop only) */}
+      <Show when={!contentProps.mobile}>
+        <div class="px-3 pb-3">
+          <button
+            onClick={props.onToggle}
+            class={cn(
+              "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150",
+              "text-zinc-400 hover:text-zinc-200 hover:bg-[#111214]",
+              !contentProps.expanded && "justify-center"
+            )}
+            title={!contentProps.expanded ? "Expand sidebar" : undefined}
+          >
+            <ChevronLeft
+              class={cn(
+                "h-4 w-4 flex-shrink-0 transition-transform duration-150",
+                !contentProps.expanded && "rotate-180"
+              )}
+            />
+            <Show when={contentProps.expanded}>
+              <span>Collapse</span>
+            </Show>
+          </button>
+        </div>
+      </Show>
 
-      <div class="p-4">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-medium">
+      {/* User section */}
+      <div class="border-t border-[#222426] p-3">
+        <div
+          class={cn(
+            "flex items-center gap-3 mb-3",
+            !contentProps.expanded && !contentProps.mobile && "justify-center"
+          )}
+        >
+          <div class="h-8 w-8 rounded-full bg-[#5e6ad2]/20 flex items-center justify-center text-sm font-medium text-[#5e6ad2] flex-shrink-0">
             {authStore.user()?.username?.charAt(0).toUpperCase()}
           </div>
-          <div class="flex-1 truncate">
-            <p class="text-sm font-medium truncate">{authStore.user()?.username}</p>
-            <Show when={authStore.user()?.is_admin}>
-              <p class="text-xs text-muted-foreground">Admin</p>
-            </Show>
-          </div>
+          <Show when={contentProps.expanded || contentProps.mobile}>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-zinc-100 truncate">
+                {authStore.user()?.username}
+              </p>
+              <Show when={authStore.user()?.is_admin}>
+                <span class="inline-block px-1.5 py-0.5 text-[10px] font-medium text-[#5e6ad2] bg-[#5e6ad2]/10 rounded mt-0.5">
+                  ADMIN
+                </span>
+              </Show>
+            </div>
+          </Show>
         </div>
 
-        <Button variant="outline" class="w-full" onClick={handleLogout}>
-          <LogOut class="h-4 w-4 mr-2" />
-          Sign Out
-        </Button>
+        {/* Logout button */}
+        <button
+          onClick={handleLogout}
+          class={cn(
+            "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150",
+            "text-zinc-400 hover:text-zinc-200 hover:bg-[#111214] border border-[#222426]",
+            !contentProps.expanded && !contentProps.mobile && "justify-center px-2"
+          )}
+          title={!contentProps.expanded && !contentProps.mobile ? "Sign out" : undefined}
+        >
+          <LogOut class="h-4 w-4 flex-shrink-0" />
+          <Show when={contentProps.expanded || contentProps.mobile}>
+            <span>Sign Out</span>
+          </Show>
+        </button>
       </div>
+
+      {/* Version footer */}
+      <Show when={contentProps.expanded || contentProps.mobile}>
+        <div class="px-3 pb-2">
+          <p class="text-xs text-zinc-600 font-mono">v1.0</p>
+        </div>
+      </Show>
     </div>
   );
 
@@ -77,11 +157,14 @@ export const Sidebar: Component = () => {
     <>
       {/* Mobile menu button */}
       <div class="lg:hidden fixed top-4 left-4 z-50">
-        <Button variant="outline" size="icon" onClick={() => setMobileOpen(!mobileOpen())}>
+        <button
+          onClick={() => setMobileOpen(!mobileOpen())}
+          class="h-10 w-10 rounded-md bg-[#111214] border border-[#222426] flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-[#1a1b1e] transition-all duration-150"
+        >
           <Show when={mobileOpen()} fallback={<Menu class="h-4 w-4" />}>
             <X class="h-4 w-4" />
           </Show>
-        </Button>
+        </button>
       </div>
 
       {/* Mobile overlay */}
@@ -95,16 +178,19 @@ export const Sidebar: Component = () => {
       {/* Mobile sidebar */}
       <aside
         class={cn(
-          "lg:hidden fixed inset-y-0 left-0 z-40 w-64 bg-background border-r transform transition-transform duration-200",
+          "lg:hidden fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200",
           mobileOpen() ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <NavContent />
+        <NavContent expanded={true} mobile={true} />
       </aside>
 
       {/* Desktop sidebar */}
-      <aside class="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 border-r bg-background">
-        <NavContent />
+      <aside
+        class="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 transition-all duration-200"
+        style={{ width: props.expanded ? "220px" : "64px" }}
+      >
+        <NavContent expanded={props.expanded} />
       </aside>
     </>
   );

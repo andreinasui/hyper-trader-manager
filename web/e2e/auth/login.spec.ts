@@ -68,9 +68,9 @@ test.describe('Authentication Flow', () => {
       
       await page.getByRole('button', { name: 'Create Admin Account' }).click();
       
-      // Wait for redirect to dashboard after success
-      await page.waitForURL(/\/dashboard/);
-      await expect(page).toHaveURL(/\/dashboard/);
+      // Wait for redirect to traders after success
+      await page.waitForURL(/\/traders/);
+      await expect(page).toHaveURL(/\/traders/);
     });
 
     test('validates password match', async ({ page }) => {
@@ -111,8 +111,8 @@ test.describe('Authentication Flow', () => {
       
       await page.getByRole('button', { name: 'Sign In' }).click();
       
-      await page.waitForURL(/\/dashboard/);
-      await expect(page).toHaveURL(/\/dashboard/);
+      await page.waitForURL(/\/traders/);
+      await expect(page).toHaveURL(/\/traders/);
     });
   });
 
@@ -125,7 +125,7 @@ test.describe('Authentication Flow', () => {
     test('redirects to dashboard if already authenticated', async ({ page }) => {
       await page.goto('/');
       await page.waitForLoadState('networkidle');
-      await expect(page).toHaveURL(/\/dashboard/);
+      await expect(page).toHaveURL(/\/traders/);
     });
   });
 });

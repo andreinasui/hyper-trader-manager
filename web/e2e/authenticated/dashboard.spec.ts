@@ -16,11 +16,11 @@ test.describe('Dashboard - Authenticated', () => {
     await page.goto('/dashboard');
     await page.waitForLoadState('networkidle');
 
-    // Check main dashboard heading
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    // Check main heading (dashboard redirects to /traders)
+    await expect(page.getByRole('heading', { name: 'Traders' })).toBeVisible();
     
     // Check description text
-    await expect(page.getByText('Manage your trading bots')).toBeVisible();
+    await expect(page.getByText('Manage and monitor your trading bots')).toBeVisible();
   });
 
   test('displays New Trader button in header', async ({ page }) => {
@@ -36,8 +36,7 @@ test.describe('Dashboard - Authenticated', () => {
     await page.goto('/dashboard');
     await page.waitForLoadState('networkidle');
 
-    // Check sidebar navigation items exist (they may be in a complementary/aside role)
-    await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+    // Check sidebar navigation items exist (Dashboard removed; only Traders + Settings)
     await expect(page.getByRole('link', { name: 'Traders' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
   });
@@ -58,7 +57,7 @@ test.describe('Dashboard - Authenticated', () => {
     // The API mock returns one trader named "Test Trader"
     await expect(page.getByText('Test Trader')).toBeVisible();
     
-    // Should show running status
-    await expect(page.getByText('running')).toBeVisible();
+    // Should show running status (use .first() — appears in KPI strip AND status indicator)
+    await expect(page.getByText('running').first()).toBeVisible();
   });
 });

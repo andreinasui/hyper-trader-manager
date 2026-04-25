@@ -1,4 +1,4 @@
-import { type Component, type JSX } from "solid-js";
+import { type Component, type JSX, createSignal } from "solid-js";
 import { Sidebar } from "./Sidebar";
 
 interface AppShellProps {
@@ -6,11 +6,16 @@ interface AppShellProps {
 }
 
 export const AppShell: Component<AppShellProps> = (props) => {
+  const [expanded, setExpanded] = createSignal(true);
+
   return (
-    <div class="min-h-screen bg-background">
-      <Sidebar />
-      <main class="lg:pl-64">
-        <div class="p-6 lg:p-8">{props.children}</div>
+    <div class="min-h-screen bg-[#08090a]">
+      <Sidebar expanded={expanded()} onToggle={() => setExpanded((v) => !v)} />
+      <main
+        class="transition-all duration-200 min-h-screen flex flex-col"
+        style={{ "margin-left": expanded() ? "220px" : "64px" }}
+      >
+        {props.children}
       </main>
     </div>
   );

@@ -19,7 +19,7 @@ test.describe('Trader Creation - Authenticated', () => {
     await page.waitForLoadState('networkidle');
 
     // Check page title
-    await expect(page.getByRole('heading', { name: 'Create New Trader' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'New trader' })).toBeVisible();
 
     // Form should be visible
     await expect(page.locator('form')).toBeVisible();

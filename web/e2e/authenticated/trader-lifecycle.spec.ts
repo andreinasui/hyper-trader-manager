@@ -121,12 +121,12 @@ test.describe('Trader Lifecycle - Start/Stop Actions', () => {
     // Navigate to traders list
     await page.goto('/traders', { waitUntil: 'networkidle' });
 
-    // Wait for table to load
-    await expect(page.locator('table')).toBeVisible();
+    // Wait for list to load (div-based rows, no table)
+    await expect(page.getByRole('heading', { name: 'Traders' })).toBeVisible();
 
-    // Check that status badge is visible
-    const statusBadge = page.locator('td').filter({ hasText: /running/i }).first();
-    await expect(statusBadge).toBeVisible();
+    // Check that status indicator is visible
+    const statusIndicator = page.getByText(/running/i).first();
+    await expect(statusIndicator).toBeVisible();
   });
 });
 

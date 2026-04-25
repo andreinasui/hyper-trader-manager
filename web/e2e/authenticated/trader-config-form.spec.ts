@@ -23,7 +23,7 @@ test.describe('Trader Config Form - Create Flow', () => {
 
   test('shows all required form sections', async ({ page }) => {
     // Wait for the page title to appear first
-    await expect(page.getByRole('heading', { name: 'Create New Trader' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'New trader' })).toBeVisible();
     
     // Check Account Settings card title
     await expect(page.getByText('Account Settings')).toBeVisible();
@@ -121,7 +121,7 @@ test.describe('Trader Config Form - Edit Flow', () => {
     
     // Wait for page to load
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('text=Test Trader')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Test Trader' })).toBeVisible({ timeout: 10000 });
     
     // Navigate to Configuration tab
     const configTab = page.locator('button[role="tab"]').filter({ hasText: 'Configuration' });
@@ -165,7 +165,7 @@ test.describe('Trader Config Form - Edit Flow', () => {
     
     // Wait for page to load
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('text=Test Trader')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Test Trader' })).toBeVisible({ timeout: 10000 });
     
     // Navigate to Configuration tab
     const configTab = page.locator('button[role="tab"]').filter({ hasText: 'Configuration' });

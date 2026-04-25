@@ -23,9 +23,9 @@ test.describe('Authentication', () => {
     // Submit
     await page.getByRole('button', { name: 'Sign In' }).click()
     
-    // Should redirect to dashboard
-    await page.waitForURL(/\/dashboard/)
-    await expect(page).toHaveURL(/\/dashboard/)
+    // Should redirect to traders (dashboard redirects to /traders)
+    await page.waitForURL(/\/traders/)
+    await expect(page).toHaveURL(/\/traders/)
   })
   
   test('unauthenticated requests redirect to login', async ({ page }) => {
@@ -47,7 +47,7 @@ test.describe('Authentication', () => {
     await page.goto('/dashboard')
     await page.waitForLoadState('networkidle')
     
-    // Should stay on dashboard
-    await expect(page).toHaveURL(/\/dashboard/)
+    // /dashboard redirects to /traders
+    await expect(page).toHaveURL(/\/traders/)
   })
 })

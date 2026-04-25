@@ -1,7 +1,6 @@
 import { type Component, Show, createSignal } from "solid-js";
 import { createQuery, createMutation, useQueryClient } from "@tanstack/solid-query";
 import { RefreshCw, Loader2 } from "lucide-solid";
-import { Button } from "~/components/ui/button";
 import { api } from "~/lib/api";
 import { traderKeys, imageKeys } from "~/lib/query-keys";
 import type { Trader } from "~/lib/types";
@@ -55,34 +54,29 @@ export const ImageVersionBanner: Component<Props> = (props) => {
 
   return (
     <Show when={updateNeeded()}>
-      <div class="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-800 dark:bg-amber-950">
-        <div class="flex items-center gap-2">
-          <RefreshCw class="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          <span class="text-amber-800 dark:text-amber-200">
-            Update available:{" "}
-            <span class="font-mono font-medium">
+      <div class="flex items-center justify-between bg-[#111214] border border-amber-900/50 rounded-md px-4 py-3">
+        <div class="flex items-center gap-3">
+          <span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+          <span class="text-sm text-zinc-300">
+            Update available{" "}
+            <span class="font-mono text-amber-400">
               {imageQuery.data?.latest_local} → {imageQuery.data?.latest_remote}
             </span>
           </span>
           <Show when={updateError()}>
-            <span class="text-destructive text-xs ml-2">{updateError()}</span>
+            <span class="text-xs text-red-400">{updateError()}</span>
           </Show>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
+        <button
           onClick={() => updateAllMutation.mutate()}
           disabled={updateAllMutation.isPending || props.traders.length === 0}
-          class="border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-amber-900/50 text-amber-400 hover:bg-amber-950/30 transition-all text-sm font-medium disabled:opacity-50"
         >
-          <Show
-            when={updateAllMutation.isPending}
-            fallback={<RefreshCw class="h-3.5 w-3.5 mr-1.5" />}
-          >
-            <Loader2 class="h-3.5 w-3.5 mr-1.5 animate-spin" />
+          <Show when={updateAllMutation.isPending} fallback={<RefreshCw size={14} stroke-width={1.5} />}>
+            <Loader2 size={14} stroke-width={1.5} class="animate-spin" />
           </Show>
-          Update All
-        </Button>
+          Update all
+        </button>
       </div>
     </Show>
   );
