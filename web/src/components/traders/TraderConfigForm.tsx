@@ -1,13 +1,12 @@
 import { type Component, createSignal, Show } from "solid-js";
 import { createForm, setValue, type PartialValues } from "@modular-forms/solid";
-import { Eye, EyeOff } from "lucide-solid";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "~/components/ui/card";
+  Eye,
+  EyeOff,
+  ChevronRight,
+  Wallet,
+  SlidersHorizontal,
+} from "lucide-solid";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -15,7 +14,11 @@ import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Select } from "~/components/ui/select";
 import { Checkbox } from "~/components/ui/checkbox";
 import { TagInput } from "~/components/ui/tag-input";
-import { Collapsible } from "~/components/ui/collapsible";
+import { Panel, PanelHeader, PanelBody } from "~/components/ui/panel";
+import { SectionLabel } from "~/components/ui/section-label";
+import { ToggleGroup } from "~/components/ui/toggle-group";
+import { Textarea } from "~/components/ui/textarea";
+import { cn } from "~/lib/utils";
 import {
   createTraderFormSchema,
   editTraderFormSchema,
@@ -33,9 +36,8 @@ export interface TraderConfigFormProps {
 export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
   const [error, setError] = createSignal<string | null>(null);
   const [showPrivateKey, setShowPrivateKey] = createSignal(false);
-  const [bucketMode, setBucketMode] = createSignal<"manual" | "auto">(
-    "auto"
-  );
+  const [bucketMode, setBucketMode] = createSignal<"manual" | "auto">("auto");
+  const [advancedOpen, setAdvancedOpen] = createSignal(false);
   const [maxLeverageEnabled, setMaxLeverageEnabled] = createSignal(
     (props.initialValues?.config?.trader_settings?.trading_strategy?.risk_parameters?.max_leverage ?? null) !== null
   );
@@ -44,10 +46,8 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
   const isEditing = props.isEditing ?? false;
 
   // Custom validator that skips wallet_address/private_key validation when editing
-  // Note: modular-forms passes PartialValues (with Maybe<T> types) to validators
   const validateForm = (values: PartialValues<CreateTraderForm>) => {
     if (isEditing) {
-      // Only validate config when editing
       const result = editTraderFormSchema.safeParse(values);
       if (!result.success) {
         const errors: Record<string, string> = {};
@@ -58,7 +58,6 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
       }
       return {};
     } else {
-      // Full validation for create
       const result = createTraderFormSchema.safeParse(values);
       if (!result.success) {
         const errors: Record<string, string> = {};
@@ -115,10 +114,8 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
   const handleSubmit = async (values: CreateTraderForm) => {
     setError(null);
     try {
-      // Auto-fill self_account.address from wallet_address
-      // In edit mode, wallet_address field is hidden so use initial value
-      const walletAddress = isEditing 
-        ? props.initialValues?.wallet_address 
+      const walletAddress = isEditing
+        ? props.initialValues?.wallet_address
         : values.wallet_address;
       values.config.provider_settings.self_account.address = walletAddress ?? "";
       await props.onSubmit(values);
@@ -128,68 +125,74 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
   };
 
   return (
-    <FormComponent onSubmit={handleSubmit} class="space-y-6">
+    <FormComponent onSubmit={handleSubmit} class="space-y-4">
       <Show when={error()}>
         <Alert variant="destructive">
           <AlertDescription>{error()}</AlertDescription>
         </Alert>
       </Show>
 
-      {/* Basic Settings Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Account Settings</CardTitle>
-          <CardDescription>
-            Configure your wallet and copy target
-          </CardDescription>
-        </CardHeader>
-        <CardContent class="space-y-4">
-          <FormField name="name">
-            {(field, fieldProps) => (
-              <div class="space-y-2">
-                <Label for="name">Name (optional)</Label>
-                <Input
-                  {...fieldProps}
-                  id="name"
-                  type="text"
-                  value={field.value ?? ""}
-                  placeholder="e.g., Main Trading Bot"
-                  maxLength={50}
-                />
-                <Show when={field.error}>
-                  <p class="text-sm text-destructive">{field.error}</p>
-                </Show>
-              </div>
-            )}
-          </FormField>
+      {/* ── Account Settings panel ──────────────────────────────────────── */}
+      <Panel>
+        <PanelHeader
+          icon={Wallet}
+          title="Account Settings"
+          description="Wallet, copy target & funds"
+        />
+        <PanelBody class="space-y-4">
+          {/* Name + Description */}
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField name="name">
+              {(field, fieldProps) => (
+                <div class="space-y-1.5">
+                  <Label for="name" class="text-xs text-text-muted">
+                    Name <span class="text-text-faint">(optional)</span>
+                  </Label>
+                  <Input
+                    {...fieldProps}
+                    id="name"
+                    type="text"
+                    value={field.value ?? ""}
+                    placeholder="e.g., Main Trading Bot"
+                    maxLength={50}
+                  />
+                  <Show when={field.error}>
+                    <p class="text-xs text-error">{field.error}</p>
+                  </Show>
+                </div>
+              )}
+            </FormField>
 
-          <FormField name="description">
-            {(field, fieldProps) => (
-              <div class="space-y-2">
-                <Label for="description">Description (optional)</Label>
-                <textarea
-                  {...fieldProps}
-                  id="description"
-                  value={field.value ?? ""}
-                  onInput={(e) => fieldProps.onInput(e)}
-                  onBlur={fieldProps.onBlur}
-                  placeholder="Optional notes about this trader"
-                  class="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  maxLength={255}
-                  rows={2}
-                />
-                <Show when={field.error}>
-                  <p class="text-sm text-destructive">{field.error}</p>
-                </Show>
-              </div>
-            )}
-          </FormField>
+            <FormField name="description">
+              {(field, fieldProps) => (
+                <div class="space-y-1.5">
+                  <Label for="description" class="text-xs text-text-muted">
+                    Description <span class="text-text-faint">(optional)</span>
+                  </Label>
+                  <Textarea
+                    {...fieldProps}
+                    id="description"
+                    value={field.value ?? ""}
+                    onInput={(e) => fieldProps.onInput(e)}
+                    onBlur={fieldProps.onBlur}
+                    placeholder="Optional notes about this trader"
+                    class="min-h-[36px] h-9"
+                    maxLength={255}
+                    rows={1}
+                  />
+                  <Show when={field.error}>
+                    <p class="text-xs text-error">{field.error}</p>
+                  </Show>
+                </div>
+              )}
+            </FormField>
+          </div>
 
           <Show when={!props.isEditing}>
             <FormField name="wallet_address">
               {(field, fieldProps) => (
-                <div class="space-y-2">
-                  <Label for="wallet_address">Wallet Address</Label>
+                <div class="space-y-1.5">
+                  <Label for="wallet_address" class="text-xs text-text-muted">Wallet Address</Label>
                   <Input
                     {...fieldProps}
                     id="wallet_address"
@@ -199,7 +202,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     class="font-mono"
                   />
                   <Show when={field.error}>
-                    <p class="text-sm text-destructive">{field.error}</p>
+                    <p class="text-xs text-error">{field.error}</p>
                   </Show>
                 </div>
               )}
@@ -207,8 +210,8 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
 
             <FormField name="private_key">
               {(field, fieldProps) => (
-                <div class="space-y-2">
-                  <Label for="private_key">Private Key</Label>
+                <div class="space-y-1.5">
+                  <Label for="private_key" class="text-xs text-text-muted">Private Key</Label>
                   <div class="relative">
                     <Input
                       {...fieldProps}
@@ -220,7 +223,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     />
                     <button
                       type="button"
-                      class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition-colors"
                       onClick={() => setShowPrivateKey(!showPrivateKey())}
                       tabIndex={-1}
                     >
@@ -229,11 +232,11 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                       </Show>
                     </button>
                   </div>
-                  <p class="text-xs text-muted-foreground">
+                  <p class="text-xs text-text-muted">
                     Stored securely as a Docker secret
                   </p>
                   <Show when={field.error}>
-                    <p class="text-sm text-destructive">{field.error}</p>
+                    <p class="text-xs text-error">{field.error}</p>
                   </Show>
                 </div>
               )}
@@ -242,8 +245,8 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
 
           <FormField name="config.provider_settings.copy_account.address">
             {(field, fieldProps) => (
-              <div class="space-y-2">
-                <Label for="copy_account">Copy Account Address</Label>
+              <div class="space-y-1.5">
+                <Label for="copy_account" class="text-xs text-text-muted">Copy Account Address</Label>
                 <Input
                   {...fieldProps}
                   id="copy_account"
@@ -252,11 +255,11 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                   placeholder="0x..."
                   class="font-mono"
                 />
-                <p class="text-xs text-muted-foreground">
+                <p class="text-xs text-text-muted">
                   The address you want to copy trades from
                 </p>
                 <Show when={field.error}>
-                  <p class="text-sm text-destructive">{field.error}</p>
+                  <p class="text-xs text-error">{field.error}</p>
                 </Show>
               </div>
             )}
@@ -265,8 +268,8 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
           <div class="grid grid-cols-2 gap-4">
             <FormField name="config.trader_settings.min_self_funds" type="number">
               {(field, fieldProps) => (
-                <div class="space-y-2">
-                  <Label for="min_self_funds">Min Self Funds (USDC)</Label>
+                <div class="space-y-1.5">
+                  <Label for="min_self_funds" class="text-xs text-text-muted">Min Self Funds (USDC)</Label>
                   <Input
                     {...fieldProps}
                     id="min_self_funds"
@@ -276,7 +279,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     step={1}
                   />
                   <Show when={field.error}>
-                    <p class="text-sm text-destructive">{field.error}</p>
+                    <p class="text-xs text-error">{field.error}</p>
                   </Show>
                 </div>
               )}
@@ -284,8 +287,8 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
 
             <FormField name="config.trader_settings.min_copy_funds" type="number">
               {(field, fieldProps) => (
-                <div class="space-y-2">
-                  <Label for="min_copy_funds">Min Copy Funds (USDC)</Label>
+                <div class="space-y-1.5">
+                  <Label for="min_copy_funds" class="text-xs text-text-muted">Min Copy Funds (USDC)</Label>
                   <Input
                     {...fieldProps}
                     id="min_copy_funds"
@@ -295,7 +298,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     step={1}
                   />
                   <Show when={field.error}>
-                    <p class="text-sm text-destructive">{field.error}</p>
+                    <p class="text-xs text-error">{field.error}</p>
                   </Show>
                 </div>
               )}
@@ -305,8 +308,8 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
           <div class="grid grid-cols-2 gap-4">
             <FormField name="config.provider_settings.network">
               {(field, fieldProps) => (
-                <div class="space-y-2">
-                  <Label for="network">Network</Label>
+                <div class="space-y-1.5">
+                  <Label for="network" class="text-xs text-text-muted">Network</Label>
                   <Select
                     id="network"
                     name={fieldProps.name}
@@ -324,8 +327,8 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
 
             <FormField name="config.provider_settings.self_account.is_sub" type="boolean">
               {(field, fieldProps) => (
-                <div class="space-y-2">
-                  <Label>Account Type</Label>
+                <div class="space-y-1.5">
+                  <Label class="text-xs text-text-muted">Account Type</Label>
                   <div class="flex items-center gap-2 h-9">
                     <Checkbox
                       id="is_sub"
@@ -340,260 +343,226 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
               )}
             </FormField>
           </div>
-        </CardContent>
-      </Card>
+        </PanelBody>
+      </Panel>
 
-      {/* Advanced Settings */}
-      <Collapsible title="Advanced Settings" defaultOpen={false}>
-        <div class="space-y-6">
-          {/* Strategy Type */}
-          <div class="space-y-4">
-            <FormField name="config.trader_settings.trading_strategy.type">
-              {(field, fieldProps) => (
-                <div class="space-y-2">
-                  <Label for="strategy_type">Strategy Type</Label>
-                  <Select
-                    id="strategy_type"
-                    name={fieldProps.name}
-                    ref={fieldProps.ref}
-                    value={(field.value as string | undefined) ?? "order_based"}
-                    onChange={(value) => setValue(form, "config.trader_settings.trading_strategy.type", value as "order_based" | "position_based")}
-                    options={[
-                      { value: "order_based", label: "Order Based" },
-                      { value: "position_based", label: "Position Based" },
-                    ]}
-                  />
-                </div>
-              )}
-            </FormField>
-          </div>
+      {/* ── Advanced Settings panel (collapsible) ───────────────────────── */}
+      <Panel>
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen(!advancedOpen())}
+          class="w-full px-5 py-3.5 flex items-center gap-2.5 text-left hover:bg-surface-overlay transition-colors"
+        >
+          <SlidersHorizontal class="w-4 h-4 text-text-subtle shrink-0" />
+          <span class="text-sm font-medium text-text-secondary">Advanced Settings</span>
+          <span class="ml-auto text-xs text-text-faint hidden sm:block">
+            Strategy, risk, slippage &amp; buckets
+          </span>
+          <ChevronRight
+            class={cn(
+              "w-4 h-4 text-text-faint transition-transform duration-200 ml-2",
+              advancedOpen() && "rotate-90"
+            )}
+          />
+        </button>
 
-          {/* Risk Parameters */}
-          <div class="space-y-4">
-            <h4 class="font-medium">Risk Parameters</h4>
-
-            <FormField name="config.trader_settings.trading_strategy.risk_parameters.allowed_assets" type="string[]">
-              {(field, _fieldProps) => (
-                <div class="space-y-2">
-                  <Label>Allowed Assets</Label>
-                  <TagInput
-                    value={(field.value as string[] | null) ?? []}
-                    onChange={(tags) => {
-                      setValue(form, "config.trader_settings.trading_strategy.risk_parameters.allowed_assets", tags.length > 0 ? tags : null);
-                    }}
-                    placeholder="Type asset and press Enter (empty = all)"
-                  />
-                  <p class="text-xs text-muted-foreground">
-                    Leave empty to allow all assets
-                  </p>
-                </div>
-              )}
-            </FormField>
-
-            <FormField name="config.trader_settings.trading_strategy.risk_parameters.blocked_assets" type="string[]">
-              {(field, _fieldProps) => (
-                <div class="space-y-2">
-                  <Label>Blocked Assets</Label>
-                  <TagInput
-                    value={(field.value as string[]) ?? []}
-                    onChange={(tags) => {
-                      setValue(form, "config.trader_settings.trading_strategy.risk_parameters.blocked_assets", tags);
-                    }}
-                    placeholder="Type asset and press Enter"
-                  />
-                </div>
-              )}
-            </FormField>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div class="space-y-2">
-                <Label>Max Leverage</Label>
-                <div class="flex items-center gap-2">
-                  <Checkbox
-                    id="max_leverage_toggle"
-                    checked={maxLeverageEnabled()}
-                    onChange={(checked) => {
-                      setMaxLeverageEnabled(checked);
-                      if (!checked) {
-                        setValue(form, "config.trader_settings.trading_strategy.risk_parameters.max_leverage", null);
-                      } else {
-                        setValue(form, "config.trader_settings.trading_strategy.risk_parameters.max_leverage", 10);
-                      }
-                    }}
-                  />
-                  <Label for="max_leverage_toggle" class="font-normal">
-                    Set max leverage
-                  </Label>
-                </div>
-                <Show when={maxLeverageEnabled()}>
-                  <FormField name="config.trader_settings.trading_strategy.risk_parameters.max_leverage" type="number">
-                    {(field, fieldProps) => (
-                      <Input
-                        {...fieldProps}
-                        id="max_leverage"
-                        type="number"
-                        value={field.value ?? 10}
-                        min={1}
-                        max={50}
-                      />
-                    )}
-                  </FormField>
-                </Show>
-              </div>
-
-              <FormField name="config.trader_settings.trading_strategy.risk_parameters.self_proportionality_multiplier" type="number">
+        <Show when={advancedOpen()}>
+          <PanelBody class="border-t border-border-default space-y-5">
+            {/* Strategy section */}
+            <SectionLabel label="Strategy" />
+            <div class="space-y-4">
+              <FormField name="config.trader_settings.trading_strategy.type">
                 {(field, fieldProps) => (
-                  <div class="space-y-2">
-                    <Label for="multiplier">Size Multiplier</Label>
-                    <Input
-                      {...fieldProps}
-                      id="multiplier"
-                      type="number"
-                      value={field.value ?? 1.0}
-                      min={0.01}
-                      max={10}
-                      step={0.1}
+                  <div class="space-y-1.5">
+                    <Label for="strategy_type" class="text-xs text-text-muted">Strategy Type</Label>
+                    <Select
+                      id="strategy_type"
+                      name={fieldProps.name}
+                      ref={fieldProps.ref}
+                      value={(field.value as string | undefined) ?? "order_based"}
+                      onChange={(value) => setValue(form, "config.trader_settings.trading_strategy.type", value as "order_based" | "position_based")}
+                      options={[
+                        { value: "order_based", label: "Order Based" },
+                        { value: "position_based", label: "Position Based" },
+                      ]}
                     />
                   </div>
                 )}
               </FormField>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-              <FormField name="config.trader_settings.trading_strategy.risk_parameters.open_on_low_pnl.enabled" type="boolean">
-                {(field, fieldProps) => (
-                  <div class="flex items-center gap-2">
-                    <Checkbox 
-                      checked={field.value ?? true} 
-                      onChange={(checked) => setValue(form, "config.trader_settings.trading_strategy.risk_parameters.open_on_low_pnl.enabled", checked)}
-                    />
-                    <Label class="font-normal">Open on Low PnL</Label>
-                  </div>
-                )}
-              </FormField>
-
-              <FormField name="config.trader_settings.trading_strategy.risk_parameters.open_on_low_pnl.max_pnl" type="number">
-                {(field, fieldProps) => (
-                  <div class="space-y-2">
-                    <Label for="max_pnl">Max PnL Threshold (%)</Label>
-                    <Input
-                      {...fieldProps}
-                      id="max_pnl"
-                      type="number"
-                      value={parseFloat(((field.value ?? 0.05) * 100).toFixed(4))}
-                      onInput={(e) => {
-                        const pctVal = parseFloat((e.target as HTMLInputElement).value);
-                        setValue(
-                          form,
-                          "config.trader_settings.trading_strategy.risk_parameters.open_on_low_pnl.max_pnl",
-                          isNaN(pctVal) ? 0.05 : pctVal / 100
-                        );
+            {/* Risk Parameters section */}
+            <SectionLabel label="Risk Parameters" />
+            <div class="space-y-4">
+              <FormField name="config.trader_settings.trading_strategy.risk_parameters.allowed_assets" type="string[]">
+                {(field, _fieldProps) => (
+                  <div class="space-y-1.5">
+                    <Label class="text-xs text-text-muted">Allowed Assets</Label>
+                    <TagInput
+                      value={(field.value as string[] | null) ?? []}
+                      onChange={(tags) => {
+                        setValue(form, "config.trader_settings.trading_strategy.risk_parameters.allowed_assets", tags.length > 0 ? tags : null);
                       }}
-                      min={-100}
-                      max={100}
-                      step={0.1}
+                      placeholder="Type asset and press Enter (empty = all)"
                     />
-
+                    <p class="text-xs text-text-muted">
+                      Leave empty to allow all assets
+                    </p>
                   </div>
                 )}
               </FormField>
-            </div>
-          </div>
 
-          {/* Slippage & Fees */}
-          <div class="space-y-4">
-            <h4 class="font-medium">Slippage & Fees</h4>
-            <FormField name="config.provider_settings.slippage_bps" type="number">
-              {(field, fieldProps) => (
-                <div class="space-y-2">
-                  <Label for="slippage">Slippage (bps)</Label>
-                  <Input
-                    {...fieldProps}
-                    id="slippage"
-                    type="number"
-                    value={field.value ?? 200}
-                    min={0}
-                    max={1000}
-                  />
-                  <p class="text-xs text-muted-foreground">1 bp = 0.01%</p>
+              <FormField name="config.trader_settings.trading_strategy.risk_parameters.blocked_assets" type="string[]">
+                {(field, _fieldProps) => (
+                  <div class="space-y-1.5">
+                    <Label class="text-xs text-text-muted">Blocked Assets</Label>
+                    <TagInput
+                      value={(field.value as string[]) ?? []}
+                      onChange={(tags) => {
+                        setValue(form, "config.trader_settings.trading_strategy.risk_parameters.blocked_assets", tags);
+                      }}
+                      placeholder="Type asset and press Enter"
+                    />
+                  </div>
+                )}
+              </FormField>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                  <Label class="text-xs text-text-muted">Max Leverage</Label>
+                  <div class="flex items-center gap-2">
+                    <Checkbox
+                      id="max_leverage_toggle"
+                      checked={maxLeverageEnabled()}
+                      onChange={(checked) => {
+                        setMaxLeverageEnabled(checked);
+                        if (!checked) {
+                          setValue(form, "config.trader_settings.trading_strategy.risk_parameters.max_leverage", null);
+                        } else {
+                          setValue(form, "config.trader_settings.trading_strategy.risk_parameters.max_leverage", 10);
+                        }
+                      }}
+                    />
+                    <Label for="max_leverage_toggle" class="font-normal">
+                      Set max leverage
+                    </Label>
+                  </div>
+                  <Show when={maxLeverageEnabled()}>
+                    <FormField name="config.trader_settings.trading_strategy.risk_parameters.max_leverage" type="number">
+                      {(field, fieldProps) => (
+                        <Input
+                          {...fieldProps}
+                          id="max_leverage"
+                          type="number"
+                          value={field.value ?? 10}
+                          min={1}
+                          max={50}
+                        />
+                      )}
+                    </FormField>
+                  </Show>
                 </div>
-              )}
-            </FormField>
-          </div>
 
-          {/* Bucket Configuration */}
-          <div class="space-y-4">
-            <h4 class="font-medium">Bucket Configuration</h4>
-
-            <div class="flex gap-4">
-              <label class="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="bucket_mode"
-                  value="manual"
-                  checked={bucketMode() === "manual"}
-                  onChange={() => setBucketMode("manual")}
-                />
-                Manual
-              </label>
-              <label class="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="bucket_mode"
-                  value="auto"
-                  checked={bucketMode() === "auto"}
-                  onChange={() => setBucketMode("auto")}
-                />
-                Auto
-              </label>
-            </div>
-
-            <Show when={bucketMode() === "manual"}>
-              {/* @ts-expect-error - bucket_config.manual path exists when bucketMode is "manual" */}
-              <FormField name="config.trader_settings.trading_strategy.bucket_config.manual.width_percent" type="number">
-                {(field, fieldProps) => (
-                  <div class="space-y-2">
-                    <Label for="width_percent">Width Percent</Label>
-                    <Input
-                      {...fieldProps}
-                      id="width_percent"
-                      type="number"
-                      value={field.value ?? 0.01}
-                      min={0.0001}
-                      max={1}
-                      step={0.001}
-                    />
-                  </div>
-                )}
-              </FormField>
-            </Show>
-
-            <Show when={bucketMode() === "auto"}>
-              <div class="grid grid-cols-3 gap-4">
-                {/* @ts-expect-error - bucket_config.auto path exists when bucketMode is "auto" */}
-                <FormField name="config.trader_settings.trading_strategy.bucket_config.auto.ratio_threshold" type="number">
+                <FormField name="config.trader_settings.trading_strategy.risk_parameters.self_proportionality_multiplier" type="number">
                   {(field, fieldProps) => (
-                    <div class="space-y-2">
-                      <Label for="ratio_threshold">Ratio Threshold</Label>
+                    <div class="space-y-1.5">
+                      <Label for="multiplier" class="text-xs text-text-muted">Size Multiplier</Label>
                       <Input
                         {...fieldProps}
-                        id="ratio_threshold"
+                        id="multiplier"
                         type="number"
-                        value={field.value ?? 1000}
-                        min={0.1}
+                        value={field.value ?? 1.0}
+                        min={0.01}
+                        max={10}
+                        step={0.1}
                       />
                     </div>
                   )}
                 </FormField>
+              </div>
 
-                {/* @ts-expect-error - bucket_config.auto path exists when bucketMode is "auto" */}
-                <FormField name="config.trader_settings.trading_strategy.bucket_config.auto.wide_bucket_percent" type="number">
+              <div class="grid grid-cols-2 gap-4">
+                <FormField name="config.trader_settings.trading_strategy.risk_parameters.open_on_low_pnl.enabled" type="boolean">
+                  {(field, _fieldProps) => (
+                    <div class="flex items-center gap-2">
+                      <Checkbox
+                        checked={field.value ?? true}
+                        onChange={(checked) => setValue(form, "config.trader_settings.trading_strategy.risk_parameters.open_on_low_pnl.enabled", checked)}
+                      />
+                      <Label class="font-normal">Open on Low PnL</Label>
+                    </div>
+                  )}
+                </FormField>
+
+                <FormField name="config.trader_settings.trading_strategy.risk_parameters.open_on_low_pnl.max_pnl" type="number">
                   {(field, fieldProps) => (
-                    <div class="space-y-2">
-                      <Label for="wide_bucket">Wide Bucket %</Label>
+                    <div class="space-y-1.5">
+                      <Label for="max_pnl" class="text-xs text-text-muted">Max PnL Threshold (%)</Label>
                       <Input
                         {...fieldProps}
-                        id="wide_bucket"
+                        id="max_pnl"
+                        type="number"
+                        value={parseFloat(((field.value ?? 0.05) * 100).toFixed(4))}
+                        onInput={(e) => {
+                          const pctVal = parseFloat((e.target as HTMLInputElement).value);
+                          setValue(
+                            form,
+                            "config.trader_settings.trading_strategy.risk_parameters.open_on_low_pnl.max_pnl",
+                            isNaN(pctVal) ? 0.05 : pctVal / 100
+                          );
+                        }}
+                        min={-100}
+                        max={100}
+                        step={0.1}
+                      />
+                    </div>
+                  )}
+                </FormField>
+              </div>
+            </div>
+
+            {/* Slippage & Fees section */}
+            <SectionLabel label="Slippage & Fees" />
+            <div class="space-y-4">
+              <FormField name="config.provider_settings.slippage_bps" type="number">
+                {(field, fieldProps) => (
+                  <div class="space-y-1.5">
+                    <Label for="slippage" class="text-xs text-text-muted">Slippage (bps)</Label>
+                    <Input
+                      {...fieldProps}
+                      id="slippage"
+                      type="number"
+                      value={field.value ?? 200}
+                      min={0}
+                      max={1000}
+                    />
+                    <p class="text-xs text-text-muted">1 bp = 0.01%</p>
+                  </div>
+                )}
+              </FormField>
+            </div>
+
+            {/* Bucket Configuration section */}
+            <SectionLabel label="Bucket Configuration" />
+            <div class="space-y-4">
+              <ToggleGroup
+                options={[
+                  { value: "manual", label: "Manual" },
+                  { value: "auto", label: "Auto" },
+                ]}
+                value={bucketMode()}
+                onChange={(v) => setBucketMode(v as "manual" | "auto")}
+              />
+
+              <Show when={bucketMode() === "manual"}>
+                {/* @ts-expect-error - bucket_config.manual path exists when bucketMode is "manual" */}
+                <FormField name="config.trader_settings.trading_strategy.bucket_config.manual.width_percent" type="number">
+                  {(field, fieldProps) => (
+                    <div class="space-y-1.5">
+                      <Label for="width_percent" class="text-xs text-text-muted">Width Percent</Label>
+                      <Input
+                        {...fieldProps}
+                        id="width_percent"
                         type="number"
                         value={field.value ?? 0.01}
                         min={0.0001}
@@ -603,50 +572,88 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     </div>
                   )}
                 </FormField>
+              </Show>
 
-                {/* @ts-expect-error - bucket_config.auto path exists when bucketMode is "auto" */}
-                <FormField name="config.trader_settings.trading_strategy.bucket_config.auto.narrow_bucket_percent" type="number">
-                  {(field, fieldProps) => (
-                    <div class="space-y-2">
-                      <Label for="narrow_bucket">Narrow Bucket %</Label>
-                      <Input
-                        {...fieldProps}
-                        id="narrow_bucket"
-                        type="number"
-                        value={field.value ?? 0.0001}
-                        min={0.00001}
-                        max={1}
-                        step={0.0001}
-                      />
-                    </div>
-                  )}
-                </FormField>
-              </div>
-            </Show>
+              <Show when={bucketMode() === "auto"}>
+                <div class="grid grid-cols-3 gap-4">
+                  {/* @ts-expect-error - bucket_config.auto path exists when bucketMode is "auto" */}
+                  <FormField name="config.trader_settings.trading_strategy.bucket_config.auto.ratio_threshold" type="number">
+                    {(field, fieldProps) => (
+                      <div class="space-y-1.5">
+                        <Label for="ratio_threshold" class="text-xs text-text-muted">Ratio Threshold</Label>
+                        <Input
+                          {...fieldProps}
+                          id="ratio_threshold"
+                          type="number"
+                          value={field.value ?? 1000}
+                          min={0.1}
+                        />
+                      </div>
+                    )}
+                  </FormField>
 
-            <FormField name="config.trader_settings.trading_strategy.bucket_config.pricing_strategy" type="string">
-              {(field, fieldProps) => (
-                <div class="space-y-2">
-                  <Label for="pricing_strategy">Pricing Strategy</Label>
-                  <Select
-                    id="pricing_strategy"
-                    name={fieldProps.name}
-                    ref={fieldProps.ref}
-                    value={(field.value as string | undefined) ?? "vwap"}
-                    onChange={(value) => {
-                      setValue(form, "config.trader_settings.trading_strategy.bucket_config.pricing_strategy", value as "vwap" | "aggressive");
-                    }}
-                    options={[
-                      { value: "vwap", label: "VWAP" },
-                      { value: "aggressive", label: "Aggressive" },
-                    ]}
-                  />
+                  {/* @ts-expect-error - bucket_config.auto path exists when bucketMode is "auto" */}
+                  <FormField name="config.trader_settings.trading_strategy.bucket_config.auto.wide_bucket_percent" type="number">
+                    {(field, fieldProps) => (
+                      <div class="space-y-1.5">
+                        <Label for="wide_bucket" class="text-xs text-text-muted">Wide Bucket %</Label>
+                        <Input
+                          {...fieldProps}
+                          id="wide_bucket"
+                          type="number"
+                          value={field.value ?? 0.01}
+                          min={0.0001}
+                          max={1}
+                          step={0.001}
+                        />
+                      </div>
+                    )}
+                  </FormField>
+
+                  {/* @ts-expect-error - bucket_config.auto path exists when bucketMode is "auto" */}
+                  <FormField name="config.trader_settings.trading_strategy.bucket_config.auto.narrow_bucket_percent" type="number">
+                    {(field, fieldProps) => (
+                      <div class="space-y-1.5">
+                        <Label for="narrow_bucket" class="text-xs text-text-muted">Narrow Bucket %</Label>
+                        <Input
+                          {...fieldProps}
+                          id="narrow_bucket"
+                          type="number"
+                          value={field.value ?? 0.0001}
+                          min={0.00001}
+                          max={1}
+                          step={0.0001}
+                        />
+                      </div>
+                    )}
+                  </FormField>
                 </div>
-              )}
-            </FormField>
-          </div>
-        </div>
-      </Collapsible>
+              </Show>
+
+              <FormField name="config.trader_settings.trading_strategy.bucket_config.pricing_strategy" type="string">
+                {(field, fieldProps) => (
+                  <div class="space-y-1.5">
+                    <Label for="pricing_strategy" class="text-xs text-text-muted">Pricing Strategy</Label>
+                    <Select
+                      id="pricing_strategy"
+                      name={fieldProps.name}
+                      ref={fieldProps.ref}
+                      value={(field.value as string | undefined) ?? "vwap"}
+                      onChange={(value) => {
+                        setValue(form, "config.trader_settings.trading_strategy.bucket_config.pricing_strategy", value as "vwap" | "aggressive");
+                      }}
+                      options={[
+                        { value: "vwap", label: "VWAP" },
+                        { value: "aggressive", label: "Aggressive" },
+                      ]}
+                    />
+                  </div>
+                )}
+              </FormField>
+            </div>
+          </PanelBody>
+        </Show>
+      </Panel>
 
       {/* Submit Button */}
       <div class="flex justify-end">
