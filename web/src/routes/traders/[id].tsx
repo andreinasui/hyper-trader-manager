@@ -1,12 +1,17 @@
 import { type Component, Show, Suspense, createSignal, createEffect } from "solid-js";
-import { useParams, useNavigate, A } from "@solidjs/router";
+import { useParams, useNavigate } from "@solidjs/router";
 import { createQuery, createMutation, useQueryClient } from "@tanstack/solid-query";
 import { Trash2, RefreshCw, Play, Square, Loader2, AlertCircle } from "lucide-solid";
 import { ProtectedRoute } from "~/components/auth/ProtectedRoute";
 import { AppShell } from "~/components/layout/AppShell";
+import { PageHeader } from "~/components/layout/PageHeader";
+import { PageContent } from "~/components/layout/PageContent";
 import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Textarea } from "~/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Toast } from "~/components/ui/toast";
+import { Panel, PanelHeader, PanelBody, PanelRow } from "~/components/ui/panel";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
-import { StatusDot, StatusIndicator, getStatusColor, getStatusLabel } from "~/components/ui/status-badge";
+import { StatusDot, StatusIndicator } from "~/components/ui/status-badge";
 import { LogViewer } from "~/components/traders/LogViewer";
 import { TraderConfigForm } from "~/components/traders/TraderConfigForm";
 import { api } from "~/lib/api";
@@ -53,21 +58,21 @@ function LoadingSkeleton() {
     <div class="p-6 space-y-6">
       <div class="flex items-start justify-between">
         <div class="space-y-2">
-          <div class="h-8 w-48 bg-[#111214] rounded-md animate-pulse" />
-          <div class="h-4 w-64 bg-[#111214] rounded-md animate-pulse" />
-          <div class="h-3 w-96 bg-[#111214] rounded-md animate-pulse mt-3" />
+          <div class="h-8 w-48 bg-surface-raised rounded-md animate-pulse" />
+          <div class="h-4 w-64 bg-surface-raised rounded-md animate-pulse" />
+          <div class="h-3 w-96 bg-surface-raised rounded-md animate-pulse mt-3" />
         </div>
         <div class="flex gap-2">
-          <div class="h-9 w-20 bg-[#111214] rounded-md animate-pulse" />
-          <div class="h-9 w-20 bg-[#111214] rounded-md animate-pulse" />
+          <div class="h-9 w-20 bg-surface-raised rounded-md animate-pulse" />
+          <div class="h-9 w-20 bg-surface-raised rounded-md animate-pulse" />
         </div>
       </div>
-      <div class="border-b border-[#222426] pb-0">
-        <div class="h-10 w-64 bg-[#111214] rounded-md animate-pulse" />
+      <div class="border-b border-border-default pb-0">
+        <div class="h-10 w-64 bg-surface-raised rounded-md animate-pulse" />
       </div>
       <div class="grid gap-6 md:grid-cols-2">
-        <div class="bg-[#111214] border border-[#222426] rounded-md p-5 h-64" />
-        <div class="bg-[#111214] border border-[#222426] rounded-md p-5 h-64" />
+        <div class="bg-surface-raised border border-border-default rounded-md p-5 h-64" />
+        <div class="bg-surface-raised border border-border-default rounded-md p-5 h-64" />
       </div>
     </div>
   );
@@ -200,10 +205,10 @@ const TraderDetailPage: Component = () => {
     const data: { name?: string; description?: string } = {};
     const currentName = editName().trim();
     const currentDesc = editDescription().trim();
-    
+
     if (currentName) data.name = currentName;
     if (currentDesc) data.description = currentDesc;
-    
+
     updateInfoMutation.mutate(data);
   };
 
@@ -226,33 +231,28 @@ const TraderDetailPage: Component = () => {
           <Show when={traderQuery.data}>
             {(trader) => {
               const currentStatus = () => statusQuery.data?.runtime_status?.state ?? trader().status;
-              
+
               return (
                 <>
-                  {/* Top bar breadcrumb */}
-                  <div class="h-14 border-b border-[#222426] flex items-center justify-between px-6 bg-[#08090a] sticky top-0 z-20">
-                    <div class="flex items-center gap-2 text-sm">
-                      <A href="/traders" class="text-zinc-500 hover:text-zinc-300 transition-colors">
-                        Traders
-                      </A>
-                      <span class="text-zinc-600">/</span>
-                      <span class="text-zinc-300 font-medium">{trader().display_name}</span>
-                    </div>
-                  </div>
+                  <PageHeader
+                    breadcrumbs={[
+                      { label: "Traders", href: "/traders" },
+                      { label: trader().display_name },
+                    ]}
+                  />
 
-                  {/* Main content */}
-                  <div class="p-6 space-y-6">
+                  <PageContent>
                     {/* Page header */}
-                    <div class="flex items-start justify-between">
+                    <div class="flex items-start justify-between mb-6">
                       <div class="space-y-3">
                         <div class="flex items-center gap-2.5">
                           <StatusDot status={currentStatus()} />
-                          <h1 class="text-2xl font-semibold text-zinc-50">{trader().display_name}</h1>
+                          <h1 class="text-2xl font-semibold text-text-base">{trader().display_name}</h1>
                         </div>
                         <Show when={trader().description}>
-                          <p class="text-sm text-zinc-500 mt-0.5">{trader().description}</p>
+                          <p class="text-sm text-text-subtle mt-0.5">{trader().description}</p>
                         </Show>
-                        <div class="flex items-center gap-4 text-xs text-zinc-500">
+                        <div class="flex items-center gap-4 text-xs text-text-subtle">
                           <span class="font-mono">
                             {trader().wallet_address.slice(0, 6)}...{trader().wallet_address.slice(-4)}
                           </span>
@@ -264,77 +264,77 @@ const TraderDetailPage: Component = () => {
                       {/* Action buttons */}
                       <div class="flex items-center gap-2">
                         <Show when={["configured", "stopped", "failed"].includes(trader().status)}>
-                          <button
+                          <Button
                             onClick={() => startMutation.mutate()}
                             disabled={startMutation.isPending}
-                            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all bg-[#5e6ad2] text-white hover:bg-[#6b76d9] disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Show
                               when={startMutation.isPending}
-                              fallback={<Play class="h-4 w-4" stroke-width={1.5} />}
+                              fallback={<Play class="h-4 w-4 mr-2" stroke-width={1.5} />}
                             >
-                              <Loader2 class="h-4 w-4 animate-spin" stroke-width={1.5} />
+                              <Loader2 class="h-4 w-4 mr-2 animate-spin" stroke-width={1.5} />
                             </Show>
                             {trader().status === "failed" ? "Retry" : "Start"}
-                          </button>
+                          </Button>
                         </Show>
 
                         <Show when={["running", "starting"].includes(trader().status)}>
-                          <button
+                          <Button
+                            variant="outline"
                             onClick={() => stopMutation.mutate()}
                             disabled={stopMutation.isPending}
-                            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all border border-[#222426] text-zinc-300 hover:bg-[#1a1b1e] disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Show
                               when={stopMutation.isPending}
-                              fallback={<Square class="h-4 w-4" stroke-width={1.5} />}
+                              fallback={<Square class="h-4 w-4 mr-2" stroke-width={1.5} />}
                             >
-                              <Loader2 class="h-4 w-4 animate-spin" stroke-width={1.5} />
+                              <Loader2 class="h-4 w-4 mr-2 animate-spin" stroke-width={1.5} />
                             </Show>
                             Stop
-                          </button>
+                          </Button>
                         </Show>
 
                         <Show when={trader().status === "running"}>
-                          <button
+                          <Button
+                            variant="outline"
                             onClick={() => restartMutation.mutate()}
                             disabled={restartMutation.isPending}
-                            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all border border-[#222426] text-zinc-300 hover:bg-[#1a1b1e] disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <RefreshCw
-                              class={`h-4 w-4 ${restartMutation.isPending ? "animate-spin" : ""}`}
+                              class={`h-4 w-4 mr-2 ${restartMutation.isPending ? "animate-spin" : ""}`}
                               stroke-width={1.5}
                             />
                             Restart
-                          </button>
+                          </Button>
                         </Show>
 
                         <Show when={needsImageUpdate()}>
-                          <button
+                          <Button
+                            variant="outline"
                             onClick={() => updateImageMutation.mutate(imageQuery.data!.latest_remote!)}
                             disabled={updateImageMutation.isPending}
-                            class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all border border-[#222426] text-zinc-300 hover:bg-[#1a1b1e] disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Show
                               when={updateImageMutation.isPending}
-                              fallback={<RefreshCw class="h-4 w-4" stroke-width={1.5} />}
+                              fallback={<RefreshCw class="h-4 w-4 mr-2" stroke-width={1.5} />}
                             >
-                              <Loader2 class="h-4 w-4 animate-spin" stroke-width={1.5} />
+                              <Loader2 class="h-4 w-4 mr-2 animate-spin" stroke-width={1.5} />
                             </Show>
                             Update Image
-                          </button>
+                          </Button>
                         </Show>
 
                         <AlertDialog open={deleteOpen()} onOpenChange={setDeleteOpen}>
                           <AlertDialogTrigger
-                            as={(props: any) => (
-                              <button
-                                {...props}
-                                class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all border border-red-900 text-red-400 hover:bg-red-950/30"
+                            as={(triggerProps: Record<string, unknown>) => (
+                              <Button
+                                {...triggerProps}
+                                variant="outline"
+                                class="border-error-muted text-error hover:bg-error-surface"
                               >
-                                <Trash2 class="h-4 w-4" stroke-width={1.5} />
+                                <Trash2 class="h-4 w-4 mr-2" stroke-width={1.5} />
                                 Delete
-                              </button>
+                              </Button>
                             )}
                           />
                           <AlertDialogContent>
@@ -358,22 +358,22 @@ const TraderDetailPage: Component = () => {
 
                     {/* Tabs */}
                     <Tabs defaultValue="overview" class="space-y-6">
-                      <TabsList class="inline-flex gap-1 border-b border-[#222426] w-full">
-                        <TabsTrigger 
+                      <TabsList class="inline-flex gap-1 border-b border-border-default w-full">
+                        <TabsTrigger
                           value="overview"
-                          class="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 border-b-2 border-transparent transition-all data-[selected]:text-zinc-100 data-[selected]:border-[#5e6ad2]"
+                          class="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-secondary border-b-2 border-transparent transition-all data-[selected]:text-text-base data-[selected]:border-primary"
                         >
                           Overview
                         </TabsTrigger>
-                        <TabsTrigger 
+                        <TabsTrigger
                           value="logs"
-                          class="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 border-b-2 border-transparent transition-all data-[selected]:text-zinc-100 data-[selected]:border-[#5e6ad2]"
+                          class="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-secondary border-b-2 border-transparent transition-all data-[selected]:text-text-base data-[selected]:border-primary"
                         >
                           Logs
                         </TabsTrigger>
-                        <TabsTrigger 
+                        <TabsTrigger
                           value="configuration"
-                          class="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 border-b-2 border-transparent transition-all data-[selected]:text-zinc-100 data-[selected]:border-[#5e6ad2]"
+                          class="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-secondary border-b-2 border-transparent transition-all data-[selected]:text-text-base data-[selected]:border-primary"
                         >
                           Configuration
                         </TabsTrigger>
@@ -383,104 +383,97 @@ const TraderDetailPage: Component = () => {
                       <TabsContent value="overview" class="space-y-0">
                         <div class="grid gap-6 md:grid-cols-2">
                           {/* Status Card */}
-                          <div class="bg-[#111214] border border-[#222426] rounded-md p-5">
-                            <h2 class="text-sm font-semibold text-zinc-300 mb-4">Status</h2>
-                            <div class="space-y-0">
-                              <div class="flex justify-between items-center border-b border-[#222426] pb-3 mb-3">
-                                <span class="text-sm text-zinc-500">Status</span>
+                          <Panel>
+                            <PanelHeader title="Status" />
+                            <PanelBody class="py-0">
+                              <PanelRow label="Status">
                                 <StatusIndicator status={currentStatus()} />
-                              </div>
+                              </PanelRow>
                               <Show when={trader().status === "running" && statusQuery.data?.runtime_status?.started_at}>
-                                <div class="flex justify-between items-center border-b border-[#222426] pb-3 mb-3">
-                                  <span class="text-sm text-zinc-500">Uptime</span>
-                                  <span class="text-sm text-zinc-300">
-                                    {formatUptime(statusQuery.data!.runtime_status.started_at!)}
-                                  </span>
-                                </div>
+                                <PanelRow label="Uptime">
+                                  {formatUptime(statusQuery.data!.runtime_status.started_at!)}
+                                </PanelRow>
                               </Show>
-                              <div class="flex justify-between items-center border-b border-[#222426] pb-3 mb-3">
-                                <span class="text-sm text-zinc-500">Image version</span>
+                              <PanelRow label="Image version" border={!(statusQuery.data?.runtime_status?.error || trader().last_error)}>
                                 <div class="flex items-center gap-2">
-                                  <span class="font-mono text-sm text-zinc-300">{trader().image_tag}</span>
+                                  <span class="font-mono">{trader().image_tag}</span>
                                   <Show when={needsImageUpdate()}>
-                                    <span class="text-xs text-amber-400">
+                                    <span class="text-xs text-warning">
                                       → {imageQuery.data?.latest_remote} available
                                     </span>
                                   </Show>
                                 </div>
-                              </div>
+                              </PanelRow>
                               <Show when={statusQuery.data?.runtime_status?.error || trader().last_error}>
-                                <div class="bg-red-950/20 rounded p-3">
-                                  <div class="flex items-center gap-2 text-red-400 text-sm mb-1">
+                                <div class="bg-error-surface rounded p-3 my-3">
+                                  <div class="flex items-center gap-2 text-error text-sm mb-1">
                                     <AlertCircle class="h-4 w-4" stroke-width={1.5} />
                                     <span class="font-medium">Error</span>
                                   </div>
-                                  <p class="text-sm text-red-400 break-all">
+                                  <p class="text-sm text-error break-all">
                                     {statusQuery.data?.runtime_status?.error || trader().last_error}
                                   </p>
                                 </div>
                               </Show>
-                            </div>
-                          </div>
+                            </PanelBody>
+                          </Panel>
 
                           {/* Trader Info Card */}
-                          <div class="bg-[#111214] border border-[#222426] rounded-md p-5">
-                            <h2 class="text-sm font-semibold text-zinc-300 mb-4">Trader info</h2>
-                            <div class="space-y-4">
+                          <Panel>
+                            <PanelHeader title="Trader info" />
+                            <PanelBody class="space-y-4">
                               <div class="space-y-2">
-                                <label class="text-sm font-medium text-zinc-400">Name</label>
-                                <input
+                                <label class="text-sm font-medium text-text-muted">Name</label>
+                                <Input
                                   type="text"
                                   value={editName()}
                                   onInput={(e) => handleNameChange(e.currentTarget.value)}
                                   placeholder="Enter a name for this trader"
-                                  class="bg-[#08090a] border border-[#222426] rounded-md px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-[#5e6ad2] transition-colors w-full"
                                   maxLength={50}
                                 />
                               </div>
                               <div class="space-y-2">
-                                <label class="text-sm font-medium text-zinc-400">Description</label>
-                                <textarea
+                                <label class="text-sm font-medium text-text-muted">Description</label>
+                                <Textarea
                                   value={editDescription()}
                                   onInput={(e) => handleDescriptionChange(e.currentTarget.value)}
                                   placeholder="Optional notes about this trader"
-                                  class="bg-[#08090a] border border-[#222426] rounded-md px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-[#5e6ad2] transition-colors w-full min-h-[60px]"
+                                  class="min-h-[60px]"
                                   maxLength={255}
                                   rows={2}
                                 />
                               </div>
                               <Show when={infoError()}>
-                                <p class="text-sm text-red-400">{infoError()}</p>
+                                <p class="text-sm text-error">{infoError()}</p>
                               </Show>
                               <Show when={infoChanged()}>
-                                <button
+                                <Button
                                   onClick={handleInfoSave}
                                   disabled={updateInfoMutation.isPending}
-                                  class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all bg-[#5e6ad2] text-white hover:bg-[#6b76d9] disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {updateInfoMutation.isPending ? "Saving..." : "Save"}
-                                </button>
+                                </Button>
                               </Show>
-                              <div class="border-t border-[#222426] pt-4 mt-4 space-y-2">
+                              <div class="border-t border-border-default pt-4 mt-4 space-y-2">
                                 <div class="flex items-center justify-between">
-                                  <span class="text-sm text-zinc-500">Created</span>
-                                  <span class="text-sm text-zinc-400">{relDate(trader().created_at)}</span>
+                                  <span class="text-sm text-text-subtle">Created</span>
+                                  <span class="text-sm text-text-muted">{relDate(trader().created_at)}</span>
                                 </div>
                                 <div class="flex items-center justify-between">
-                                  <span class="text-sm text-zinc-500">Last updated</span>
-                                  <span class="text-sm text-zinc-400">{relDate(trader().updated_at)}</span>
+                                  <span class="text-sm text-text-subtle">Last updated</span>
+                                  <span class="text-sm text-text-muted">{relDate(trader().updated_at)}</span>
                                 </div>
                               </div>
-                            </div>
-                          </div>
+                            </PanelBody>
+                          </Panel>
                         </div>
                       </TabsContent>
 
                       {/* Logs Tab */}
                       <TabsContent value="logs">
-                        <div class="bg-[#111214] border border-[#222426] rounded-md overflow-hidden">
+                        <Panel>
                           <LogViewer traderId={params.id} />
-                        </div>
+                        </Panel>
                       </TabsContent>
 
                       {/* Configuration Tab */}
@@ -488,32 +481,34 @@ const TraderDetailPage: Component = () => {
                         <Show
                           when={trader().latest_config}
                           fallback={
-                            <div class="bg-[#111214] border border-[#222426] rounded-md p-8 text-center">
-                              <p class="text-sm text-zinc-500">No configuration available for this trader.</p>
-                            </div>
+                            <Panel class="p-8 text-center">
+                              <p class="text-sm text-text-subtle">No configuration available for this trader.</p>
+                            </Panel>
                           }
                         >
                           {(config) => (
-                            <div class="bg-[#111214] border border-[#222426] rounded-md p-6">
-                              <TraderConfigForm
-                                initialValues={{
-                                  wallet_address: trader().wallet_address,
-                                  private_key: "",
-                                  config: normalizeConfig(config() as TraderConfig),
-                                }}
-                                onSubmit={async (data: CreateTraderForm) => {
-                                  await updateMutation.mutateAsync(data.config);
-                                }}
-                                isEditing={true}
-                                isSubmitting={updateMutation.isPending}
-                                submitLabel="Save Configuration"
-                              />
-                            </div>
+                            <Panel>
+                              <PanelBody>
+                                <TraderConfigForm
+                                  initialValues={{
+                                    wallet_address: trader().wallet_address,
+                                    private_key: "",
+                                    config: normalizeConfig(config() as TraderConfig),
+                                  }}
+                                  onSubmit={async (data: CreateTraderForm) => {
+                                    await updateMutation.mutateAsync(data.config);
+                                  }}
+                                  isEditing={true}
+                                  isSubmitting={updateMutation.isPending}
+                                  submitLabel="Save Configuration"
+                                />
+                              </PanelBody>
+                            </Panel>
                           )}
                         </Show>
                       </TabsContent>
                     </Tabs>
-                  </div>
+                  </PageContent>
                 </>
               );
             }}
