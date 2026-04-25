@@ -6,20 +6,20 @@ type AnyStatus = Trader["status"] | RuntimeStatus["state"];
 export function getStatusColor(status: AnyStatus): string {
   switch (status) {
     case "running":
-      return "bg-emerald-400";
+      return "bg-success";
     case "failed":
     case "error":
     case "not_found":
-      return "bg-red-400";
+      return "bg-error";
     case "starting":
     case "pending":
     case "restarting":
-      return "bg-amber-400";
+      return "bg-warning";
     case "stopped":
     case "configured":
     case "unknown":
     default:
-      return "bg-zinc-500";
+      return "bg-text-subtle";
   }
 }
 
@@ -67,7 +67,7 @@ export function StatusIndicator(props: StatusIndicatorProps): JSX.Element {
   return (
     <span class={`inline-flex items-center gap-2 ${props.class ?? ""}`}>
       <StatusDot status={props.status} />
-      <span class="text-sm text-zinc-400">{getStatusLabel(props.status)}</span>
+      <span class="text-sm text-text-muted">{getStatusLabel(props.status)}</span>
     </span>
   );
 }
