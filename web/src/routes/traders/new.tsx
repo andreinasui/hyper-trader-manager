@@ -1,8 +1,11 @@
 import { type Component } from "solid-js";
-import { A, useNavigate } from "@solidjs/router";
+import { useNavigate } from "@solidjs/router";
 import { createMutation, useQueryClient } from "@tanstack/solid-query";
 import { ProtectedRoute } from "~/components/auth/ProtectedRoute";
 import { AppShell } from "~/components/layout/AppShell";
+import { PageHeader } from "~/components/layout/PageHeader";
+import { PageContent } from "~/components/layout/PageContent";
+import { PageTitle } from "~/components/layout/PageTitle";
 import { TraderConfigForm } from "~/components/traders/TraderConfigForm";
 import { api } from "~/lib/api";
 import { traderKeys } from "~/lib/query-keys";
@@ -44,37 +47,25 @@ const NewTraderPage: Component = () => {
   return (
     <ProtectedRoute>
       <AppShell>
-        {/* Top bar strip — REQUIRED first child */}
-        <div class="h-14 border-b border-[#222426] flex items-center justify-between px-6 bg-[#08090a] sticky top-0 z-20">
-          <div class="flex items-center gap-2 text-sm">
-            <A href="/traders" class="text-zinc-500 hover:text-zinc-300 transition-colors">
-              Traders
-            </A>
-            <span class="text-zinc-600">/</span>
-            <span class="text-zinc-300 font-medium">New trader</span>
-          </div>
-          {/* ⌘K button */}
-          <button class="flex items-center gap-2 px-3 py-1.5 rounded-md border border-[#222426] text-zinc-400 hover:text-zinc-200 hover:bg-[#111214] transition-all text-sm">
-            <span class="text-zinc-500">⌘</span>
-            <span class="font-mono text-xs text-zinc-400">K</span>
-          </button>
-        </div>
+        <PageHeader
+          breadcrumbs={[
+            { label: "Traders", href: "/traders" },
+            { label: "New trader" },
+          ]}
+        />
+        <PageContent maxWidth="3xl">
+          <PageTitle
+            backLink={{ label: "Back to traders", href: "/traders" }}
+            title="New trader"
+            subtitle="Configure and deploy a new trading bot"
+          />
 
-        {/* Page content */}
-        <div class="p-6 max-w-4xl space-y-6">
-          <div>
-            <h1 class="text-2xl font-semibold tracking-tight text-zinc-50">New trader</h1>
-            <p class="text-sm text-zinc-500 mt-1">Configure and deploy a new trading bot</p>
-          </div>
-
-          <div class="bg-[#111214] border border-[#222426] rounded-md overflow-hidden p-6">
-            <TraderConfigForm
-              onSubmit={handleSubmit}
-              isSubmitting={createTraderMutation.isPending}
-              submitLabel="Create Trader"
-            />
-          </div>
-        </div>
+          <TraderConfigForm
+            onSubmit={handleSubmit}
+            isSubmitting={createTraderMutation.isPending}
+            submitLabel="Create Trader"
+          />
+        </PageContent>
       </AppShell>
     </ProtectedRoute>
   );
