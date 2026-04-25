@@ -17,7 +17,7 @@ const queryClient = new QueryClient({
 
 function LoadingScreen() {
   return (
-    <div class="min-h-screen flex items-center justify-center bg-background">
+    <div class="min-h-screen flex items-center justify-center bg-surface-base">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
     </div>
   );
@@ -41,10 +41,10 @@ function AuthGuard(props: ParentProps) {
 
 function ErrorFallback(props: { error: Error }) {
   return (
-    <div class="min-h-screen flex items-center justify-center bg-background p-4">
+    <div class="min-h-screen flex items-center justify-center bg-surface-base p-4">
       <div class="max-w-md text-center">
-        <h1 class="text-2xl font-bold text-destructive mb-4">Something went wrong</h1>
-        <pre class="text-sm text-muted-foreground bg-muted p-4 rounded overflow-auto">
+        <h1 class="text-2xl font-bold text-error mb-4">Something went wrong</h1>
+        <pre class="text-sm text-text-subtle bg-surface-raised p-4 rounded overflow-auto">
           {props.error.message}
         </pre>
       </div>
