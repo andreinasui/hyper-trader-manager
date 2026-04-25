@@ -108,7 +108,7 @@ const TraderDetailPage: Component = () => {
     return {
       queryKey: traderKeys.status(params.id),
       queryFn: () => api.getTraderStatus(params.id),
-      refetchInterval: status === "starting" ? 2000 : status === "running" ? 10000 : false,
+      refetchInterval: status === "starting" ? 500 : status === "running" ? 1000 : false,
       enabled: status === "running" || status === "starting",
     };
   });
