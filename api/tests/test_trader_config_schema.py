@@ -293,16 +293,16 @@ class TestRiskParametersValidation:
     """Tests for RiskParameters validation rules."""
 
     def test_max_leverage_bounds(self):
-        """RiskParameters validates max_leverage is between 1 and 50."""
+        """RiskParameters validates max_leverage is between 1 and 40."""
         # Valid: 1
         params = RiskParameters(max_leverage=1)
         assert params.max_leverage == 1
 
-        # Valid: 50
-        params = RiskParameters(max_leverage=50)
-        assert params.max_leverage == 50
+        # Valid: 40
+        params = RiskParameters(max_leverage=40)
+        assert params.max_leverage == 40
 
-        # Valid: None (no limit)
+        # Valid: None (disabled)
         params = RiskParameters(max_leverage=None)
         assert params.max_leverage is None
 
@@ -311,9 +311,9 @@ class TestRiskParametersValidation:
             RiskParameters(max_leverage=0)
         assert "max_leverage" in str(exc_info.value).lower()
 
-        # Invalid: 51
+        # Invalid: 41
         with pytest.raises(ValidationError) as exc_info:
-            RiskParameters(max_leverage=51)
+            RiskParameters(max_leverage=41)
         assert "max_leverage" in str(exc_info.value).lower()
 
     def test_self_proportionality_multiplier_bounds(self):

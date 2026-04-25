@@ -92,8 +92,8 @@ class RiskParameters(BaseModel):
     max_leverage: int | None = Field(
         default=None,
         ge=1,
-        le=50,
-        description="Maximum leverage (null = no limit)",
+        le=40,
+        description="Maximum leverage allowed for positions",
     )
     self_proportionality_multiplier: float = Field(
         default=1.0,
