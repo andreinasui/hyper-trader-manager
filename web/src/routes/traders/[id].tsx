@@ -140,8 +140,16 @@ const TraderDetailPage: Component = () => {
   const stopMutation = createMutation(() => ({
     mutationFn: () => api.stopTrader(params.id),
     onSuccess: () => {
+      // Optimistically mark trader as stopped so the UI reflects it immediately,
+      // before the detail query refetches from the server.
+      queryClient.setQueryData<Trader>(traderKeys.detail(params.id), (old) =>
+        old ? { ...old, status: "stopped" } : old
+      );
+      // Remove stale runtime status data — the container is gone so the next
+      // status poll would return "not_found", which we don't want to show.
+      queryClient.removeQueries({ queryKey: traderKeys.status(params.id) });
+      // Kick off a background refetch to confirm the server-side state.
       queryClient.invalidateQueries({ queryKey: traderKeys.detail(params.id) });
-      queryClient.invalidateQueries({ queryKey: traderKeys.status(params.id) });
     },
   }));
 
@@ -230,7 +238,17 @@ const TraderDetailPage: Component = () => {
         <Suspense fallback={<LoadingSkeleton />}>
           <Show when={traderQuery.data}>
             {(trader) => {
-              const currentStatus = () => statusQuery.data?.runtime_status?.state ?? trader().status;
+              // Only use live runtime status when the DB says the trader is actively
+              // running or starting. In all other states (stopped, configured, failed)
+              // the DB status is authoritative — the runtime may return "not_found"
+              // for a freshly stopped container, which we must not display.
+              const currentStatus = () => {
+                const dbStatus = trader().status;
+                if (dbStatus === "running" || dbStatus === "starting") {
+                  return statusQuery.data?.runtime_status?.state ?? dbStatus;
+                }
+                return dbStatus;
+              };
 
               return (
                 <>
