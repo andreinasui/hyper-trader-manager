@@ -25,6 +25,37 @@
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
+
+  /* ── Surfaces ─────────────────────────────────────── */
+  --color-surface-base: #08090a;
+  --color-surface-raised: #111214;
+  --color-surface-overlay: #1a1b1e;
+  --color-surface-subtle: #161719;
+
+  /* ── Borders ──────────────────────────────────────── */
+  --color-border-default: #222426;
+  --color-border-ring: #5e6ad2;
+
+  /* ── Primary ──────────────────────────────────────── */
+  --color-primary-hover: #6b76d9;
+  --color-primary-muted: oklch(from #5e6ad2 l c h / 20%);
+
+  /* ── Text ─────────────────────────────────────────── */
+  --color-text-base: var(--color-zinc-50);
+  --color-text-secondary: var(--color-zinc-200);
+  --color-text-tertiary: var(--color-zinc-300);
+  --color-text-muted: var(--color-zinc-400);
+  --color-text-subtle: var(--color-zinc-500);
+  --color-text-faint: var(--color-zinc-600);
+
+  /* ── Semantic ─────────────────────────────────────── */
+  --color-success: var(--color-emerald-400);
+  --color-warning: var(--color-amber-400);
+  --color-error: var(--color-red-400);
+  --color-error-muted: var(--color-red-900);
+  --color-error-surface: oklch(from var(--color-red-950) l c h / 20%);
+  --color-warning-muted: var(--color-amber-900);
+  --color-warning-surface: oklch(from var(--color-amber-950) l c h / 30%);
 }
 
 html { color-scheme: dark; }
