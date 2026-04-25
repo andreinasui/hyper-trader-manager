@@ -9,15 +9,15 @@ const SetupPage: Component = () => {
       when={!authStore.isInitialized()} 
       fallback={<Navigate href="/" />}
     >
-      <div class="min-h-screen bg-[#08090a] flex items-center justify-center p-4">
-        <div class="w-full max-w-md bg-[#111214] border border-[#222426] rounded-md overflow-hidden">
+      <div class="min-h-screen bg-surface-base flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-surface-raised border border-border-default rounded-md overflow-hidden">
           {/* Header strip */}
-          <div class="px-8 pt-8 pb-6 border-b border-[#222426]">
-            <div class="w-10 h-10 rounded-md bg-[#5e6ad2] flex items-center justify-center mb-5">
+          <div class="px-8 pt-8 pb-6 border-b border-border-default">
+            <div class="w-10 h-10 rounded-md bg-primary flex items-center justify-center mb-5">
               <span class="text-white text-sm font-semibold">HT</span>
             </div>
-            <h1 class="text-xl font-semibold text-zinc-50">Create your account</h1>
-            <p class="text-sm text-zinc-500 mt-1">Set up the admin account to get started</p>
+            <h1 class="text-xl font-semibold text-text-base">Create your account</h1>
+            <p class="text-sm text-text-subtle mt-1">Set up the admin account to get started</p>
           </div>
 
           {/* Form area */}
