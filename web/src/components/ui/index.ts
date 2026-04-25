@@ -21,3 +21,4 @@ export * from "./data-table";
 export * from "./section-label";
 export * from "./textarea";
 export * from "./toggle-group";
+export * from "./switch";
