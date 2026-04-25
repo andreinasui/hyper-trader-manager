@@ -39,7 +39,7 @@ const DEFAULTS = {
   maxPnl: 0.05,       // stored as fraction; display = * 100
   maxLeverage: 10,
   maxLeverageMin: 1,
-  maxLeverageMax: 40,
+  maxLeverageMax: 50,
   slippageBps: 200,
   ratioThreshold: 1000,
   wideBucketPct: 0.01,
@@ -80,19 +80,16 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
         private_key: "",
         name: "",
         description: "",
-        config: {
-          provider_settings: {
-            exchange: "hyperliquid",
-            network: "mainnet",
-            self_account: { address: "", is_sub: false },
-            copy_account: { address: "" },
-            slippage_bps: DEFAULTS.slippageBps,
-            builder_fee_bps: 0,
-          },
-          trader_settings: {
-            min_self_funds: 1,
-            min_copy_funds: 1,
-            trading_strategy: {
+            config: {
+              provider_settings: {
+                exchange: "hyperliquid",
+                network: "mainnet",
+                self_account: { address: "", is_sub: false },
+                copy_account: { address: "" },
+                slippage_bps: DEFAULTS.slippageBps,
+              },
+              trader_settings: {
+                trading_strategy: {
               type: "order_based",
               risk_parameters: {
                 blocked_assets: [],
@@ -307,44 +304,6 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
               )}
             </FormField>
           </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <FormField name="config.trader_settings.min_self_funds" type="number">
-              {(field, fieldProps) => (
-                <div class="space-y-1.5">
-                  <Label for="min_self_funds" class="text-xs text-text-muted">Min Self Funds (USDC)</Label>
-                  <Input
-                    {...fieldProps}
-                    id="min_self_funds"
-                    type="number"
-                    value={field.value ?? ""}
-                    placeholder="e.g., 100"
-                  />
-                  <Show when={field.error}>
-                    <p class="text-xs text-error">{field.error}</p>
-                  </Show>
-                </div>
-              )}
-            </FormField>
-
-            <FormField name="config.trader_settings.min_copy_funds" type="number">
-              {(field, fieldProps) => (
-                <div class="space-y-1.5">
-                  <Label for="min_copy_funds" class="text-xs text-text-muted">Min Copy Funds (USDC)</Label>
-                  <Input
-                    {...fieldProps}
-                    id="min_copy_funds"
-                    type="number"
-                    value={field.value ?? ""}
-                    placeholder="e.g., 100"
-                  />
-                  <Show when={field.error}>
-                    <p class="text-xs text-error">{field.error}</p>
-                  </Show>
-                </div>
-              )}
-            </FormField>
-          </div>
         </PanelBody>
       </Panel>
 
@@ -550,8 +509,8 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
               </div>
             </div>
 
-            {/* Slippage & Fees section */}
-            <SectionLabel label="Slippage & Fees" />
+            {/* Slippage section */}
+            <SectionLabel label="Slippage" />
             <div class="space-y-4">
               <FormField name="config.provider_settings.slippage_bps" type="number">
                 {(field, fieldProps) => (

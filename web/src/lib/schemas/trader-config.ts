@@ -23,7 +23,6 @@ export const providerSettingsSchema = z.object({
   self_account: selfAccountSchema,
   copy_account: copyAccountSchema,
   slippage_bps: z.number().int().min(0).max(1000).default(200),
-  builder_fee_bps: z.number().int().min(0).max(200).default(0),
 });
 
 // For form validation, uses relaxed self_account validation
@@ -33,7 +32,6 @@ export const providerSettingsFormSchema = z.object({
   self_account: selfAccountFormSchema,
   copy_account: copyAccountSchema,
   slippage_bps: z.number().int().min(0).max(1000).default(200),
-  builder_fee_bps: z.number().int().min(0).max(200).default(0),
 });
 
 export const openOnLowPnlSchema = z.object({
@@ -44,7 +42,7 @@ export const openOnLowPnlSchema = z.object({
 export const riskParametersSchema = z.object({
   allowed_assets: z.array(z.string()).nullable().optional(),
   blocked_assets: z.array(z.string()).default([]),
-  max_leverage: z.number().int().min(1).max(40).nullable().optional(),
+  max_leverage: z.number().int().min(1).max(50).nullable().optional(),
   self_proportionality_multiplier: z.number().min(0.01).max(10).default(1.0),
   open_on_low_pnl: openOnLowPnlSchema.default({}),
 });
@@ -76,8 +74,6 @@ export const tradingStrategySchema = z.object({
 });
 
 export const traderSettingsSchema = z.object({
-  min_self_funds: z.number().int().min(1).default(1),
-  min_copy_funds: z.number().int().min(1).default(1),
   trading_strategy: tradingStrategySchema.default({}),
 });
 

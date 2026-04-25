@@ -76,8 +76,6 @@ class TraderCreate(BaseModel):
                         },
                     },
                     "trader_settings": {
-                        "min_self_funds": 100,
-                        "min_copy_funds": 1000,
                         "trading_strategy": {
                             "type": "order_based",
                         },
@@ -115,8 +113,6 @@ class TraderUpdate(BaseModel):
                         },
                     },
                     "trader_settings": {
-                        "min_self_funds": 200,
-                        "min_copy_funds": 2000,
                         "trading_strategy": {
                             "type": "order_based",
                         },
@@ -196,8 +192,6 @@ class TraderResponse(BaseModel):
                         "copy_account": {"address": "0x1234567890abcdef1234567890abcdef12345678"},
                     },
                     "trader_settings": {
-                        "min_self_funds": 100,
-                        "min_copy_funds": 1000,
                         "trading_strategy": {
                             "type": "order_based",
                         },

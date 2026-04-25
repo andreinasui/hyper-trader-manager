@@ -48,8 +48,6 @@ def sample_config():
             },
         },
         "trader_settings": {
-            "min_self_funds": 100,
-            "min_copy_funds": 1000,
             "trading_strategy": {
                 "type": "order_based",
             },
@@ -97,8 +95,6 @@ def mock_trader_full(mock_user):
             "copy_account": {"address": "0x1234567890abcdef1234567890abcdef12345678"},
         },
         "trader_settings": {
-            "min_self_funds": 100,
-            "min_copy_funds": 1000,
             "trading_strategy": {"type": "order_based"},
         },
     }
@@ -455,7 +451,8 @@ class TestUpdateTraderConfigEndpoint:
 
         # Update config with new values
         updated_config = sample_config.copy()
-        updated_config["trader_settings"]["min_self_funds"] = 200
+        updated_config["provider_settings"] = dict(updated_config["provider_settings"])
+        updated_config["provider_settings"]["slippage_bps"] = 500
         mock_trader_full.latest_config.config_json = updated_config
 
         update_payload = {
@@ -471,7 +468,7 @@ class TestUpdateTraderConfigEndpoint:
             assert response.status_code == 200
             data = response.json()
             assert data["id"] == trader_id
-            assert data["latest_config"]["trader_settings"]["min_self_funds"] == 200
+            assert data["latest_config"]["provider_settings"]["slippage_bps"] == 500
 
     def test_update_config_value_error(
         self, auth_client, mock_db, mock_user, mock_trader_full, sample_config

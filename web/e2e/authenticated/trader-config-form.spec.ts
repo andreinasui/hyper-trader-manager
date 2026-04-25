@@ -56,26 +56,6 @@ test.describe('Trader Config Form - Create Flow', () => {
     await expect(page.locator('text=/invalid|must|error/i').first()).toBeVisible({ timeout: 3000 });
   });
 
-  test('validates min funds are positive numbers', async ({ page }) => {
-    // Wait for form to be ready
-    await expect(page.getByText('Account Settings')).toBeVisible();
-    
-    // Fill min_self_funds with 0
-    const minSelfFundsInput = page.getByLabel('Min Self Funds (USDC)');
-    await minSelfFundsInput.fill('0');
-    
-    // Fill required fields with valid data
-    await page.getByLabel('Wallet Address').fill('0x1234567890123456789012345678901234567890');
-    await page.getByLabel('Private Key').fill('0x1234567890123456789012345678901234567890123456789012345678901234');
-    await page.getByLabel('Copy Account Address').fill('0xabcdefabcdefabcdefabcdefabcdefabcdefabcd');
-    
-    // Try to submit
-    await page.getByRole('button', { name: 'Create Trader' }).click();
-    
-    // Should see validation error
-    await expect(page.locator('text=/must|greater|positive|invalid/i').first()).toBeVisible({ timeout: 3000 });
-  });
-
   test('network selector works', async ({ page }) => {
     // Wait for form to be ready
     await expect(page.getByText('Account Settings')).toBeVisible();
@@ -137,10 +117,6 @@ test.describe('Trader Config Form - Edit Flow', () => {
     const copyAccountInput = page.locator('input#copy_account');
     await expect(copyAccountInput).toHaveValue('0xabcdefabcdefabcdefabcdefabcdefabcdefabcd');
     
-    // Check min funds values
-    const minSelfFundsInput = page.locator('input#min_self_funds');
-    await expect(minSelfFundsInput).toHaveValue('100');
-    
     // Wallet address and private key fields should NOT be visible in edit mode
     await expect(page.locator('input#wallet_address')).not.toBeVisible();
     await expect(page.locator('input#private_key')).not.toBeVisible();
@@ -176,10 +152,6 @@ test.describe('Trader Config Form - Edit Flow', () => {
     
     // Wait for config form to load
     await expect(page.locator('text=Account Settings')).toBeVisible({ timeout: 5000 });
-    
-    // Make a change
-    const minSelfFundsInput = page.locator('input#min_self_funds');
-    await minSelfFundsInput.fill('200');
     
     // Click save
     const saveButton = page.locator('button[type="submit"]').filter({ hasText: /save/i });

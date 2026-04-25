@@ -43,8 +43,6 @@ class TestTraderConfigSchema:
                 },
             },
             "trader_settings": {
-                "min_self_funds": 100,
-                "min_copy_funds": 1000,
                 "trading_strategy": {
                     "type": "order_based",
                 },
@@ -64,8 +62,6 @@ class TestTraderConfigSchema:
             config.provider_settings.copy_account.address
             == "0x1234567890abcdef1234567890abcdef12345678"
         )
-        assert config.trader_settings.min_self_funds == 100
-        assert config.trader_settings.min_copy_funds == 1000
         assert config.trader_settings.trading_strategy.type == "order_based"
 
     def test_valid_full_config(self):
@@ -82,11 +78,8 @@ class TestTraderConfigSchema:
                     "address": "0x1234567890abcdef1234567890abcdef12345678",
                 },
                 "slippage_bps": 50,
-                "builder_fee_bps": 10,
             },
             "trader_settings": {
-                "min_self_funds": 500,
-                "min_copy_funds": 5000,
                 "trading_strategy": {
                     "type": "order_based",
                     "risk_parameters": {
@@ -111,9 +104,6 @@ class TestTraderConfigSchema:
         assert config.provider_settings.network == "testnet"
         assert config.provider_settings.self_account.is_sub is True
         assert config.provider_settings.slippage_bps == 50
-        assert config.provider_settings.builder_fee_bps == 10
-        assert config.trader_settings.min_self_funds == 500
-        assert config.trader_settings.min_copy_funds == 5000
         assert config.trader_settings.trading_strategy.type == "order_based"
         assert config.trader_settings.trading_strategy.risk_parameters.max_leverage == 20
         assert (
@@ -123,16 +113,6 @@ class TestTraderConfigSchema:
         assert (
             config.trader_settings.trading_strategy.bucket_config.pricing_strategy == "aggressive"
         )
-
-    def test_min_funds_default_to_one(self):
-        """TraderSettings min_self_funds and min_copy_funds default to 1."""
-        from hyper_trader_api.schemas.trader_config import TraderSettings, TradingStrategy
-
-        settings = TraderSettings(
-            trading_strategy=TradingStrategy(type="order_based"),
-        )
-        assert settings.min_self_funds == 1
-        assert settings.min_copy_funds == 1
 
 
 class TestProviderSettingsValidation:
@@ -226,46 +206,6 @@ class TestProviderSettingsValidation:
             )
         assert "slippage_bps" in str(exc_info.value).lower()
 
-    def test_builder_fee_bps_bounds(self):
-        """ProviderSettings validates builder_fee_bps is between 0 and 200."""
-        # Valid: 0
-        settings = ProviderSettings(
-            network="mainnet",
-            self_account=SelfAccount(address="0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"),
-            copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
-            builder_fee_bps=0,
-        )
-        assert settings.builder_fee_bps == 0
-
-        # Valid: 200
-        settings = ProviderSettings(
-            network="mainnet",
-            self_account=SelfAccount(address="0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"),
-            copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
-            builder_fee_bps=200,
-        )
-        assert settings.builder_fee_bps == 200
-
-        # Invalid: negative
-        with pytest.raises(ValidationError) as exc_info:
-            ProviderSettings(
-                network="mainnet",
-                self_account=SelfAccount(address="0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"),
-                copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
-                builder_fee_bps=-1,
-            )
-        assert "builder_fee_bps" in str(exc_info.value).lower()
-
-        # Invalid: too high
-        with pytest.raises(ValidationError) as exc_info:
-            ProviderSettings(
-                network="mainnet",
-                self_account=SelfAccount(address="0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"),
-                copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
-                builder_fee_bps=201,
-            )
-        assert "builder_fee_bps" in str(exc_info.value).lower()
-
 
 class TestTradingStrategyValidation:
     """Tests for TradingStrategy validation rules."""
@@ -282,25 +222,25 @@ class TestTradingStrategyValidation:
         assert strategy.type == "order_based"
         assert strategy.risk_parameters is not None
 
-    def test_position_based_rejected(self):
-        """TradingStrategy rejects 'position_based' strategy type (only order_based allowed)."""
-        with pytest.raises(ValidationError) as exc_info:
-            TradingStrategy(type="position_based")
-        assert "type" in str(exc_info.value).lower()
+    def test_valid_position_based(self):
+        """TradingStrategy accepts 'position_based' strategy type."""
+        strategy = TradingStrategy(type="position_based")
+        assert strategy.type == "position_based"
+        assert strategy.risk_parameters is not None
 
 
 class TestRiskParametersValidation:
     """Tests for RiskParameters validation rules."""
 
     def test_max_leverage_bounds(self):
-        """RiskParameters validates max_leverage is between 1 and 40."""
+        """RiskParameters validates max_leverage is between 1 and 50."""
         # Valid: 1
         params = RiskParameters(max_leverage=1)
         assert params.max_leverage == 1
 
-        # Valid: 40
-        params = RiskParameters(max_leverage=40)
-        assert params.max_leverage == 40
+        # Valid: 50
+        params = RiskParameters(max_leverage=50)
+        assert params.max_leverage == 50
 
         # Valid: None (disabled)
         params = RiskParameters(max_leverage=None)
@@ -311,9 +251,9 @@ class TestRiskParametersValidation:
             RiskParameters(max_leverage=0)
         assert "max_leverage" in str(exc_info.value).lower()
 
-        # Invalid: 41
+        # Invalid: 51
         with pytest.raises(ValidationError) as exc_info:
-            RiskParameters(max_leverage=41)
+            RiskParameters(max_leverage=51)
         assert "max_leverage" in str(exc_info.value).lower()
 
     def test_self_proportionality_multiplier_bounds(self):
@@ -411,8 +351,6 @@ class TestTraderConfigUpdateSchema:
                 },
             },
             "trader_settings": {
-                "min_self_funds": 100,
-                "min_copy_funds": 1000,
                 "trading_strategy": {
                     "type": "order_based",
                 },
@@ -439,8 +377,6 @@ class TestTraderConfigUpdateSchema:
                 },
             },
             "trader_settings": {
-                "min_self_funds": 100,
-                "min_copy_funds": 1000,
                 "trading_strategy": {
                     "type": "order_based",
                 },
@@ -466,8 +402,6 @@ class TestTraderConfigUpdateSchema:
                 # self_account omitted entirely
             },
             "trader_settings": {
-                "min_self_funds": 100,
-                "min_copy_funds": 1000,
                 "trading_strategy": {
                     "type": "order_based",
                 },

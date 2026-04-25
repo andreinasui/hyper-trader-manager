@@ -58,12 +58,6 @@ class ProviderSettings(BaseModel):
         le=1000,
         description="Slippage tolerance in basis points (1bp = 0.01%)",
     )
-    builder_fee_bps: int = Field(
-        default=0,
-        ge=0,
-        le=200,
-        description="Builder fee in basis points",
-    )
 
 
 class OpenOnLowPnl(BaseModel):
@@ -92,7 +86,7 @@ class RiskParameters(BaseModel):
     max_leverage: int | None = Field(
         default=None,
         ge=1,
-        le=40,
+        le=50,
         description="Maximum leverage allowed for positions",
     )
     self_proportionality_multiplier: float = Field(
@@ -163,7 +157,7 @@ class BucketConfig(BaseModel):
 class TradingStrategy(BaseModel):
     """Trading strategy configuration."""
 
-    type: Literal["order_based"] = Field(
+    type: Literal["order_based", "position_based"] = Field(
         default="order_based",
         description="Trading strategy type",
     )
@@ -179,16 +173,6 @@ class TradingStrategy(BaseModel):
 class TraderSettings(BaseModel):
     """Trading strategy and risk parameters."""
 
-    min_self_funds: int = Field(
-        default=1,
-        ge=1,
-        description="Minimum USDC in self account to start trading",
-    )
-    min_copy_funds: int = Field(
-        default=1,
-        ge=1,
-        description="Minimum USDC in copy account to start trading",
-    )
     trading_strategy: TradingStrategy = Field(
         ...,
         description="Trading strategy configuration",
@@ -222,8 +206,6 @@ class TraderConfigSchema(BaseModel):
                     },
                 },
                 "trader_settings": {
-                    "min_self_funds": 100,
-                    "min_copy_funds": 1000,
                     "trading_strategy": {
                         "type": "order_based",
                         "risk_parameters": {
@@ -279,12 +261,6 @@ class ProviderSettingsUpdate(BaseModel):
         le=1000,
         description="Slippage tolerance in basis points (1bp = 0.01%)",
     )
-    builder_fee_bps: int = Field(
-        default=0,
-        ge=0,
-        le=200,
-        description="Builder fee in basis points",
-    )
 
 
 class TraderConfigUpdateSchema(BaseModel):
@@ -313,8 +289,6 @@ class TraderConfigUpdateSchema(BaseModel):
                     },
                 },
                 "trader_settings": {
-                    "min_self_funds": 100,
-                    "min_copy_funds": 1000,
                     "trading_strategy": {
                         "type": "order_based",
                         "risk_parameters": {

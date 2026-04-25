@@ -48,8 +48,6 @@ export const mockTrader: Trader = {
       },
     },
     trader_settings: {
-      min_self_funds: 100,
-      min_copy_funds: 1000,
       trading_strategy: {
         type: 'order_based',
         risk_parameters: {

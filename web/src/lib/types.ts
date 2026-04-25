@@ -17,11 +17,8 @@ export interface TraderConfig {
       address: string;
     };
     slippage_bps: number;
-    builder_fee_bps: number;
   };
   trader_settings: {
-    min_self_funds: number;
-    min_copy_funds: number;
     trading_strategy: {
       type: "order_based" | "position_based";
       risk_parameters: {
