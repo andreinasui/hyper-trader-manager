@@ -6,6 +6,7 @@ implementation based on configuration.
 """
 
 import docker
+
 from hyper_trader_api.runtime.base import TraderRuntime
 from hyper_trader_api.runtime.docker_runtime import DockerRuntime
 

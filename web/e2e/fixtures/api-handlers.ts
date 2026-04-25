@@ -14,6 +14,7 @@ export const mockUser: User = {
   id: 'test-user-id',
   username: 'admin',
   is_admin: true,
+  created_at: '2024-01-01T00:00:00Z',
 };
 
 /**
@@ -23,23 +24,43 @@ export const mockTrader: Trader = {
   id: 'test-trader-id',
   user_id: 'test-user-id',
   name: 'Test Trader',
+  description: 'A test trading bot',
   wallet_address: '0x1234567890123456789012345678901234567890',
-  agent_address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
   runtime_name: 'trader-12345678',
   status: 'running',
   image_tag: 'latest',
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
+  start_attempts: 1,
+  last_error: null,
+  stopped_at: null,
+  display_name: 'Test Trader',
   latest_config: {
-    name: 'Test Trader',
-    exchange: 'hyperliquid',
-    self_account: {
-      address: '0x1234567890123456789012345678901234567890',
-      base_url: 'testnet',
+    provider_settings: {
+      exchange: 'hyperliquid',
+      network: 'mainnet',
+      self_account: {
+        address: '0x1234567890123456789012345678901234567890',
+        is_sub: false,
+      },
+      copy_account: {
+        address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+      },
     },
-    copy_account: {
-      address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
-      base_url: 'testnet',
+    trader_settings: {
+      min_self_funds: 100,
+      min_copy_funds: 1000,
+      trading_strategy: {
+        type: 'order_based',
+        risk_parameters: {
+          blocked_assets: [],
+          self_proportionality_multiplier: 1.0,
+          open_on_low_pnl: {
+            enabled: true,
+            max_pnl: 0.05,
+          },
+        },
+      },
     },
   },
 };
@@ -79,6 +100,18 @@ export async function setupApiMocks(page: Page) {
         json: {
           success: true,
         },
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  // Mock logout
+  await page.route('**/api/v1/auth/logout', async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({
+        status: 200,
+        json: { success: true },
       });
       return;
     }
@@ -146,7 +179,7 @@ export async function setupApiMocks(page: Page) {
           id: `trader-${Date.now()}`,
           wallet_address: body.wallet_address || '0x0000000000000000000000000000000000000000',
           latest_config: body.config,
-          status: 'pending',
+          status: 'configured',
         };
         
         await route.fulfill({
@@ -204,13 +237,78 @@ export async function setupApiMocks(page: Page) {
           status: 204,
           json: { success: true },
         });
+      } else if (method === 'PATCH') {
+        // Update trader info (name/description)
+        const body = route.request().postDataJSON();
+        const updatedTrader = {
+          ...mockTrader,
+          ...body,
+          updated_at: new Date().toISOString(),
+        };
+        await route.fulfill({
+          status: 200,
+          json: updatedTrader,
+        });
+      }
+      return;
+    }
+
+    // Config update endpoint
+    if (url.match(/\/api\/v1\/traders\/[^\/]+\/config\/?$/)) {
+      if (method === 'PATCH') {
+        const body = route.request().postDataJSON();
+        const updatedTrader = {
+          ...mockTrader,
+          latest_config: body.config,
+          updated_at: new Date().toISOString(),
+        };
+        await route.fulfill({
+          status: 200,
+          json: updatedTrader,
+        });
       }
       return;
     }
 
     // Control endpoints
-    if (url.match(/\/api\/v1\/traders\/[^\/]+\/(start|stop|restart)\/?$/)) {
-      await route.fulfill({ status: 200, json: {} });
+    if (url.match(/\/api\/v1\/traders\/[^\/]+\/start\/?$/)) {
+      await route.fulfill({
+        status: 200,
+        json: {
+          message: 'Trader started successfully',
+          trader_id: mockTrader.id,
+          runtime_name: mockTrader.runtime_name,
+          status: 'running',
+          start_attempts: mockTrader.start_attempts + 1,
+        },
+      });
+      return;
+    }
+
+    if (url.match(/\/api\/v1\/traders\/[^\/]+\/stop\/?$/)) {
+      await route.fulfill({
+        status: 200,
+        json: {
+          message: 'Trader stopped successfully',
+          trader_id: mockTrader.id,
+          runtime_name: mockTrader.runtime_name,
+          status: 'stopped',
+        },
+      });
+      return;
+    }
+
+    if (url.match(/\/api\/v1\/traders\/[^\/]+\/restart\/?$/)) {
+      await route.fulfill({
+        status: 200,
+        json: {
+          message: 'Trader restarted successfully',
+          trader_id: mockTrader.id,
+          runtime_name: mockTrader.runtime_name,
+          status: 'running',
+          start_attempts: mockTrader.start_attempts + 1,
+        },
+      });
       return;
     }
 

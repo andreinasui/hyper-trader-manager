@@ -1,141 +1,57 @@
-import { type Component, createSignal, Show } from "solid-js";
+import { type Component } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { createMutation, useQueryClient } from "@tanstack/solid-query";
 import { ProtectedRoute } from "~/components/auth/ProtectedRoute";
 import { AppShell } from "~/components/layout/AppShell";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Alert, AlertDescription } from "~/components/ui/alert";
+import { TraderConfigForm } from "~/components/traders/TraderConfigForm";
 import { api } from "~/lib/api";
 import { traderKeys } from "~/lib/query-keys";
+import type { CreateTraderForm } from "~/lib/schemas/trader-config";
+import type { CreateTraderRequest } from "~/lib/types";
 
 const NewTraderPage: Component = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [name, setName] = createSignal("");
-  const [walletAddress, setWalletAddress] = createSignal("");
-  const [privateKey, setPrivateKey] = createSignal("");
-  const [error, setError] = createSignal<string | null>(null);
-
   const createTraderMutation = createMutation(() => ({
-    mutationFn: () =>
-      api.createTrader({
-        name: name(),
-        wallet_address: walletAddress(),
-        private_key: privateKey(),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: traderKeys.all });
-      navigate("/traders");
+    mutationFn: (data: CreateTraderForm) => {
+      const payload: CreateTraderRequest = {
+        wallet_address: data.wallet_address,
+        private_key: data.private_key,
+        config: data.config,
+      };
+
+      // Include name and description if provided
+      if (data.name?.trim()) {
+        payload.name = data.name.trim();
+      }
+      if (data.description?.trim()) {
+        payload.description = data.description.trim();
+      }
+
+      return api.createTrader(payload);
     },
-    onError: (err: Error) => {
-      setError(err.message);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: traderKeys.all });
+      navigate("/traders");
     },
   }));
 
-  function handleSubmit(e: Event) {
-    e.preventDefault();
-    setError(null);
-
-    // Basic validation
-    if (!name().trim()) {
-      setError("Name is required");
-      return;
-    }
-
-    // Validate Ethereum address format
-    const addressRegex = /^0x[a-fA-F0-9]{40}$/;
-    if (!addressRegex.test(walletAddress())) {
-      setError("Invalid Ethereum wallet address");
-      return;
-    }
-
-    if (!privateKey().trim()) {
-      setError("Private key is required");
-      return;
-    }
-
-    createTraderMutation.mutate();
-  }
+  const handleSubmit = async (data: CreateTraderForm) => {
+    await createTraderMutation.mutateAsync(data);
+  };
 
   return (
     <ProtectedRoute>
       <AppShell>
-        <div class="max-w-2xl mx-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle>Create New Trader</CardTitle>
-              <CardDescription>
-                Set up a new trading bot with your wallet credentials
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} class="space-y-4">
-                <Show when={error()}>
-                  <Alert variant="destructive">
-                    <AlertDescription>{error()}</AlertDescription>
-                  </Alert>
-                </Show>
+        <div class="max-w-4xl mx-auto">
+          <h1 class="text-2xl font-bold mb-6">Create New Trader</h1>
 
-                <div class="space-y-2">
-                  <Label for="name">Trader Name</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    value={name()}
-                    onInput={(e) => setName(e.currentTarget.value)}
-                    placeholder="My Trading Bot"
-                    required
-                  />
-                </div>
-
-                <div class="space-y-2">
-                  <Label for="walletAddress">Wallet Address</Label>
-                  <Input
-                    id="walletAddress"
-                    type="text"
-                    value={walletAddress()}
-                    onInput={(e) => setWalletAddress(e.currentTarget.value)}
-                    placeholder="0x..."
-                    class="font-mono"
-                    required
-                  />
-                </div>
-
-                <div class="space-y-2">
-                  <Label for="privateKey">Private Key</Label>
-                  <Input
-                    id="privateKey"
-                    type="password"
-                    value={privateKey()}
-                    onInput={(e) => setPrivateKey(e.currentTarget.value)}
-                    placeholder="Enter private key"
-                    class="font-mono"
-                    required
-                  />
-                  <p class="text-xs text-muted-foreground">
-                    Your private key is encrypted and stored securely
-                  </p>
-                </div>
-
-                <div class="flex gap-4 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate("/traders")}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createTraderMutation.isPending}>
-                    {createTraderMutation.isPending ? "Creating..." : "Create Trader"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+          <TraderConfigForm
+            onSubmit={handleSubmit}
+            isSubmitting={createTraderMutation.isPending}
+            submitLabel="Create Trader"
+          />
         </div>
       </AppShell>
     </ProtectedRoute>

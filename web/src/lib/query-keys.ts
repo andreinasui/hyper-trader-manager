@@ -23,3 +23,8 @@ export const setupKeys = {
   status: () => [...setupKeys.all, "status"] as const,
   ssl: () => [...setupKeys.all, "ssl"] as const,
 };
+
+export const imageKeys = {
+  all: ["images"] as const,
+  versions: () => [...imageKeys.all, "versions"] as const,
+};

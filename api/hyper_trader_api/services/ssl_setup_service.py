@@ -4,10 +4,10 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
+import docker
 import docker.errors
 from sqlalchemy.orm import Session
 
-import docker
 from hyper_trader_api.config import get_settings
 from hyper_trader_api.models.ssl_config import SSLConfig
 from hyper_trader_api.services.cert_generator import generate_self_signed_cert

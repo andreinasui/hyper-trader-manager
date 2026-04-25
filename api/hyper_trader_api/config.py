@@ -18,20 +18,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def _get_env_file() -> str:
-    """Determine which .env file to load based on environment."""
-    # First check if ENV_FILE is explicitly set
     if env_file := os.getenv("ENV_FILE"):
         return env_file
-
-    # Otherwise, determine from ENVIRONMENT
-    environment = os.getenv("ENVIRONMENT", "development")
-
-    if environment == "production":
-        return ".env.prod"
-    elif environment == "staging":
-        return ".env.staging"
-    else:
-        return ".env.development"
 
 
 class Settings(BaseSettings):
@@ -56,10 +44,7 @@ class Settings(BaseSettings):
     # ==================== Self-Hosted Configuration ====================
     public_base_url: str = "http://localhost"
     public_port: int = 80
-    image_tag: str = "latest"  # Docker image tag for trader containers
-    data_dir: str = (
-        "./data"  # Base directory for app data (traefik config, certs, etc.)
-    )
+    data_dir: str = "./data"  # Base directory for app data (traefik config, certs, etc.)
 
     # ==================== Server ====================
     host: str = "0.0.0.0"
@@ -85,10 +70,8 @@ class Settings(BaseSettings):
     http_timeout: float = 10.0
 
     # ==================== API Metadata ====================
-    api_title: str = (
-        f'HyperTrader API {"(Development)" if environment == "development" else ""}'
-    )
-    api_version: str = f'1.0.0{"-dev" if environment == "development" else ""}'
+    api_title: str = "HyperTrader API"
+    api_version: str = f"1.0.0{'-dev' if environment == 'development' else ''}"
 
 
 @lru_cache

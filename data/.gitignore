@@ -1,5 +1,5 @@
 # Generated when using local development docker containers
-sqlitedb/
+sqlitedb/*.db
 
 deploy/.env
 

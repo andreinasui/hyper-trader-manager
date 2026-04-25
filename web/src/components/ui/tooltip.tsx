@@ -1,11 +1,15 @@
 import { Tooltip as TooltipPrimitive } from "@kobalte/core/tooltip";
-import { splitProps } from "solid-js";
+import { type ParentProps, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 
 export const Tooltip = TooltipPrimitive;
 export const TooltipTrigger = TooltipPrimitive.Trigger;
 
-export function TooltipContent(props: TooltipPrimitive.ContentProps) {
+export interface TooltipContentProps extends ParentProps {
+  class?: string;
+}
+
+export function TooltipContent(props: TooltipContentProps) {
   const [local, others] = splitProps(props, ["class"]);
   return (
     <TooltipPrimitive.Portal>

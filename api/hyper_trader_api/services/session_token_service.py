@@ -94,11 +94,7 @@ class SessionTokenService:
         token_hash = _hash_token(token)
         now = datetime.now(UTC)
 
-        session = (
-            self.db.query(SessionToken)
-            .filter(SessionToken.token_hash == token_hash)
-            .first()
-        )
+        session = self.db.query(SessionToken).filter(SessionToken.token_hash == token_hash).first()
 
         if session is None:
             return None
@@ -132,11 +128,7 @@ class SessionTokenService:
 
         token_hash = _hash_token(token)
 
-        session = (
-            self.db.query(SessionToken)
-            .filter(SessionToken.token_hash == token_hash)
-            .first()
-        )
+        session = self.db.query(SessionToken).filter(SessionToken.token_hash == token_hash).first()
 
         if session is None:
             return False

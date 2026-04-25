@@ -1,4 +1,4 @@
-import { type ParentProps, Suspense, onMount, createSignal, Show } from "solid-js";
+import { type ParentProps, Suspense, onMount, createSignal, Show, ErrorBoundary } from "solid-js";
 import { Router } from "@solidjs/router";
 import { FileRoutes } from "@solidjs/start/router";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
@@ -39,16 +39,31 @@ function AuthGuard(props: ParentProps) {
   );
 }
 
+function ErrorFallback(props: { error: Error }) {
+  return (
+    <div class="min-h-screen flex items-center justify-center bg-background p-4">
+      <div class="max-w-md text-center">
+        <h1 class="text-2xl font-bold text-destructive mb-4">Something went wrong</h1>
+        <pre class="text-sm text-muted-foreground bg-muted p-4 rounded overflow-auto">
+          {props.error.message}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   return (
-    <MetaProvider>
-      <QueryClientProvider client={queryClient}>
-        <AuthGuard>
-          <Router root={(props) => <Suspense>{props.children}</Suspense>}>
-            <FileRoutes />
-          </Router>
-        </AuthGuard>
-      </QueryClientProvider>
-    </MetaProvider>
+    <ErrorBoundary fallback={(err) => <ErrorFallback error={err} />}>
+      <MetaProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthGuard>
+            <Router root={(props) => <Suspense fallback={<LoadingScreen />}>{props.children}</Suspense>}>
+              <FileRoutes />
+            </Router>
+          </AuthGuard>
+        </QueryClientProvider>
+      </MetaProvider>
+    </ErrorBoundary>
   );
 }

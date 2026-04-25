@@ -40,31 +40,6 @@ class TraderRuntime(Protocol):
         """
         ...
 
-    def restart_trader(self, runtime_name: str) -> None:
-        """
-        Force update a trader service to trigger restart.
-
-        Args:
-            runtime_name: Service name to restart
-
-        Raises:
-            NotFound: If service doesn't exist
-        """
-        ...
-
-    def remove_trader(self, runtime_name: str, trader_id: str) -> None:
-        """
-        Stop service and remove associated Docker secret.
-
-        Args:
-            runtime_name: Service name to remove
-            trader_id: Trader ID used in secret naming
-
-        Raises:
-            NotFound: If service doesn't exist
-        """
-        ...
-
     def get_status(self, runtime_name: str) -> dict[str, Any]:
         """
         Get current status of a trader service.
@@ -93,4 +68,37 @@ class TraderRuntime(Protocol):
         Returns:
             Log output as string. Empty string if service doesn't exist.
         """
+        ...
+
+    def create_secret(self, trader_id: str, private_key: str) -> str:
+        """Create Docker secret for trader private key."""
+        ...
+
+    def create_service(self, trader: Any, config_path: Path) -> None:
+        """Create Docker Swarm service for trader."""
+        ...
+
+    def remove_service(
+        self, runtime_name: str, remove_secret: bool = False, trader_id: str = ""
+    ) -> None:
+        """Remove Docker Swarm trader service"""
+        ...
+
+    def service_exists(self, runtime_name: str) -> bool:
+        """Check if service exists."""
+        ...
+
+    def list_local_image_tags(self) -> list[str]:
+        """
+        List locally available image tags for the trader image, sorted descending by semver.
+        Returns list of tag strings, newest first. Empty list if none found.
+        """
+        ...
+
+    def pull_image(self, tag: str) -> None:
+        """Pull a specific image tag from the registry."""
+        ...
+
+    def update_service_image(self, runtime_name: str, new_tag: str) -> None:
+        """Update a running Swarm service to use a new image tag."""
         ...

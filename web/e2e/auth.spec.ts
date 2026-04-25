@@ -10,6 +10,7 @@ test.describe('Authentication', () => {
   test('user can login with username and password', async ({ page }) => {
     await setupUnauthenticatedState(page)
     await page.goto('/')
+    await page.waitForLoadState('networkidle')
     
     // Should show login form
     await expect(page.getByLabel('Username')).toBeVisible()
@@ -23,6 +24,7 @@ test.describe('Authentication', () => {
     await page.getByRole('button', { name: 'Sign In' }).click()
     
     // Should redirect to dashboard
+    await page.waitForURL(/\/dashboard/)
     await expect(page).toHaveURL(/\/dashboard/)
   })
   
@@ -31,6 +33,7 @@ test.describe('Authentication', () => {
     
     // Try to access protected route
     await page.goto('/dashboard')
+    await page.waitForLoadState('networkidle')
     
     // Should redirect to login page
     await expect(page).toHaveURL('/')
@@ -42,6 +45,7 @@ test.describe('Authentication', () => {
   test('authenticated user can access dashboard', async ({ page }) => {
     await setupAuthenticatedState(page)
     await page.goto('/dashboard')
+    await page.waitForLoadState('networkidle')
     
     // Should stay on dashboard
     await expect(page).toHaveURL(/\/dashboard/)

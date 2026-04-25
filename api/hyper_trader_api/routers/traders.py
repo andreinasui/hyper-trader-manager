@@ -8,6 +8,7 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from hyper_trader_api.database import get_db
@@ -18,7 +19,10 @@ from hyper_trader_api.schemas.trader import (
     DeleteResponse,
     RestartResponse,
     RuntimeStatus,
+    StartResponse,
+    StopResponse,
     TraderCreate,
+    TraderInfoUpdate,
     TraderListResponse,
     TraderLogsResponse,
     TraderResponse,
@@ -38,6 +42,12 @@ router = APIRouter(
     prefix="/api/v1/traders",
     tags=["Traders"],
 )
+
+
+class UpdateImageRequest(BaseModel):
+    """Request model for updating trader image tag."""
+
+    new_tag: str = Field(..., description="Image tag to update to (e.g. '0.4.4')")
 
 
 def get_trader_service(db: Session = Depends(get_db)) -> TraderService:
@@ -61,6 +71,11 @@ def _trader_to_response(trader: Trader) -> TraderResponse:
         created_at=trader.created_at,
         updated_at=trader.updated_at,
         latest_config=latest_config,
+        start_attempts=trader.start_attempts,
+        last_error=trader.last_error,
+        stopped_at=trader.stopped_at,
+        name=trader.name,
+        description=trader.description,
     )
 
 
@@ -89,7 +104,7 @@ async def create_trader(
 
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         ) from e
     except TraderServiceError as e:
@@ -153,10 +168,52 @@ async def get_trader(
 @router.patch(
     "/{trader_id}",
     response_model=TraderResponse,
+    summary="Update trader info",
+    description="Update a trader's display name and description. Does not restart the container.",
+)
+async def update_trader_info(
+    trader_id: uuid.UUID,
+    update_data: TraderInfoUpdate,
+    user: User = Depends(get_current_user),
+    service: TraderService = Depends(get_trader_service),
+) -> TraderResponse:
+    """
+    Update a trader's display info (name/description).
+
+    - **name**: Optional display name (unique per user)
+    - **description**: Optional description/notes
+
+    This does NOT restart the container.
+    """
+    try:
+        trader = service.update_trader_info(trader_id, user.id, update_data)
+        logger.info(f"Trader info updated: {trader.runtime_name}")
+        return _trader_to_response(trader)
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e),
+        ) from e
+    except TraderNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trader not found: {trader_id}",
+        ) from e
+    except TraderOwnershipError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this trader",
+        ) from e
+
+
+@router.patch(
+    "/{trader_id}/config",
+    response_model=TraderResponse,
     summary="Update trader configuration",
     description="Update a trader's configuration. The container will be restarted to apply changes.",
 )
-async def update_trader(
+async def update_trader_config(
     trader_id: uuid.UUID,
     update_data: TraderUpdate,
     user: User = Depends(get_current_user),
@@ -174,6 +231,11 @@ async def update_trader(
         logger.info(f"Trader updated: {trader.runtime_name}")
         return _trader_to_response(trader)
 
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
     except TraderNotFoundError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -254,17 +316,17 @@ async def restart_trader(
     service: TraderService = Depends(get_trader_service),
 ) -> RestartResponse:
     """
-    Restart a trader's Docker container.
+    Restart a trader by stopping and starting with fresh config from DB.
 
-    The container will be restarted using Docker API.
+    The trader service is removed and recreated with the latest configuration,
+    ensuring any config changes made via the dashboard take effect.
     """
     try:
-        trader = service.get_trader(trader_id, user.id)
-        service.restart_trader(trader_id, user.id)
-        logger.info(f"Trader restart initiated: {trader.runtime_name}")
+        trader = service.restart_trader(trader_id, user.id)
+        logger.info(f"Trader restarted with fresh config: {trader.runtime_name}")
 
         return RestartResponse(
-            message="Trader restart initiated",
+            message="Trader restarted with fresh config",
             trader_id=trader_id,
             runtime_name=trader.runtime_name,
         )
@@ -284,6 +346,114 @@ async def restart_trader(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to restart trader: {str(e)}",
+        ) from e
+
+
+@router.post(
+    "/{trader_id}/start",
+    response_model=StartResponse,
+    summary="Start trader",
+    description="Start a trader by creating its Docker Swarm service. Retries up to 3 times.",
+)
+async def start_trader(
+    trader_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    service: TraderService = Depends(get_trader_service),
+) -> StartResponse:
+    """
+    Start a trader's Docker container.
+
+    The trader must be in 'configured', 'stopped', or 'failed' state.
+    Will retry up to 3 times with 2s delay between attempts.
+    """
+    try:
+        trader = service.start_trader(trader_id, user.id)
+        logger.info(f"Trader started: {trader.runtime_name}")
+
+        return StartResponse(
+            message="Trader started successfully",
+            trader_id=trader_id,
+            runtime_name=trader.runtime_name,
+            status=trader.status,
+            start_attempts=trader.start_attempts,
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except TraderNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trader not found: {trader_id}",
+        ) from e
+    except TraderOwnershipError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this trader",
+        ) from e
+    except TraderServiceError as e:
+        logger.error(f"Failed to start trader: {e}")
+        # Return the trader info even on failure so UI can show error
+        trader = service.get_trader(trader_id, user.id)
+        return StartResponse(
+            message=f"Failed to start trader: {str(e)}",
+            trader_id=trader_id,
+            runtime_name=trader.runtime_name,
+            status=trader.status,
+            start_attempts=trader.start_attempts,
+        )
+
+
+@router.post(
+    "/{trader_id}/stop",
+    response_model=StopResponse,
+    summary="Stop trader",
+    description="Stop a trader by removing its Docker Swarm service. Keeps config for later restart.",
+)
+async def stop_trader(
+    trader_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    service: TraderService = Depends(get_trader_service),
+) -> StopResponse:
+    """
+    Stop a trader's Docker container.
+
+    The trader must be in 'running', 'starting', or 'failed' state.
+    The Docker secret and database record are kept for later restart.
+    """
+    try:
+        trader = service.stop_trader(trader_id, user.id)
+        logger.info(f"Trader stopped: {trader.runtime_name}")
+
+        return StopResponse(
+            message="Trader stopped successfully",
+            trader_id=trader_id,
+            runtime_name=trader.runtime_name,
+            status=trader.status,
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except TraderNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trader not found: {trader_id}",
+        ) from e
+    except TraderOwnershipError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this trader",
+        ) from e
+    except TraderServiceError as e:
+        logger.error(f"Failed to stop trader: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to stop trader: {str(e)}",
         ) from e
 
 
@@ -366,3 +536,31 @@ async def get_trader_logs(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this trader",
         ) from e
+
+
+@router.post(
+    "/{trader_id}/update-image",
+    response_model=TraderResponse,
+    summary="Update trader image",
+    description=(
+        "Pull a new image tag and update the trader. "
+        "Running traders get their service updated immediately. "
+        "Stopped/configured/failed traders get only the DB updated."
+    ),
+)
+async def update_trader_image(
+    trader_id: uuid.UUID,
+    request: UpdateImageRequest,
+    current_user: User = Depends(get_current_user),
+    service: TraderService = Depends(get_trader_service),
+) -> TraderResponse:
+    """Update a trader's image to a new tag."""
+    try:
+        trader = service.update_image(trader_id, current_user.id, request.new_tag)
+        return _trader_to_response(trader)
+    except TraderNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trader not found") from e
+    except TraderOwnershipError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied") from e
+    except TraderServiceError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)) from e

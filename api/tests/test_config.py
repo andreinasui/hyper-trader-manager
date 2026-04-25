@@ -35,10 +35,7 @@ class TestSettings:
 
         settings = Settings()
         assert hasattr(settings, "public_base_url")
-        assert (
-            "localhost" in settings.public_base_url
-            or "127.0.0.1" in settings.public_base_url
-        )
+        assert "localhost" in settings.public_base_url or "127.0.0.1" in settings.public_base_url
 
 
 class TestDatabaseEngine:

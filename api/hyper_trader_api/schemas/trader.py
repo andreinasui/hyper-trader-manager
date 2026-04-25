@@ -6,9 +6,24 @@ Pydantic v2 schemas for trader CRUD operations and status.
 
 import uuid
 from datetime import datetime
-from typing import Any
+from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+from hyper_trader_api.schemas.trader_config import (
+    TraderConfigSchema,
+    TraderConfigUpdateSchema,
+)
+
+
+class TraderStatus(str, Enum):
+    """Valid trader lifecycle states."""
+
+    CONFIGURED = "configured"
+    STARTING = "starting"
+    RUNNING = "running"
+    STOPPED = "stopped"
+    FAILED = "failed"
 
 
 class TraderCreate(BaseModel):
@@ -27,7 +42,22 @@ class TraderCreate(BaseModel):
         pattern=r"^0x[a-fA-F0-9]{64}$",
         description="Private key for the wallet (0x followed by 64 hexadecimal characters)",
     )
-    config: dict[str, Any] = Field(..., description="Trader configuration JSON")
+    config: TraderConfigSchema = Field(..., description="Trader configuration")
+    name: str | None = Field(
+        default=None,
+        max_length=50,
+        pattern=r"^[a-zA-Z0-9 _-]+$",
+        description="User-friendly name for the trader",
+    )
+    description: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Optional description or notes",
+    )
+    image_tag: str | None = Field(
+        default=None,
+        description="Docker image tag to use (e.g. '0.4.4'). If omitted, uses latest local tag.",
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -35,30 +65,88 @@ class TraderCreate(BaseModel):
                 "wallet_address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a",
                 "private_key": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
                 "config": {
-                    "self_account": {"address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"},
-                    "copy_account": {"address": "0x1234567890abcdef1234567890abcdef12345678"},
-                    "order_sizing": {"max_size_usd": 100},
+                    "provider_settings": {
+                        "exchange": "hyperliquid",
+                        "network": "mainnet",
+                        "self_account": {
+                            "address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a",
+                        },
+                        "copy_account": {
+                            "address": "0x1234567890abcdef1234567890abcdef12345678",
+                        },
+                    },
+                    "trader_settings": {
+                        "min_self_funds": 100,
+                        "min_copy_funds": 1000,
+                        "trading_strategy": {
+                            "type": "order_based",
+                        },
+                    },
                 },
+                "image_tag": "0.4.4",
             }
         }
     )
 
 
 class TraderUpdate(BaseModel):
-    """Schema for updating a trader's configuration."""
+    """Schema for updating a trader's configuration.
 
-    config: dict[str, Any] | None = Field(
-        default=None, description="Updated trader configuration JSON"
+    Note: self_account.address is optional in updates - it will be auto-filled
+    from the trader's wallet_address since that's an identity field.
+    """
+
+    config: TraderConfigUpdateSchema | None = Field(
+        default=None, description="Updated trader configuration"
     )
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "config": {
-                    "self_account": {"address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"},
-                    "copy_account": {"address": "0xnewaddress1234567890abcdef12345678901234"},
-                    "order_sizing": {"max_size_usd": 200},
+                    "provider_settings": {
+                        "exchange": "hyperliquid",
+                        "network": "mainnet",
+                        "self_account": {
+                            "is_sub": False,
+                        },
+                        "copy_account": {
+                            "address": "0xnewaddress1234567890abcdef12345678901234",
+                        },
+                    },
+                    "trader_settings": {
+                        "min_self_funds": 200,
+                        "min_copy_funds": 2000,
+                        "trading_strategy": {
+                            "type": "order_based",
+                        },
+                    },
                 }
+            }
+        }
+    )
+
+
+class TraderInfoUpdate(BaseModel):
+    """Schema for updating trader display info (name/description)."""
+
+    name: str | None = Field(
+        default=None,
+        max_length=50,
+        pattern=r"^[a-zA-Z0-9 _-]+$",
+        description="User-friendly name for the trader",
+    )
+    description: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Optional description or notes",
+    )
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Main Trading Bot",
+                "description": "Copy trading setup for testnet",
             }
         }
     )
@@ -75,7 +163,18 @@ class TraderResponse(BaseModel):
     image_tag: str
     created_at: datetime
     updated_at: datetime
-    latest_config: dict[str, Any] | None = None
+    start_attempts: int = 0
+    last_error: str | None = None
+    stopped_at: datetime | None = None
+    name: str | None = None
+    description: str | None = None
+    latest_config: TraderConfigSchema | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def display_name(self) -> str:
+        """Return name if set, otherwise trader id."""
+        return self.name if self.name else self.id
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -90,7 +189,19 @@ class TraderResponse(BaseModel):
                 "created_at": "2024-01-15T10:30:00Z",
                 "updated_at": "2024-01-15T10:30:00Z",
                 "latest_config": {
-                    "self_account": {"address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"}
+                    "provider_settings": {
+                        "exchange": "hyperliquid",
+                        "network": "mainnet",
+                        "self_account": {"address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"},
+                        "copy_account": {"address": "0x1234567890abcdef1234567890abcdef12345678"},
+                    },
+                    "trader_settings": {
+                        "min_self_funds": 100,
+                        "min_copy_funds": 1000,
+                        "trading_strategy": {
+                            "type": "order_based",
+                        },
+                    },
                 },
             }
         },
@@ -109,10 +220,11 @@ class TraderListResponse(BaseModel):
 class RuntimeStatus(BaseModel):
     """Docker runtime status details."""
 
-    state: str = Field(description="Container state (running, exited, not_found, etc.)")
+    state: str = Field(description="Container state (running, stopped, failed, pending, etc.)")
     running: bool = Field(description="Whether the container is running")
     started_at: str | None = Field(default=None, description="ISO timestamp when container started")
     exit_code: int | None = Field(default=None, description="Exit code if container exited")
+    error: str | None = Field(default=None, description="Error message if task failed")
 
 
 class TraderStatusResponse(BaseModel):
@@ -192,6 +304,48 @@ class DeleteResponse(BaseModel):
                 "message": "Trader deleted successfully",
                 "trader_id": "550e8400-e29b-41d4-a716-446655440000",
                 "wallet_address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a",
+            }
+        }
+    )
+
+
+class StartResponse(BaseModel):
+    """Schema for start response."""
+
+    message: str
+    trader_id: uuid.UUID
+    runtime_name: str
+    status: str
+    start_attempts: int
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "message": "Trader started successfully",
+                "trader_id": "550e8400-e29b-41d4-a716-446655440000",
+                "runtime_name": "trader-e221ef33",
+                "status": "running",
+                "start_attempts": 1,
+            }
+        }
+    )
+
+
+class StopResponse(BaseModel):
+    """Schema for stop response."""
+
+    message: str
+    trader_id: uuid.UUID
+    runtime_name: str
+    status: str
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "message": "Trader stopped successfully",
+                "trader_id": "550e8400-e29b-41d4-a716-446655440000",
+                "runtime_name": "trader-e221ef33",
+                "status": "stopped",
             }
         }
     )

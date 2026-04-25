@@ -12,54 +12,53 @@ test.describe('Dashboard - Authenticated', () => {
     await setupApiMocks(page);
   });
 
-  test('displays welcome message with username', async ({ page }) => {
+  test('displays dashboard heading and description', async ({ page }) => {
     await page.goto('/dashboard');
+    await page.waitForLoadState('networkidle');
 
-    // Check heading - use getByRole to get the main heading, not the header
+    // Check main dashboard heading
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-
-    // Check username display
-    await expect(page.getByText(mockUser.username)).toBeVisible();
+    
+    // Check description text
+    await expect(page.getByText('Manage your trading bots')).toBeVisible();
   });
 
-  test('displays quick action buttons', async ({ page }) => {
+  test('displays New Trader button in header', async ({ page }) => {
     await page.goto('/dashboard');
+    await page.waitForLoadState('networkidle');
 
-    // Check for quick action buttons
-    await expect(page.locator('button:has-text("Create Trader")').or(page.locator('a:has-text("Create Trader")'))).toBeVisible();
+    // The main "New Trader" button is in the header area (not sidebar)
+    // Use the button specifically (the link might be in sidebar)
+    await expect(page.getByRole('button', { name: /New Trader/i })).toBeVisible();
   });
 
-  test('navigation header is visible', async ({ page }) => {
+  test('shows sidebar navigation', async ({ page }) => {
     await page.goto('/dashboard');
+    await page.waitForLoadState('networkidle');
 
-    // Check for HyperTrader branding. There might be multiple instances (sidebar, header).
-    // We look for the one in the visible header or the main heading.
-    const branding = page.getByRole('heading', { name: 'HyperTrader' }).or(page.locator('header div:has-text("HyperTrader")')).filter({ visible: true }).first();
-    await expect(branding).toBeVisible();
+    // Check sidebar navigation items exist (they may be in a complementary/aside role)
+    await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Traders' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
   });
 
   test('can navigate to trader creation from dashboard', async ({ page }) => {
     await page.goto('/dashboard');
+    await page.waitForLoadState('networkidle');
 
-    // Click create trader button/link
-    const createButton = page.locator('a:has-text("Create Trader")').or(page.locator('button:has-text("Create Trader")'));
-    
-    if (await createButton.count() > 0) {
-      await createButton.first().click();
-      await expect(page).toHaveURL(/\/traders\/new/);
-    }
+    // Click the main "New Trader" button in the header
+    await page.getByRole('button', { name: /New Trader/i }).click();
+    await expect(page).toHaveURL(/\/traders\/new/);
   });
 
   test('displays traders list if user has traders', async ({ page }) => {
     await page.goto('/dashboard');
+    await page.waitForLoadState('networkidle');
 
-    // The API mock returns one trader, so it should be visible
-    // This depends on how the dashboard displays traders
-    // Adjust selector based on actual implementation
-    const tradersSection = page.locator('text=Test Trader').or(page.locator('[data-testid="traders-list"]'));
+    // The API mock returns one trader named "Test Trader"
+    await expect(page.getByText('Test Trader')).toBeVisible();
     
-    // Check if traders section exists (may not be on dashboard)
-    const count = await tradersSection.count();
-    expect(count).toBeGreaterThanOrEqual(0);
+    // Should show running status
+    await expect(page.getByText('running')).toBeVisible();
   });
 });

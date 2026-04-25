@@ -1,16 +1,17 @@
 import { AlertDialog as AlertDialogPrimitive } from "@kobalte/core/alert-dialog";
-import { type JSX, splitProps } from "solid-js";
+import { type JSX, type ParentProps, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 import { buttonVariants } from "./button";
 
 export const AlertDialog = AlertDialogPrimitive;
 export const AlertDialogTrigger = AlertDialogPrimitive.Trigger;
+export const AlertDialogPortal = AlertDialogPrimitive.Portal;
 
-export function AlertDialogPortal(props: AlertDialogPrimitive.PortalProps) {
-  return <AlertDialogPrimitive.Portal {...props} />;
+export interface AlertDialogOverlayProps {
+  class?: string;
 }
 
-export function AlertDialogOverlay(props: AlertDialogPrimitive.OverlayProps) {
+export function AlertDialogOverlay(props: AlertDialogOverlayProps) {
   const [local, others] = splitProps(props, ["class"]);
   return (
     <AlertDialogPrimitive.Overlay
@@ -23,7 +24,11 @@ export function AlertDialogOverlay(props: AlertDialogPrimitive.OverlayProps) {
   );
 }
 
-export function AlertDialogContent(props: AlertDialogPrimitive.ContentProps) {
+export interface AlertDialogContentProps extends ParentProps {
+  class?: string;
+}
+
+export function AlertDialogContent(props: AlertDialogContentProps) {
   const [local, others] = splitProps(props, ["class", "children"]);
   return (
     <AlertDialogPortal>
@@ -51,22 +56,40 @@ export function AlertDialogFooter(props: JSX.HTMLAttributes<HTMLDivElement>) {
   return <div class={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", local.class)} {...others} />;
 }
 
-export function AlertDialogTitle(props: AlertDialogPrimitive.TitleProps) {
+export interface AlertDialogTitleProps extends ParentProps {
+  class?: string;
+}
+
+export function AlertDialogTitle(props: AlertDialogTitleProps) {
   const [local, others] = splitProps(props, ["class"]);
   return <AlertDialogPrimitive.Title class={cn("text-lg font-semibold", local.class)} {...others} />;
 }
 
-export function AlertDialogDescription(props: AlertDialogPrimitive.DescriptionProps) {
+export interface AlertDialogDescriptionProps extends ParentProps {
+  class?: string;
+}
+
+export function AlertDialogDescription(props: AlertDialogDescriptionProps) {
   const [local, others] = splitProps(props, ["class"]);
   return <AlertDialogPrimitive.Description class={cn("text-sm text-muted-foreground", local.class)} {...others} />;
 }
 
-export function AlertDialogAction(props: AlertDialogPrimitive.CloseButtonProps) {
+export interface AlertDialogActionProps extends ParentProps {
+  class?: string;
+  onClick?: () => void;
+}
+
+export function AlertDialogAction(props: AlertDialogActionProps) {
   const [local, others] = splitProps(props, ["class"]);
   return <AlertDialogPrimitive.CloseButton class={cn(buttonVariants(), local.class)} {...others} />;
 }
 
-export function AlertDialogCancel(props: AlertDialogPrimitive.CloseButtonProps) {
+export interface AlertDialogCancelProps extends ParentProps {
+  class?: string;
+  onClick?: () => void;
+}
+
+export function AlertDialogCancel(props: AlertDialogCancelProps) {
   const [local, others] = splitProps(props, ["class"]);
   return <AlertDialogPrimitive.CloseButton class={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0", local.class)} {...others} />;
 }

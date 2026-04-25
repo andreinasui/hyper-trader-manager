@@ -125,7 +125,14 @@ def test_create_session_is_not_revoked_by_default(service, mock_user):
 # ---------------------------------------------------------------------------
 
 
-def _make_session_token(user_id: str, token: str, *, revoked: bool = False, expired: bool = False, naive_tz: bool = False):
+def _make_session_token(
+    user_id: str,
+    token: str,
+    *,
+    revoked: bool = False,
+    expired: bool = False,
+    naive_tz: bool = False,
+):
     """Helper: build a mock SessionToken ORM object."""
     session = MagicMock()
     session.user_id = user_id

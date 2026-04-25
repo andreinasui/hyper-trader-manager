@@ -1,16 +1,17 @@
 import { Dialog as DialogPrimitive } from "@kobalte/core/dialog";
-import { type JSX, splitProps } from "solid-js";
+import { type JSX, type ParentProps, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 
 export const Dialog = DialogPrimitive;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.CloseButton;
+export const DialogPortal = DialogPrimitive.Portal;
 
-export function DialogPortal(props: DialogPrimitive.PortalProps) {
-  return <DialogPrimitive.Portal {...props} />;
+export interface DialogOverlayProps {
+  class?: string;
 }
 
-export function DialogOverlay(props: DialogPrimitive.OverlayProps) {
+export function DialogOverlay(props: DialogOverlayProps) {
   const [local, others] = splitProps(props, ["class"]);
   return (
     <DialogPrimitive.Overlay
@@ -23,7 +24,11 @@ export function DialogOverlay(props: DialogPrimitive.OverlayProps) {
   );
 }
 
-export function DialogContent(props: DialogPrimitive.ContentProps) {
+export interface DialogContentProps extends ParentProps {
+  class?: string;
+}
+
+export function DialogContent(props: DialogContentProps) {
   const [local, others] = splitProps(props, ["class", "children"]);
   return (
     <DialogPortal>
@@ -51,12 +56,20 @@ export function DialogFooter(props: JSX.HTMLAttributes<HTMLDivElement>) {
   return <div class={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", local.class)} {...others} />;
 }
 
-export function DialogTitle(props: DialogPrimitive.TitleProps) {
+export interface DialogTitleProps extends ParentProps {
+  class?: string;
+}
+
+export function DialogTitle(props: DialogTitleProps) {
   const [local, others] = splitProps(props, ["class"]);
   return <DialogPrimitive.Title class={cn("text-lg font-semibold leading-none tracking-tight", local.class)} {...others} />;
 }
 
-export function DialogDescription(props: DialogPrimitive.DescriptionProps) {
+export interface DialogDescriptionProps extends ParentProps {
+  class?: string;
+}
+
+export function DialogDescription(props: DialogDescriptionProps) {
   const [local, others] = splitProps(props, ["class"]);
   return <DialogPrimitive.Description class={cn("text-sm text-muted-foreground", local.class)} {...others} />;
 }

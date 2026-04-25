@@ -18,7 +18,7 @@ from sqlalchemy import text
 from hyper_trader_api.config import get_settings
 from hyper_trader_api.database import engine
 from hyper_trader_api.db.bootstrap import bootstrap_database
-from hyper_trader_api.routers import auth_router, traders_router
+from hyper_trader_api.routers import auth_router, images_router, traders_router
 from hyper_trader_api.routers.ssl_setup import router as ssl_setup_router
 
 settings = get_settings()
@@ -45,6 +45,7 @@ else:
 
 logger = logging.getLogger(__name__)
 logger.info(f"Logging configured at {settings.log_level} level")
+logger.info(f"Starting {settings.api_title} ({settings.api_version})...")
 
 
 @asynccontextmanager
@@ -169,6 +170,7 @@ async def validation_exception_handler(
 # Include routers
 app.include_router(auth_router)
 app.include_router(traders_router)
+app.include_router(images_router)
 app.include_router(ssl_setup_router)
 # app.include_router(admin_router)  # Disabled - no admin functionality currently implemented
 

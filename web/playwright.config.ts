@@ -48,8 +48,10 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
     env: {
-      // Use test environment variables
-      VITE_API_URL: 'http://localhost:8000',
+      // Use relative API URL so requests go through the dev server proxy
+      // This allows Playwright to intercept them at the browser level
+      // DO NOT use http://localhost:8000 - it bypasses mocks!
+      VITE_API_URL: '/api',
     },
   },
 });

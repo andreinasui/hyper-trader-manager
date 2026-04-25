@@ -1,10 +1,14 @@
 import { Tabs as TabsPrimitive } from "@kobalte/core/tabs";
-import { splitProps } from "solid-js";
+import { type ParentProps, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 
 export const Tabs = TabsPrimitive;
 
-export function TabsList(props: TabsPrimitive.ListProps) {
+export interface TabsListProps extends ParentProps {
+  class?: string;
+}
+
+export function TabsList(props: TabsListProps) {
   const [local, others] = splitProps(props, ["class"]);
   return (
     <TabsPrimitive.List
@@ -17,7 +21,12 @@ export function TabsList(props: TabsPrimitive.ListProps) {
   );
 }
 
-export function TabsTrigger(props: TabsPrimitive.TriggerProps) {
+export interface TabsTriggerProps extends ParentProps {
+  class?: string;
+  value: string;
+}
+
+export function TabsTrigger(props: TabsTriggerProps) {
   const [local, others] = splitProps(props, ["class"]);
   return (
     <TabsPrimitive.Trigger
@@ -30,7 +39,12 @@ export function TabsTrigger(props: TabsPrimitive.TriggerProps) {
   );
 }
 
-export function TabsContent(props: TabsPrimitive.ContentProps) {
+export interface TabsContentProps extends ParentProps {
+  class?: string;
+  value: string;
+}
+
+export function TabsContent(props: TabsContentProps) {
   const [local, others] = splitProps(props, ["class"]);
   return (
     <TabsPrimitive.Content

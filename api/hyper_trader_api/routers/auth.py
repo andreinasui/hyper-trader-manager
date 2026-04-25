@@ -191,7 +191,7 @@ async def logout(
     """Logout and revoke current session token."""
     auth_header = request.headers.get("Authorization", "")
     # Extract token using slice (not replace) to handle only the prefix
-    token = auth_header[len("Bearer "):] if auth_header.startswith("Bearer ") else ""
+    token = auth_header[len("Bearer ") :] if auth_header.startswith("Bearer ") else ""
 
     token_service = SessionTokenService(db)
     token_service.revoke_session(token)

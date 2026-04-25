@@ -2,12 +2,18 @@ import { setTokenGetter, getToken } from "./api/client";
 import type {
   User,
   Trader,
+  TraderListResponse,
   TraderStatusResponse,
   CreateTraderRequest,
+  UpdateTraderRequest,
+  UpdateTraderInfoRequest,
   SystemStats,
   LoginResponse,
   SetupStatusResponse,
   SSLStatusResponse,
+  StartResponse,
+  StopResponse,
+  ImageVersionInfo,
 } from "./types";
 import { config } from "~/config";
 
@@ -76,7 +82,8 @@ export const api = {
 
   // Traders
   async listTraders(): Promise<Trader[]> {
-    return fetchJson("/v1/traders/");
+    const response = await fetchJson<TraderListResponse>("/v1/traders/");
+    return response.traders;
   },
 
   async getTrader(id: string): Promise<Trader> {
@@ -90,12 +97,57 @@ export const api = {
     });
   },
 
+  async updateTrader(id: string, data: UpdateTraderRequest): Promise<Trader> {
+    return fetchJson(`/v1/traders/${id}/config`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateTraderInfo(
+    traderId: string,
+    data: UpdateTraderInfoRequest
+  ): Promise<Trader> {
+    // Only send fields that have values
+    const payload: UpdateTraderInfoRequest = {};
+    if (data.name !== undefined && data.name !== "") {
+      payload.name = data.name;
+    }
+    if (data.description !== undefined && data.description !== "") {
+      payload.description = data.description;
+    }
+    const response = await fetchJson<Trader>(`/v1/traders/${traderId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    return response;
+  },
+
   async deleteTrader(id: string): Promise<void> {
     return fetchJson(`/v1/traders/${id}`, { method: "DELETE" });
   },
 
   async restartTrader(id: string): Promise<void> {
     return fetchJson(`/v1/traders/${id}/restart`, { method: "POST" });
+  },
+
+  async startTrader(id: string): Promise<StartResponse> {
+    return fetchJson(`/v1/traders/${id}/start`, { method: "POST" });
+  },
+
+  async stopTrader(id: string): Promise<StopResponse> {
+    return fetchJson(`/v1/traders/${id}/stop`, { method: "POST" });
+  },
+
+  async getImageVersions(): Promise<ImageVersionInfo> {
+    return fetchJson("/v1/images");
+  },
+
+  async updateTraderImage(id: string, newTag: string): Promise<Trader> {
+    return fetchJson(`/v1/traders/${id}/update-image`, {
+      method: "POST",
+      body: JSON.stringify({ new_tag: newTag }),
+    });
   },
 
   async getTraderStatus(id: string): Promise<TraderStatusResponse> {

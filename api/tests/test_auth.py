@@ -253,7 +253,9 @@ class TestLogout:
     def test_logout_revokes_session_token(self, client, mock_db, mock_user):
         """Test logout revokes the session token and returns 204."""
         with (
-            patch("hyper_trader_api.middleware.session_auth.SessionTokenService") as MockSessionAuth,
+            patch(
+                "hyper_trader_api.middleware.session_auth.SessionTokenService"
+            ) as MockSessionAuth,
             patch("hyper_trader_api.routers.auth.SessionTokenService") as MockTokenRevoke,
         ):
             # Auth middleware verifies token successfully
@@ -275,7 +277,9 @@ class TestLogout:
     def test_logout_calls_revoke_session_with_token(self, client, mock_db, mock_user):
         """Test logout extracts the Bearer token and calls revoke_session with it."""
         with (
-            patch("hyper_trader_api.middleware.session_auth.SessionTokenService") as MockSessionAuth,
+            patch(
+                "hyper_trader_api.middleware.session_auth.SessionTokenService"
+            ) as MockSessionAuth,
             patch("hyper_trader_api.routers.auth.SessionTokenService") as MockTokenRevoke,
         ):
             mock_session_auth = MockSessionAuth.return_value

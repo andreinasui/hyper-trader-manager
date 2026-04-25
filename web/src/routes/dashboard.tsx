@@ -17,10 +17,16 @@ function StatusBadge(props: { status: Trader["status"] }) {
     switch (props.status) {
       case "running":
         return "success";
-      case "stopped":
+      case "configured":
         return "secondary";
-      case "error":
+      case "stopped":
+        return "outline";
+      case "starting":
+        return "default";
+      case "failed":
         return "destructive";
+      case "pending":
+        return "outline";
       default:
         return "outline";
     }
@@ -35,7 +41,7 @@ function TraderCard(props: { trader: Trader }) {
       <Card class="hover:bg-secondary/50 transition-colors cursor-pointer">
         <CardHeader class="pb-2">
           <div class="flex items-center justify-between">
-            <CardTitle class="text-lg">{props.trader.name}</CardTitle>
+            <CardTitle class="text-lg">{props.trader.display_name}</CardTitle>
             <StatusBadge status={props.trader.status} />
           </div>
           <CardDescription class="font-mono text-xs truncate">

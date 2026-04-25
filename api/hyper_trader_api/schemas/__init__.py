@@ -17,6 +17,19 @@ from hyper_trader_api.schemas.trader import (
     TraderStatusResponse,
     TraderUpdate,
 )
+from hyper_trader_api.schemas.trader_config import (
+    AutoBucket,
+    BucketConfig,
+    CopyAccount,
+    ManualBucket,
+    OpenOnLowPnl,
+    ProviderSettings,
+    RiskParameters,
+    SelfAccount,
+    TraderConfigSchema,
+    TraderSettings,
+    TradingStrategy,
+)
 
 __all__ = [
     # Auth schemas
@@ -35,4 +48,16 @@ __all__ = [
     "RestartResponse",
     "DeleteResponse",
     "RuntimeStatus",
+    # Trader config schemas
+    "TraderConfigSchema",
+    "ProviderSettings",
+    "SelfAccount",
+    "CopyAccount",
+    "TraderSettings",
+    "TradingStrategy",
+    "RiskParameters",
+    "OpenOnLowPnl",
+    "BucketConfig",
+    "ManualBucket",
+    "AutoBucket",
 ]

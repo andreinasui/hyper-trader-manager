@@ -178,7 +178,7 @@ class TraefikConfigWriter:
             "http": {
                 "routers": {
                     "health": {
-                        "rule": f'Host(`{domain}`) && Path(`/health`)',
+                        "rule": f"Host(`{domain}`) && Path(`/health`)",
                         "service": "api",
                         "entryPoints": ["websecure"],
                         "priority": 20,
@@ -187,7 +187,7 @@ class TraefikConfigWriter:
                         },
                     },
                     "api": {
-                        "rule": f'Host(`{domain}`) && PathPrefix(`/api`)',
+                        "rule": f"Host(`{domain}`) && PathPrefix(`/api`)",
                         "service": "api",
                         "entryPoints": ["websecure"],
                         "priority": 10,
@@ -196,7 +196,7 @@ class TraefikConfigWriter:
                         },
                     },
                     "web": {
-                        "rule": f'Host(`{domain}`)',
+                        "rule": f"Host(`{domain}`)",
                         "service": "web",
                         "entryPoints": ["websecure"],
                         "priority": 1,

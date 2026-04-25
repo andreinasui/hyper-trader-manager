@@ -1,5 +1,5 @@
 import { DropdownMenu as DropdownMenuPrimitive } from "@kobalte/core/dropdown-menu";
-import { splitProps } from "solid-js";
+import { type ParentProps, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 
 export const DropdownMenu = DropdownMenuPrimitive;
@@ -8,7 +8,11 @@ export const DropdownMenuGroup = DropdownMenuPrimitive.Group;
 export const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 export const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
 
-export function DropdownMenuContent(props: DropdownMenuPrimitive.ContentProps) {
+export interface DropdownMenuContentProps {
+  class?: string;
+}
+
+export function DropdownMenuContent(props: DropdownMenuContentProps) {
   const [local, others] = splitProps(props, ["class"]);
   return (
     <DropdownMenuPrimitive.Portal>
@@ -23,7 +27,12 @@ export function DropdownMenuContent(props: DropdownMenuPrimitive.ContentProps) {
   );
 }
 
-export function DropdownMenuItem(props: DropdownMenuPrimitive.ItemProps) {
+export interface DropdownMenuItemProps extends ParentProps {
+  class?: string;
+  onSelect?: () => void;
+}
+
+export function DropdownMenuItem(props: DropdownMenuItemProps) {
   const [local, others] = splitProps(props, ["class"]);
   return (
     <DropdownMenuPrimitive.Item
@@ -36,12 +45,20 @@ export function DropdownMenuItem(props: DropdownMenuPrimitive.ItemProps) {
   );
 }
 
-export function DropdownMenuSeparator(props: DropdownMenuPrimitive.SeparatorProps) {
+export interface DropdownMenuSeparatorProps {
+  class?: string;
+}
+
+export function DropdownMenuSeparator(props: DropdownMenuSeparatorProps) {
   const [local, others] = splitProps(props, ["class"]);
   return <DropdownMenuPrimitive.Separator class={cn("-mx-1 my-1 h-px bg-muted", local.class)} {...others} />;
 }
 
-export function DropdownMenuLabel(props: DropdownMenuPrimitive.GroupLabelProps) {
+export interface DropdownMenuLabelProps extends ParentProps {
+  class?: string;
+}
+
+export function DropdownMenuLabel(props: DropdownMenuLabelProps) {
   const [local, others] = splitProps(props, ["class"]);
   return <DropdownMenuPrimitive.GroupLabel class={cn("px-2 py-1.5 text-sm font-semibold", local.class)} {...others} />;
 }

@@ -32,8 +32,13 @@ class Trader(Base):
         user_id: Foreign key to owning user
         wallet_address: Ethereum wallet address (unique)
         runtime_name: Docker container name (unique)
-        status: Current status (pending, running, stopped, failed)
+        status: Current status (configured, starting, running, stopped, failed)
+        start_attempts: Number of start attempts (for retry logic, max 3)
+        last_error: Error message when status is failed
+        stopped_at: Timestamp when user stopped the trader
         image_tag: Docker image tag for deployment
+        name: Optional user-friendly display name (unique per user, max 50 chars)
+        description: Optional notes about the trader (max 255 chars)
         created_at: Creation timestamp
         updated_at: Last update timestamp
     """
@@ -63,12 +68,32 @@ class Trader(Base):
     )
     status: Mapped[str] = mapped_column(
         String(50),
-        default="pending",
+        default="configured",
         index=True,
+    )
+    start_attempts: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+    )
+    last_error: Mapped[str | None] = mapped_column(
+        String(1000),
+        nullable=True,
+    )
+    stopped_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
     image_tag: Mapped[str] = mapped_column(
         String(100),
         default="latest",
+    )
+    name: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+    description: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -79,6 +104,8 @@ class Trader(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_trader_user_name"),)
 
     # Relationships
     user: Mapped["User"] = relationship(
@@ -152,4 +179,3 @@ class TraderConfig(Base):
 
     def __repr__(self) -> str:
         return f"<TraderConfig(trader_id={self.trader_id}, version={self.version})>"
-
