@@ -304,6 +304,44 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
               )}
             </FormField>
           </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <FormField name="config.trader_settings.min_self_funds" type="number">
+              {(field, fieldProps) => (
+                <div class="space-y-1.5">
+                  <Label for="min_self_funds" class="text-xs text-text-muted">Min Self Funds (USDC)</Label>
+                  <Input
+                    {...fieldProps}
+                    id="min_self_funds"
+                    type="number"
+                    value={field.value ?? ""}
+                    placeholder="e.g., 100"
+                  />
+                  <Show when={field.error}>
+                    <p class="text-xs text-error">{field.error}</p>
+                  </Show>
+                </div>
+              )}
+            </FormField>
+
+            <FormField name="config.trader_settings.min_copy_funds" type="number">
+              {(field, fieldProps) => (
+                <div class="space-y-1.5">
+                  <Label for="min_copy_funds" class="text-xs text-text-muted">Min Copy Funds (USDC)</Label>
+                  <Input
+                    {...fieldProps}
+                    id="min_copy_funds"
+                    type="number"
+                    value={field.value ?? ""}
+                    placeholder="e.g., 100"
+                  />
+                  <Show when={field.error}>
+                    <p class="text-xs text-error">{field.error}</p>
+                  </Show>
+                </div>
+              )}
+            </FormField>
+          </div>
         </PanelBody>
       </Panel>
 

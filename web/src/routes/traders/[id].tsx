@@ -1,4 +1,5 @@
 import { type Component, Show, Suspense, createSignal, createEffect } from "solid-js";
+import TraderOverview from "~/components/traders/overviews/TraderOverview";
 import { useParams, useNavigate } from "@solidjs/router";
 import { createQuery, createMutation, useQueryClient } from "@tanstack/solid-query";
 import { Trash2, RefreshCw, Play, Square, Loader2, AlertCircle } from "lucide-solid";
@@ -7,11 +8,9 @@ import { AppShell } from "~/components/layout/AppShell";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { PageContent } from "~/components/layout/PageContent";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Textarea } from "~/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Toast } from "~/components/ui/toast";
-import { Panel, PanelHeader, PanelBody, PanelRow } from "~/components/ui/panel";
+import { Panel, PanelBody } from "~/components/ui/panel";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
-import { StatusDot, StatusIndicator } from "~/components/ui/status-badge";
+import { StatusDot } from "~/components/ui/status-badge";
 import { LogViewer } from "~/components/traders/LogViewer";
 import { TraderConfigForm } from "~/components/traders/TraderConfigForm";
 import { api } from "~/lib/api";
@@ -49,9 +48,6 @@ function normalizeConfig(config: TraderConfig): TraderConfig {
 
 type AnyStatus = Trader["status"] | RuntimeStatus["state"];
 
-function relDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-}
 
 function LoadingSkeleton() {
   return (
@@ -266,17 +262,13 @@ const TraderDetailPage: Component = () => {
                         <div class="flex items-center gap-2.5">
                           <StatusDot status={currentStatus()} />
                           <h1 class="text-2xl font-semibold text-text-base">{trader().display_name}</h1>
+
+
                         </div>
                         <Show when={trader().description}>
                           <p class="text-sm text-text-subtle mt-0.5">{trader().description}</p>
                         </Show>
-                        <div class="flex items-center gap-4 text-xs text-text-subtle">
-                          <span class="font-mono">
-                            {trader().wallet_address.slice(0, 6)}...{trader().wallet_address.slice(-4)}
-                          </span>
-                          <span>v{trader().image_tag}</span>
-                          <span>Created {relDate(trader().created_at)}</span>
-                        </div>
+
                       </div>
 
                       {/* Action buttons */}
@@ -375,116 +367,31 @@ const TraderDetailPage: Component = () => {
                     </div>
 
                     {/* Tabs */}
-                    <Tabs defaultValue="overview" class="space-y-6">
-                      <TabsList class="inline-flex gap-1 border-b border-border-default w-full">
-                        <TabsTrigger
-                          value="overview"
-                          class="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-secondary border-b-2 border-transparent transition-all data-[selected]:text-text-base data-[selected]:border-primary"
-                        >
-                          Overview
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="logs"
-                          class="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-secondary border-b-2 border-transparent transition-all data-[selected]:text-text-base data-[selected]:border-primary"
-                        >
-                          Logs
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="configuration"
-                          class="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-secondary border-b-2 border-transparent transition-all data-[selected]:text-text-base data-[selected]:border-primary"
-                        >
-                          Configuration
-                        </TabsTrigger>
-                      </TabsList>
+                     <Tabs defaultValue="overview" class="space-y-6">
+                       <TabsList>
+                         <TabsTrigger value="overview">Overview</TabsTrigger>
+                         <TabsTrigger value="logs">Logs</TabsTrigger>
+                         <TabsTrigger value="configuration">Configuration</TabsTrigger>
+                       </TabsList>
 
                       {/* Overview Tab */}
                       <TabsContent value="overview" class="space-y-0">
-                        <div class="grid gap-6 md:grid-cols-2">
-                          {/* Status Card */}
-                          <Panel>
-                            <PanelHeader title="Status" />
-                            <PanelBody class="py-0">
-                              <PanelRow label="Status">
-                                <StatusIndicator status={currentStatus()} />
-                              </PanelRow>
-                              <Show when={trader().status === "running" && statusQuery.data?.runtime_status?.started_at}>
-                                <PanelRow label="Uptime">
-                                  {formatUptime(statusQuery.data!.runtime_status.started_at!)}
-                                </PanelRow>
-                              </Show>
-                              <PanelRow label="Image version" border={!(statusQuery.data?.runtime_status?.error || trader().last_error)}>
-                                <div class="flex items-center gap-2">
-                                  <span class="font-mono">{trader().image_tag}</span>
-                                  <Show when={needsImageUpdate()}>
-                                    <span class="text-xs text-warning">
-                                      → {imageQuery.data?.latest_remote} available
-                                    </span>
-                                  </Show>
-                                </div>
-                              </PanelRow>
-                              <Show when={statusQuery.data?.runtime_status?.error || trader().last_error}>
-                                <div class="bg-error-surface rounded p-3 my-3">
-                                  <div class="flex items-center gap-2 text-error text-sm mb-1">
-                                    <AlertCircle class="h-4 w-4" stroke-width={1.5} />
-                                    <span class="font-medium">Error</span>
-                                  </div>
-                                  <p class="text-sm text-error break-all">
-                                    {statusQuery.data?.runtime_status?.error || trader().last_error}
-                                  </p>
-                                </div>
-                              </Show>
-                            </PanelBody>
-                          </Panel>
-
-                          {/* Trader Info Card */}
-                          <Panel>
-                            <PanelHeader title="Trader info" />
-                            <PanelBody class="space-y-4">
-                              <div class="space-y-2">
-                                <label class="text-sm font-medium text-text-muted">Name</label>
-                                <Input
-                                  type="text"
-                                  value={editName()}
-                                  onInput={(e) => handleNameChange(e.currentTarget.value)}
-                                  placeholder="Enter a name for this trader"
-                                  maxLength={50}
-                                />
-                              </div>
-                              <div class="space-y-2">
-                                <label class="text-sm font-medium text-text-muted">Description</label>
-                                <Textarea
-                                  value={editDescription()}
-                                  onInput={(e) => handleDescriptionChange(e.currentTarget.value)}
-                                  placeholder="Optional notes about this trader"
-                                  class="min-h-[60px]"
-                                  maxLength={255}
-                                  rows={2}
-                                />
-                              </div>
-                              <Show when={infoError()}>
-                                <p class="text-sm text-error">{infoError()}</p>
-                              </Show>
-                              <Show when={infoChanged()}>
-                                <Button
-                                  onClick={handleInfoSave}
-                                  disabled={updateInfoMutation.isPending}
-                                >
-                                  {updateInfoMutation.isPending ? "Saving..." : "Save"}
-                                </Button>
-                              </Show>
-                              <div class="border-t border-border-default pt-4 mt-4 space-y-2">
-                                <div class="flex items-center justify-between">
-                                  <span class="text-sm text-text-subtle">Created</span>
-                                  <span class="text-sm text-text-muted">{relDate(trader().created_at)}</span>
-                                </div>
-                                <div class="flex items-center justify-between">
-                                  <span class="text-sm text-text-subtle">Last updated</span>
-                                  <span class="text-sm text-text-muted">{relDate(trader().updated_at)}</span>
-                                </div>
-                              </div>
-                            </PanelBody>
-                          </Panel>
-                        </div>
+                        <TraderOverview
+                          trader={trader()}
+                          currentStatus={currentStatus}
+                          statusQuery={statusQuery}
+                          editName={editName}
+                          editDescription={editDescription}
+                          handleNameChange={handleNameChange}
+                          handleDescriptionChange={handleDescriptionChange}
+                          infoChanged={infoChanged}
+                          infoError={infoError}
+                          handleInfoSave={handleInfoSave}
+                          updateInfoMutation={updateInfoMutation}
+                          needsImageUpdate={needsImageUpdate}
+                          imageQuery={imageQuery}
+                          formatUptime={formatUptime}
+                        />
                       </TabsContent>
 
                       {/* Logs Tab */}
