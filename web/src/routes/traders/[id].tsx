@@ -355,15 +355,22 @@ const TraderDetailPage: Component = () => {
                           />
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Trader</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete "{trader().display_name}" and all its configuration.
-                                This action cannot be undone.
-                              </AlertDialogDescription>
+                              <div class="flex items-start gap-3">
+                                <div class="flex shrink-0 items-center justify-center size-9 rounded-lg bg-destructive/10 border border-destructive/20 mt-0.5">
+                                  <Trash2 class="size-4 text-destructive" stroke-width={1.5} />
+                                </div>
+                                <div>
+                                  <AlertDialogTitle>Delete Trader</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete "{trader().display_name}" and all its configuration.
+                                    This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </div>
+                              </div>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteMutation.mutate()}>
+                              <AlertDialogAction variant="destructive" onClick={() => deleteMutation.mutate()}>
                                 {deleteMutation.isPending ? "Deleting..." : "Delete"}
                               </AlertDialogAction>
                             </AlertDialogFooter>

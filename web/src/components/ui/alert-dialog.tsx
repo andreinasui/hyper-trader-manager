@@ -1,4 +1,5 @@
 import { AlertDialog as AlertDialogPrimitive } from "@kobalte/core/alert-dialog";
+import type { VariantProps } from "class-variance-authority";
 import { type JSX, type ParentProps, splitProps } from "solid-js";
 import { cn } from "~/lib/utils";
 import { buttonVariants } from "./button";
@@ -77,11 +78,17 @@ export function AlertDialogDescription(props: AlertDialogDescriptionProps) {
 export interface AlertDialogActionProps extends ParentProps {
   class?: string;
   onClick?: () => void;
+  variant?: VariantProps<typeof buttonVariants>["variant"];
 }
 
 export function AlertDialogAction(props: AlertDialogActionProps) {
-  const [local, others] = splitProps(props, ["class"]);
-  return <AlertDialogPrimitive.CloseButton class={cn(buttonVariants(), local.class)} {...others} />;
+  const [local, others] = splitProps(props, ["class", "variant"]);
+  return (
+    <AlertDialogPrimitive.CloseButton
+      class={cn(buttonVariants({ variant: local.variant }), local.class)}
+      {...others}
+    />
+  );
 }
 
 export interface AlertDialogCancelProps extends ParentProps {
