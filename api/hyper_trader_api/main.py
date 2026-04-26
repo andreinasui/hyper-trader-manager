@@ -103,7 +103,7 @@ app = FastAPI(
         "3. Create a trader at `POST /api/v1/traders/`\n"
         "4. Monitor with `GET /api/v1/traders/{id}/status` and `GET /api/v1/traders/{id}/logs`\n"
     ),
-    version="1.0.0",
+    version=settings.api_version,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -202,7 +202,7 @@ async def health_check() -> dict[str, Any]:
     return {
         "status": "healthy" if db_status == "connected" else "degraded",
         "database": db_status,
-        "version": "1.0.0",
+        "version": settings.api_version,
     }
 
 

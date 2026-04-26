@@ -11,9 +11,10 @@ Automatically loads environment-specific .env files:
 
 import os
 from functools import lru_cache
+from importlib.metadata import version as get_package_version
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -71,7 +72,13 @@ class Settings(BaseSettings):
 
     # ==================== API Metadata ====================
     api_title: str = "HyperTrader API"
-    api_version: str = f"1.0.0{'-dev' if environment == 'development' else ''}"
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def api_version(self) -> str:
+        """Version derived from pyproject.toml; appends -dev in development."""
+        base = get_package_version("hyper-trader-api")
+        return f"{base}-dev" if self.environment == "development" else base
 
 
 @lru_cache

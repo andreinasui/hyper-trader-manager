@@ -147,7 +147,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       {/* Version footer */}
       <Show when={contentProps.expanded || contentProps.mobile}>
         <div class="px-3 pb-2">
-          <p class="text-xs text-text-faint font-mono">v1.0</p>
+          <p class="text-xs text-text-faint font-mono">v{__APP_VERSION__}</p>
         </div>
       </Show>
     </div>
