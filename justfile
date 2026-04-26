@@ -24,6 +24,10 @@ install:
     cd api && just install-dev
     cd web && just install
 
+# Create a new release (usage: just release 1.2.3 or just release 1.2.3 --dry-run)
+release version *args:
+    ./scripts/release.sh {{version}} {{args}}
+
 # ─────────────────────────────────────────────────────────────
 # Docker Build Commands
 # ─────────────────────────────────────────────────────────────
