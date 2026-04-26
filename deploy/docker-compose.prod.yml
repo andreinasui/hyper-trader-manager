@@ -30,7 +30,7 @@ services:
   # API service (FastAPI + uvicorn)
   # ============================================
   api:
-    image: hypertrader-api:${HYPERTRADER_API_IMAGE_VERSION}
+    image: ${HYPERTRADER_API_IMAGE}
     container_name: hypertrader-api
     restart: unless-stopped
     env_file:
@@ -55,7 +55,7 @@ services:
   # Web service
   # ============================================
   web:
-    image: hypertrader-web:${HYPERTRADER_WEB_IMAGE_VERSION}
+    image: ${HYPERTRADER_WEB_IMAGE}
     container_name: hypertrader-web
     restart: unless-stopped
     environment:
