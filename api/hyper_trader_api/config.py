@@ -56,7 +56,10 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
     # ==================== CORS ====================
-    cors_origins: str = "http://localhost"
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def cors_origins(self) -> list[str]:
+        return ["http://localhost"]
 
     @field_validator("cors_origins", mode="after")
     @classmethod
@@ -65,9 +68,6 @@ class Settings(BaseSettings):
         if not v.strip():
             return []
         return [origin.strip() for origin in v.split(",") if origin.strip()]
-
-    # ==================== HTTP Client ====================
-    http_timeout: float = 10.0
 
     # ==================== API Metadata ====================
     @computed_field  # type: ignore[prop-decorator]
