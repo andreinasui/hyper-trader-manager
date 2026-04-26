@@ -43,21 +43,20 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/hypertrader.db"
 
     # ==================== Self-Hosted Configuration ====================
-    public_base_url: str = "http://localhost"
-    public_port: int = 80
-    data_dir: str = "./data"  # Base directory for app data (traefik config, certs, etc.)
+    data_dir: str = (
+        "./data"  # Base directory for app data (traefik config, certs, etc.)
+    )
 
-    # ==================== Server ====================
-    host: str = "0.0.0.0"
-    port: int = 8000
-    workers: int = 1
-    debug: bool = False
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def debug(self) -> str:
+        return self.environment == "development"
 
     # ==================== Logging ====================
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
     # ==================== CORS ====================
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost"
 
     @field_validator("cors_origins", mode="after")
     @classmethod
@@ -71,7 +70,10 @@ class Settings(BaseSettings):
     http_timeout: float = 10.0
 
     # ==================== API Metadata ====================
-    api_title: str = "HyperTrader API"
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def api_title(self) -> str:
+        return "HyperTrader API"
 
     @computed_field  # type: ignore[prop-decorator]
     @property

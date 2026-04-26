@@ -1,10 +1,4 @@
 # HyperTrader Manager Stack
-# Usage:
-#   cd deploy
-#   cp .env.example .env
-#   cp api.env.example api.env
-#   cp web.env.example web.env
-#   # Edit .env, api.env, web.env with your settings
 #   docker compose -f docker-compose.prod.yml up -d
 
 services:
@@ -20,9 +14,9 @@ services:
       - "${PUBLIC_PORT:-80}:80"
       - "${HTTPS_PUBLIC_PORT-:443}:443"
     volumes:
-      - ../data/traefik:/etc/traefik:ro
-      - ../data/traefik/certs:/certs:ro
-      - ../data/traefik/acme.json:/letsencrypt/acme.json
+      - ./data/traefik:/etc/traefik:ro
+      - ./data/traefik/certs:/certs:ro
+      - ./data/traefik/acme.json:/letsencrypt/acme.json
     networks:
       - hypertrader
     healthcheck:
@@ -36,13 +30,10 @@ services:
   # API service (FastAPI + uvicorn)
   # ============================================
   api:
-    build:
-      context: api
-      dockerfile: Dockerfile
+    image: hypertrader-api:${HYPERTRADER_API_IMAGE_VERSION}
     container_name: hypertrader-api
     restart: unless-stopped
     env_file:
-      - .env
       - api.env
     group_add:
       - ${DOCKER_GID:-999}
@@ -64,13 +55,11 @@ services:
   # Web service
   # ============================================
   web:
-    build:
-      context: web
-      dockerfile: Dockerfile
+    image: hypertrader-web:${HYPERTRADER_WEB_IMAGE_VERSION}
     container_name: hypertrader-web
     restart: unless-stopped
-    env_file:
-      - web.env
+    environment:
+      - NODE_ENV=production
     networks:
       - hypertrader
     healthcheck:

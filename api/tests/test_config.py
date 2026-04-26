@@ -23,20 +23,6 @@ class TestSettings:
         settings = Settings()
         assert settings.database_url.startswith("sqlite")
 
-    def test_public_base_url_default(self, monkeypatch):
-        """Public base URL should default to localhost:80."""
-        monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
-        monkeypatch.delenv("DATABASE_URL", raising=False)
-        from hyper_trader_api.config import get_settings
-
-        get_settings.cache_clear()
-
-        from hyper_trader_api.config import Settings
-
-        settings = Settings()
-        assert hasattr(settings, "public_base_url")
-        assert "localhost" in settings.public_base_url or "127.0.0.1" in settings.public_base_url
-
 
 class TestDatabaseEngine:
     """Tests for database engine configuration."""

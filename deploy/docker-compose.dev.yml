@@ -61,8 +61,8 @@ services:
       dockerfile: Dockerfile
     container_name: hypertrader-web
     restart: unless-stopped
-    env_file:
-      - .env.web.development
+    environment:
+      - NODE_ENV=development
     networks:
       - hypertrader
     healthcheck:
