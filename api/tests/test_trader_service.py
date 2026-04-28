@@ -539,7 +539,7 @@ class TestRestartTrader:
         mock_runtime.service_exists.return_value = False
 
         with patch.object(trader_service, "_get_config_data", return_value="provider_settings: {}"):
-            result = trader_service.restart_trader(trader_id, mock_user.id)
+            trader_service.restart_trader(trader_id, mock_user.id)
 
         # Service was not running, so remove_service should NOT be called
         mock_runtime.remove_service.assert_not_called()

@@ -14,7 +14,7 @@ class SSLConfig(Base):
 
     Attributes:
         id: Primary key, always 1 (singleton pattern)
-        mode: SSL mode - "domain" (Let's Encrypt) or "ip_only" (self-signed)
+        mode: SSL mode - "domain" (Let's Encrypt)
         domain: The domain name if using Let's Encrypt
         email: Email address for Let's Encrypt certificate notifications
         configured_at: When SSL was first configured
@@ -25,9 +25,7 @@ class SSLConfig(Base):
     __tablename__ = "ssl_config"
 
     id: Mapped[int] = mapped_column(primary_key=True, default=1)
-    mode: Mapped[str | None] = mapped_column(
-        String(20), nullable=True
-    )  # "domain" | "ip_only" | null
+    mode: Mapped[str | None] = mapped_column(String(20), nullable=True)  # "domain" | null
     domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     configured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

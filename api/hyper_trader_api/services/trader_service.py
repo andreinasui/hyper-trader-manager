@@ -6,11 +6,10 @@ Handles trader CRUD operations using Docker runtime.
 
 import logging
 import uuid
-
-import yaml
 from datetime import UTC
 from typing import Any
 
+import yaml
 from sqlalchemy.orm import Session
 
 from hyper_trader_api.config import get_settings

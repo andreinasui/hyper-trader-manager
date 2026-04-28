@@ -9,6 +9,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from hyper_trader_api.config import get_settings
 from hyper_trader_api.database import get_db
 from hyper_trader_api.middleware.session_auth import get_current_user
 from hyper_trader_api.models import User
@@ -21,6 +22,7 @@ from hyper_trader_api.schemas.auth import (
 )
 from hyper_trader_api.services.local_auth_service import LocalAuthService
 from hyper_trader_api.services.session_token_service import SessionTokenService
+from hyper_trader_api.services.ssl_setup_service import SSLSetupService
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +78,20 @@ async def bootstrap_admin(
         AuthResponse: Access token and user info
 
     Raises:
+        HTTPException: 409 if SSL is not configured in production
         HTTPException: 409 if system is already initialized
     """
+    settings = get_settings()
+
+    # In production, require SSL to be configured before bootstrapping
+    if settings.environment == "production":
+        ssl_service = SSLSetupService(db)
+        if not ssl_service.is_ssl_configured():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="SSL must be configured before bootstrapping the admin account",
+            )
+
     auth_service = LocalAuthService(db)
     token_service = SessionTokenService(db)
 

@@ -15,6 +15,7 @@ function createAuthStore() {
   const [token, setToken] = createSignal<string | null>(getLocalStorage("auth_token"));
   const [loading, setLoading] = createSignal(true);
   const [isInitialized, setIsInitialized] = createSignal(false);
+  const [sslConfigured, setSslConfigured] = createSignal<boolean | null>(null);
 
   const authenticated = () => !!user() && !!token();
   const ready = () => !loading();
@@ -40,6 +41,16 @@ function createAuthStore() {
     } catch {
       setIsInitialized(false);
       return false;
+    }
+  }
+
+  async function checkSSL(): Promise<void> {
+    try {
+      const status = await api.getSSLStatus();
+      setSslConfigured(status.ssl_configured);
+    } catch {
+      // Fail-closed: assume SSL not configured on error
+      setSslConfigured(false);
     }
   }
 
@@ -103,7 +114,9 @@ function createAuthStore() {
     ready,
     authenticated,
     isInitialized,
+    sslConfigured,
     checkSetup,
+    checkSSL,
     checkAuth,
     login,
     logout,

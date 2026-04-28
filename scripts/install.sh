@@ -103,7 +103,7 @@ fi
 # ── Phase 3: Create directory structure ──────────────────────────────────────
 header "Creating install directory"
 
-mkdir -p "${INSTALL_DIR}/deploy/data/traefik/certs"
+mkdir -p "${INSTALL_DIR}/deploy/data/traefik/dynamic"
 touch "${INSTALL_DIR}/deploy/data/traefik/acme.json"
 chmod 600 "${INSTALL_DIR}/deploy/data/traefik/acme.json"
 
@@ -126,6 +126,8 @@ download() {
 download "${RAW_BASE}/deploy/docker-compose.prod.yml" "${INSTALL_DIR}/deploy/docker-compose.prod.yml"
 download "${RAW_BASE}/deploy/.env.example"            "${INSTALL_DIR}/deploy/.env.example"
 download "${RAW_BASE}/api/.env.example"               "${INSTALL_DIR}/deploy/api.env.example"
+download "${RAW_BASE}/data/traefik/traefik.yml"       "${INSTALL_DIR}/deploy/data/traefik/traefik.yml"
+download "${RAW_BASE}/data/traefik/dynamic/00-bootstrap.yml" "${INSTALL_DIR}/deploy/data/traefik/dynamic/00-bootstrap.yml"
 
 success "Files downloaded."
 

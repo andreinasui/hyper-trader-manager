@@ -163,10 +163,10 @@ export const api = {
     return fetchJson("/v1/setup/ssl-status");
   },
 
-  async configureSSL(mode: "domain" | "ip", domain?: string): Promise<void> {
+  async configureSSL(domain: string, email: string): Promise<{ success: boolean; message: string; redirect_url: string }> {
     return fetchJson("/v1/setup/ssl", {
       method: "POST",
-      body: JSON.stringify({ mode, domain }),
+      body: JSON.stringify({ mode: "domain", domain, email }),
     });
   },
 

@@ -167,51 +167,35 @@ just web  # In terminal 2
 
 ## SSL Configuration (Production)
 
-HyperTrader includes an **SSL Setup Wizard** that guides self-hosted users through configuring HTTPS access. SSL is not required for local development but is strongly recommended for any internet-facing deployment.
+HyperTrader includes an **SSL Setup Wizard** that guides self-hosted users through configuring HTTPS access. SSL is **only available in production deployments** (`ENVIRONMENT=production`); local development runs over plain HTTP.
 
 ### How the SSL Setup Wizard Works
 
-On the first access to a production instance where SSL has not yet been configured, users are automatically redirected to `/setup/ssl`. The wizard offers two modes:
-
-| Mode | Use Case | Certificate Type |
-|------|----------|-----------------|
-| **Domain (Let's Encrypt)** | You have a domain name pointing to your server | Trusted by all browsers |
-| **IP-only (Self-Signed)** | No domain — access by IP address only | Triggers browser warning |
+On the first access to a production instance, users are automatically redirected to `/setup/ssl`. The wizard configures HTTPS via **Let's Encrypt** — this is the only supported mode. Self-signed / IP-only certificates are not supported; a real domain is required.
 
 **Wizard flow:**
-1. User visits the app for the first time (production).
+1. User visits the app for the first time over HTTP (production).
 2. App redirects to `/setup/ssl`.
-3. User selects a mode and fills in any required fields (domain/email for Let's Encrypt).
-4. Backend writes Traefik configuration, generates certificates if needed, and restarts Traefik.
-5. User is redirected to the HTTPS URL.
+3. User enters their domain name and an email address (used for Let's Encrypt expiry notifications).
+4. Backend writes Traefik configuration, requests a certificate via the ACME HTTP-01 challenge, and restarts Traefik.
+5. User is redirected to `https://<domain>` and can then create the admin account.
 
-### Let's Encrypt Mode Requirements
+The admin bootstrap endpoint is **gated** on SSL being configured: in production, `POST /api/v1/auth/bootstrap` returns `409 Conflict` until a valid certificate has been provisioned. This guarantees the admin password is never transmitted over plaintext HTTP.
 
-Before choosing the **Domain (Let's Encrypt)** mode, ensure all of the following are true:
+### Let's Encrypt Requirements
+
+Before running the wizard, ensure all of the following are true:
 
 - **Domain name** — You own a domain (or subdomain) and its DNS `A` record points to the public IP address of your server.
 - **Port 80 open** — Let's Encrypt's ACME HTTP-01 challenge requires inbound traffic on port 80. Traefik handles the challenge automatically; you only need the port to be reachable.
 - **Port 443 open** — HTTPS traffic must be reachable on port 443.
 - **No firewall/NAT blocking** — Both ports must be reachable from the public internet (check cloud security groups, router port forwarding, etc.).
 
-> **Note:** Certificate issuance can take up to 60 seconds. Let's Encrypt rate-limits failed attempts, so verify DNS propagation and port accessibility *before* running the wizard.
-
-### Self-Signed Certificate Mode (IP-Only)
-
-When you select IP-only mode, the backend generates a self-signed certificate. This certificate is **not trusted by browsers or operating systems by default**, so users will see a security warning on first visit.
-
-**What to expect:**
-- Chrome/Edge: "Your connection is not private" (NET::ERR_CERT_AUTHORITY_INVALID)
-- Firefox: "Warning: Potential Security Risk Ahead"
-- Safari: "This Connection Is Not Private"
-
-Users can bypass the warning by clicking **Advanced → Proceed** (Chrome/Edge) or **Accept the Risk and Continue** (Firefox). This is acceptable for internal or personal deployments; it is **not** recommended for production systems accessed by untrusting third parties.
-
-Self-signed certificates are stored at `data/traefik/certs/` inside the deployment directory.
+> **Note:** Certificate issuance can take up to 60 seconds. Let's Encrypt rate-limits failed attempts (5 failures per account/hostname per hour), so verify DNS propagation and port accessibility *before* running the wizard.
 
 ### Reconfiguring SSL
 
-If you need to change SSL settings (e.g., switch from self-signed to Let's Encrypt, or update the domain), you must reset the stored SSL configuration:
+If you need to update the domain or re-issue the certificate, reset the stored SSL configuration:
 
 ```bash
 # 1. Open the database

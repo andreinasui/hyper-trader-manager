@@ -1,14 +1,44 @@
-import { type Component, Show } from "solid-js";
-import { Navigate } from "@solidjs/router";
+import { type Component, onMount, createSignal, Show } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { BootstrapForm } from "~/components/auth/BootstrapForm";
 import { authStore } from "~/stores/auth";
+import { evaluateSetupGuard } from "~/lib/setupGuard";
 
 const SetupPage: Component = () => {
+  const navigate = useNavigate();
+  const [shouldRender, setShouldRender] = createSignal(false);
+
+  // Evaluate guard after mount so navigation completes correctly under Solid Router.
+  onMount(() => {
+    const decision = evaluateSetupGuard(
+      window.location.pathname,
+      window.isSecureContext,
+      {
+        sslConfigured: authStore.sslConfigured(),
+        isInitialized: authStore.isInitialized(),
+      },
+    );
+
+    if (decision.type === "redirect-route") {
+      navigate(decision.to, { replace: true });
+      return;
+    }
+
+    if (decision.type === "redirect-https") {
+      window.location.replace(decision.url);
+      return;
+    }
+
+    if (authStore.isInitialized()) {
+      navigate("/", { replace: true });
+      return;
+    }
+
+    setShouldRender(true);
+  });
+
   return (
-    <Show 
-      when={!authStore.isInitialized()} 
-      fallback={<Navigate href="/" />}
-    >
+    <Show when={shouldRender()}>
       <div class="min-h-screen bg-surface-base flex items-center justify-center p-4">
         <div class="w-full max-w-md bg-surface-raised border border-border-default rounded-md overflow-hidden">
           {/* Header strip */}

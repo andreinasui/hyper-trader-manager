@@ -11,10 +11,9 @@ services:
     restart: unless-stopped
     ports:
       - "${PUBLIC_PORT:-80}:80"
-      - "3443:443"
+      - "${HTTPS_PUBLIC_PORT:-443}:443"
     volumes:
       - ../data/traefik:/etc/traefik:ro
-      - ../data/traefik/certs:/certs:ro
       - ../data/traefik/acme.json:/letsencrypt/acme.json
     networks:
       - hypertrader
@@ -43,6 +42,8 @@ services:
       - ../data/sqlitedb/:/app/data
       # Docker socket access for managing trader containers
       - ${DOCKER_SOCK}:/var/run/docker.sock
+      # Bind mount for Traefik config (wizard writes here)
+      - ../data/traefik:/host-traefik
     networks:
       - hypertrader
     healthcheck:

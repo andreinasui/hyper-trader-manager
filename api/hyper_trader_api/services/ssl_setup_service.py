@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 
 from hyper_trader_api.config import get_settings
 from hyper_trader_api.models.ssl_config import SSLConfig
-from hyper_trader_api.services.cert_generator import generate_self_signed_cert
 from hyper_trader_api.services.traefik_config import TraefikConfigWriter
 
 logger = logging.getLogger(__name__)
@@ -71,10 +70,12 @@ class SSLSetupService:
             SSLSetupError: If configuration fails (backup is restored).
         """
         settings = get_settings()
-        data_dir = Path(settings.data_dir)
-        traefik_config_dir = data_dir / "traefik"
-        letsencrypt_dir = data_dir / "letsencrypt"
-        acme_json_path = letsencrypt_dir / "acme.json"
+
+        # Defense-in-depth: only allow SSL setup in production
+        if settings.environment != "production":
+            raise SSLSetupError("SSL setup is only available in production environment")
+
+        traefik_config_dir = Path(settings.traefik_config_dir)
 
         writer = TraefikConfigWriter(traefik_config_dir)
         backup = writer.backup_config()
@@ -82,12 +83,6 @@ class SSLSetupService:
         try:
             # Write new Traefik config for domain mode
             writer.write_domain_config(domain, email)
-
-            # Create acme.json with correct permissions (0o600)
-            letsencrypt_dir.mkdir(parents=True, exist_ok=True)
-            if not acme_json_path.exists():
-                acme_json_path.touch()
-            acme_json_path.chmod(0o600)
 
             # Restart Traefik container
             self._restart_traefik()
@@ -109,59 +104,6 @@ class SSLSetupService:
             if isinstance(e, SSLSetupError):
                 raise
             raise SSLSetupError(f"Domain SSL setup failed: {e}") from e
-
-    def configure_ip_only_ssl(self) -> str:
-        """Configure self-signed certificate SSL for IP-only access.
-
-        Generates a self-signed certificate, writes Traefik config, and
-        restarts Traefik. On failure, restores the previous Traefik config.
-
-        Returns:
-            Message describing the self-signed cert configuration.
-
-        Raises:
-            SSLSetupError: If configuration fails (backup is restored).
-        """
-        settings = get_settings()
-        data_dir = Path(settings.data_dir)
-        traefik_config_dir = data_dir / "traefik"
-        certs_dir = data_dir / "certs"
-        cert_path = certs_dir / "cert.pem"
-        key_path = certs_dir / "key.pem"
-
-        writer = TraefikConfigWriter(traefik_config_dir)
-        backup = writer.backup_config()
-
-        try:
-            # Generate self-signed certificate
-            generate_self_signed_cert(cert_path=cert_path, key_path=key_path)
-
-            # Write new Traefik config for IP-only mode
-            writer.write_ip_only_config()
-
-            # Restart Traefik container
-            self._restart_traefik()
-
-            # Save config to database
-            self._save_config(mode="ip_only", domain=None, email=None)
-
-            logger.info("IP-only SSL configured with self-signed certificate")
-            return (
-                "SSL configured with self-signed certificate. "
-                "Your browser will show a security warning - this is expected for IP-only access."
-            )
-
-        except Exception as e:
-            logger.error(f"IP-only SSL setup failed: {e}")
-            if backup is not None:
-                try:
-                    writer.restore_config(backup)
-                    logger.info("Restored Traefik config from backup")
-                except Exception as restore_err:
-                    logger.error(f"Failed to restore Traefik config: {restore_err}")
-            if isinstance(e, SSLSetupError):
-                raise
-            raise SSLSetupError(f"IP-only SSL setup failed: {e}") from e
 
     def _restart_traefik(self) -> None:
         """Restart the Traefik container via Docker socket.
@@ -190,7 +132,7 @@ class SSLSetupService:
         Creates or updates the SSLConfig singleton (id=1).
 
         Args:
-            mode: SSL mode - "domain" or "ip_only".
+            mode: SSL mode - "domain" (Let's Encrypt).
             domain: Domain name (for Let's Encrypt mode), or None.
             email: ACME email address (for Let's Encrypt mode), or None.
         """

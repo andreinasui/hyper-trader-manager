@@ -9,7 +9,7 @@ Tests for username/password authentication with session tokens:
 - POST /api/v1/auth/logout
 """
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 
 class TestSetupStatus:
@@ -117,6 +117,82 @@ class TestBootstrap:
         )
 
         assert response.status_code == 422
+
+    def test_bootstrap_blocked_when_ssl_not_configured_in_production(self, client, mock_db):
+        """Test bootstrap fails in production when SSL is not configured."""
+        mock_settings = MagicMock()
+        mock_settings.environment = "production"
+
+        with (
+            patch("hyper_trader_api.routers.auth.get_settings", return_value=mock_settings),
+            patch("hyper_trader_api.routers.auth.SSLSetupService") as MockSSL,
+        ):
+            mock_ssl_service = MockSSL.return_value
+            mock_ssl_service.is_ssl_configured.return_value = False
+
+            response = client.post(
+                "/api/v1/auth/bootstrap",
+                json={"username": "admin", "password": "securepassword123"},
+            )
+
+            assert response.status_code == 409
+            assert "ssl" in response.json()["detail"].lower()
+
+    def test_bootstrap_allowed_when_ssl_configured_in_production(
+        self, client, mock_db, mock_admin_user
+    ):
+        """Test bootstrap succeeds in production when SSL is configured."""
+        mock_settings = MagicMock()
+        mock_settings.environment = "production"
+
+        with (
+            patch("hyper_trader_api.routers.auth.get_settings", return_value=mock_settings),
+            patch("hyper_trader_api.routers.auth.SSLSetupService") as MockSSL,
+            patch("hyper_trader_api.routers.auth.LocalAuthService") as MockAuth,
+            patch("hyper_trader_api.routers.auth.SessionTokenService") as MockToken,
+        ):
+            mock_ssl_service = MockSSL.return_value
+            mock_ssl_service.is_ssl_configured.return_value = True
+
+            mock_auth = MockAuth.return_value
+            mock_auth.bootstrap_admin.return_value = mock_admin_user
+
+            mock_token_service = MockToken.return_value
+            mock_token_service.create_session.return_value = "htk_test_token"
+
+            response = client.post(
+                "/api/v1/auth/bootstrap",
+                json={"username": "admin", "password": "securepassword123"},
+            )
+
+            assert response.status_code == 201
+            data = response.json()
+            assert data["access_token"] == "htk_test_token"
+
+    def test_bootstrap_allowed_in_development_without_ssl(self, client, mock_db, mock_admin_user):
+        """Test bootstrap succeeds in development without SSL check."""
+        mock_settings = MagicMock()
+        mock_settings.environment = "development"
+
+        with (
+            patch("hyper_trader_api.routers.auth.get_settings", return_value=mock_settings),
+            patch("hyper_trader_api.routers.auth.LocalAuthService") as MockAuth,
+            patch("hyper_trader_api.routers.auth.SessionTokenService") as MockToken,
+        ):
+            mock_auth = MockAuth.return_value
+            mock_auth.bootstrap_admin.return_value = mock_admin_user
+
+            mock_token_service = MockToken.return_value
+            mock_token_service.create_session.return_value = "htk_test_token"
+
+            response = client.post(
+                "/api/v1/auth/bootstrap",
+                json={"username": "admin", "password": "securepassword123"},
+            )
+
+            assert response.status_code == 201
+            data = response.json()
+            assert data["access_token"] == "htk_test_token"
 
 
 class TestLogin:

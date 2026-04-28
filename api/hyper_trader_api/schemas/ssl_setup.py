@@ -10,7 +10,7 @@ class SSLStatusResponse(BaseModel):
     """Response for SSL setup status check."""
 
     ssl_configured: bool
-    mode: Literal["domain", "ip_only"] | None = None
+    mode: str | None = None  # Loosened to str to tolerate legacy 'ip_only' rows
     domain: str | None = None
     configured_at: datetime | None = None
 
@@ -20,25 +20,24 @@ class SSLStatusResponse(BaseModel):
 class SSLSetupRequest(BaseModel):
     """Request to configure SSL."""
 
-    mode: Literal["domain", "ip_only"] = Field(
+    mode: Literal["domain"] = Field(
+        default="domain",
+        description="SSL mode: only 'domain' (Let's Encrypt) is supported",
+    )
+    domain: str = Field(
         ...,
-        description="SSL mode: 'domain' for Let's Encrypt, 'ip_only' for self-signed",
-    )
-    domain: str | None = Field(
-        default=None,
         pattern=r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$",
-        description="Domain name (required if mode is 'domain')",
+        description="Domain name (required)",
     )
-    email: EmailStr | None = Field(
-        default=None,
-        description="Email for Let's Encrypt notifications (required if mode is 'domain')",
+    email: EmailStr = Field(
+        ...,
+        description="Email for Let's Encrypt notifications (required)",
     )
 
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
                 {"mode": "domain", "domain": "trader.example.com", "email": "admin@example.com"},
-                {"mode": "ip_only"},
             ]
         }
     )

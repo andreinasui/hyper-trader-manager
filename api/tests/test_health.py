@@ -1,4 +1,5 @@
 """Tests for the /health endpoint."""
+
 from importlib.metadata import version
 
 from fastapi.testclient import TestClient

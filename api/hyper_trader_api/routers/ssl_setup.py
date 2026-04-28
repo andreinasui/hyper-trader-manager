@@ -45,7 +45,7 @@ async def get_ssl_status(
 
     # In development mode, skip SSL setup requirement
     if settings.environment == "development":
-        return SSLStatusResponse(ssl_configured=True, mode="ip_only")
+        return SSLStatusResponse(ssl_configured=True, mode="domain")
 
     service = SSLSetupService(db)
     config = service.get_ssl_config()
@@ -55,7 +55,7 @@ async def get_ssl_status(
 
     return SSLStatusResponse(
         ssl_configured=True,
-        mode=cast(Literal["domain", "ip_only"], config.mode),
+        mode=cast(Literal["domain"], config.mode),
         domain=config.domain,
         configured_at=config.configured_at,
     )
@@ -65,10 +65,7 @@ async def get_ssl_status(
     "/ssl",
     response_model=SSLSetupResponse,
     summary="Configure SSL/HTTPS",
-    description=(
-        "Configure SSL/HTTPS for the application. "
-        "Use mode='domain' for Let's Encrypt certificates or mode='ip_only' for self-signed."
-    ),
+    description=("Configure SSL/HTTPS for the application using Let's Encrypt certificates."),
 )
 async def configure_ssl(
     request: SSLSetupRequest,
@@ -78,17 +75,25 @@ async def configure_ssl(
     Configure SSL/HTTPS.
 
     Args:
-        request: SSLSetupRequest with mode, optional domain and email
+        request: SSLSetupRequest with domain and email
         db: Database session
 
     Returns:
-        SSLSetupResponse: success flag, message, and optional redirect_url
+        SSLSetupResponse: success flag, message, and redirect_url
 
     Raises:
+        HTTPException: 403 if not in production environment
         HTTPException: 400 if SSL is already configured
-        HTTPException: 422 if mode='domain' but domain or email is missing
         HTTPException: 500 if SSL setup fails
     """
+    # Only allow SSL setup in production
+    settings = get_settings()
+    if settings.environment != "production":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="SSL setup is only available in production environment",
+        )
+
     service = SSLSetupService(db)
 
     # Check if already configured
@@ -98,37 +103,16 @@ async def configure_ssl(
             detail="SSL is already configured",
         )
 
-    # Validate domain mode requirements
-    if request.mode == "domain":
-        if not request.domain:
-            raise HTTPException(
-                status_code=422,
-                detail="domain is required when mode is 'domain'",
-            )
-        if not request.email:
-            raise HTTPException(
-                status_code=422,
-                detail="email is required when mode is 'domain'",
-            )
-
     try:
-        if request.mode == "domain":
-            redirect_url = service.configure_domain_ssl(
-                domain=request.domain,  # type: ignore[arg-type]
-                email=str(request.email),
-            )
-            return SSLSetupResponse(
-                success=True,
-                message=f"SSL configured for domain {request.domain}. Redirecting to HTTPS...",
-                redirect_url=redirect_url,
-            )
-        else:
-            message = service.configure_ip_only_ssl()
-            return SSLSetupResponse(
-                success=True,
-                message=message,
-                redirect_url=None,
-            )
+        redirect_url = service.configure_domain_ssl(
+            domain=request.domain,
+            email=str(request.email),
+        )
+        return SSLSetupResponse(
+            success=True,
+            message=f"SSL configured for domain {request.domain}. Redirecting to HTTPS...",
+            redirect_url=redirect_url,
+        )
 
     except SSLSetupError as e:
         logger.error(f"SSL setup failed: {e}")

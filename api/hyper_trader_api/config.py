@@ -43,8 +43,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/hypertrader.db"
 
     # ==================== Self-Hosted Configuration ====================
-    data_dir: str = (
-        "./data"  # Base directory for app data (traefik config, certs, etc.)
+    data_dir: str = "./data"  # Base directory for app data (traefik config, certs, etc.)
+    traefik_config_dir: str = (
+        "/host-traefik"  # Path to Traefik config directory (bind-mounted from host)
     )
 
     @computed_field  # type: ignore[prop-decorator]

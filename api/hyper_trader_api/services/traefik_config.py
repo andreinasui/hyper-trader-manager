@@ -17,11 +17,12 @@ class TraefikConfigError(Exception):
 class TraefikConfigWriter:
     """Writes Traefik configuration files for SSL setup.
 
-    Generates traefik.yml and dynamic.yml for either Let's Encrypt (domain)
-    mode or self-signed certificate (IP-only) mode.
+    Generates traefik.yml (static config) and dynamic/10-tls.yml (TLS routing)
+    for Let's Encrypt (domain) mode. Uses directory provider pattern to coexist
+    with bootstrap config (dynamic/00-bootstrap.yml).
 
     Args:
-        config_dir: Directory where traefik.yml and dynamic.yml will be written.
+        config_dir: Directory where traefik.yml and dynamic/ subdirectory exist.
     """
 
     def __init__(self, config_dir: Path) -> None:
@@ -30,8 +31,9 @@ class TraefikConfigWriter:
     def write_domain_config(self, domain: str, email: str) -> None:
         """Write Traefik config files for Let's Encrypt (domain) mode.
 
-        Creates traefik.yml with ACME resolver and dynamic.yml with
-        Host-based routing rules using the provided domain.
+        Creates traefik.yml (static config with ACME resolver) and
+        dynamic/10-tls.yml (TLS routers that reference services defined
+        in dynamic/00-bootstrap.yml).
 
         Args:
             domain: The domain name for routing and TLS certificate.
@@ -42,12 +44,14 @@ class TraefikConfigWriter:
         """
         try:
             self.config_dir.mkdir(parents=True, exist_ok=True)
+            dynamic_dir = self.config_dir / "dynamic"
+            dynamic_dir.mkdir(parents=True, exist_ok=True)
 
             traefik_config = self._build_domain_traefik_yml(email)
             dynamic_config = self._build_domain_dynamic_yml(domain)
 
             self._write_yaml(self.config_dir / "traefik.yml", traefik_config)
-            self._write_yaml(self.config_dir / "dynamic.yml", dynamic_config)
+            self._write_yaml(dynamic_dir / "10-tls.yml", dynamic_config)
 
             logger.info(f"Wrote domain Traefik config for {domain!r} to {self.config_dir}")
 
@@ -57,66 +61,54 @@ class TraefikConfigWriter:
             logger.error(f"Failed to write domain Traefik config: {e}")
             raise TraefikConfigError(f"Failed to write domain Traefik config: {e}") from e
 
-    def write_ip_only_config(self) -> None:
-        """Write Traefik config files for self-signed certificate (IP-only) mode.
+    def backup_config(self) -> tuple[str, str | None] | None:
+        """Back up current traefik.yml and dynamic/10-tls.yml files.
 
-        Creates traefik.yml without ACME and dynamic.yml with PathPrefix-based
-        routing rules and TLS pointing to /certs/cert.pem and /certs/key.pem.
-
-        Raises:
-            TraefikConfigError: If writing configuration files fails.
-        """
-        try:
-            self.config_dir.mkdir(parents=True, exist_ok=True)
-
-            traefik_config = self._build_ip_only_traefik_yml()
-            dynamic_config = self._build_ip_only_dynamic_yml()
-
-            self._write_yaml(self.config_dir / "traefik.yml", traefik_config)
-            self._write_yaml(self.config_dir / "dynamic.yml", dynamic_config)
-
-            logger.info(f"Wrote IP-only Traefik config to {self.config_dir}")
-
-        except TraefikConfigError:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to write IP-only Traefik config: {e}")
-            raise TraefikConfigError(f"Failed to write IP-only Traefik config: {e}") from e
-
-    def backup_config(self) -> tuple[str, str] | None:
-        """Back up current traefik.yml and dynamic.yml files.
-
-        Returns both file contents as strings, or None if either file does
-        not exist (incomplete configuration).
+        Returns both file contents as strings. If traefik.yml doesn't exist,
+        returns None (incomplete config). If only 10-tls.yml is missing,
+        returns (traefik_content, None).
 
         Returns:
-            A tuple of (traefik_yml_content, dynamic_yml_content), or None
-            if the configuration is incomplete or missing.
+            A tuple of (traefik_yml_content, tls_yml_content | None), or None
+            if traefik.yml is missing.
         """
         traefik_path = self.config_dir / "traefik.yml"
-        dynamic_path = self.config_dir / "dynamic.yml"
+        tls_path = self.config_dir / "dynamic" / "10-tls.yml"
 
-        if not traefik_path.exists() or not dynamic_path.exists():
+        if not traefik_path.exists():
             return None
 
-        return (traefik_path.read_text(), dynamic_path.read_text())
+        traefik_content = traefik_path.read_text()
+        tls_content = tls_path.read_text() if tls_path.exists() else None
 
-    def restore_config(self, backup: tuple[str, str]) -> None:
-        """Restore traefik.yml and dynamic.yml from a backup.
+        return (traefik_content, tls_content)
+
+    def restore_config(self, backup: tuple[str, str | None]) -> None:
+        """Restore traefik.yml and dynamic/10-tls.yml from a backup.
 
         Args:
-            backup: A tuple of (traefik_yml_content, dynamic_yml_content)
-                as returned by backup_config().
+            backup: A tuple of (traefik_yml_content, tls_yml_content | None)
+                as returned by backup_config(). If tls_yml_content is None,
+                any existing dynamic/10-tls.yml is deleted (rollback case).
 
         Raises:
             TraefikConfigError: If restoring configuration files fails.
         """
         try:
             self.config_dir.mkdir(parents=True, exist_ok=True)
+            dynamic_dir = self.config_dir / "dynamic"
+            dynamic_dir.mkdir(parents=True, exist_ok=True)
 
-            traefik_content, dynamic_content = backup
+            traefik_content, tls_content = backup
             (self.config_dir / "traefik.yml").write_text(traefik_content)
-            (self.config_dir / "dynamic.yml").write_text(dynamic_content)
+
+            tls_path = dynamic_dir / "10-tls.yml"
+            if tls_content is not None:
+                tls_path.write_text(tls_content)
+            else:
+                # Rollback case: delete TLS config if it exists
+                if tls_path.exists():
+                    tls_path.unlink()
 
             logger.info(f"Restored Traefik config to {self.config_dir}")
 
@@ -129,10 +121,6 @@ class TraefikConfigWriter:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
-
-    def _dynamic_yml_path(self) -> str:
-        """Return the absolute path string for dynamic.yml."""
-        return str((self.config_dir / "dynamic.yml").absolute())
 
     def _build_domain_traefik_yml(self, email: str) -> dict:  # type: ignore[type-arg]
         """Build traefik.yml config dict for domain (Let's Encrypt) mode."""
@@ -153,6 +141,7 @@ class TraefikConfigWriter:
                     "address": ":443",
                 },
             },
+            "ping": {},
             "certificatesResolvers": {
                 "letsencrypt": {
                     "acme": {
@@ -166,18 +155,24 @@ class TraefikConfigWriter:
             },
             "providers": {
                 "file": {
-                    "filename": self._dynamic_yml_path(),
+                    "directory": "/etc/traefik/dynamic",
                     "watch": True,
                 }
             },
         }
 
     def _build_domain_dynamic_yml(self, domain: str) -> dict:  # type: ignore[type-arg]
-        """Build dynamic.yml config dict for domain (Let's Encrypt) mode."""
+        """Build dynamic/10-tls.yml config dict for domain (Let's Encrypt) mode.
+
+        Defines only TLS routers that reference services already defined in
+        dynamic/00-bootstrap.yml. Services are NOT redefined to avoid conflicts.
+        Router names are suffixed with '-tls' to avoid name collisions with
+        bootstrap routers (Traefik file provider de-duplicates by name).
+        """
         return {
             "http": {
                 "routers": {
-                    "health": {
+                    "health-tls": {
                         "rule": f"Host(`{domain}`) && Path(`/health`)",
                         "service": "api",
                         "entryPoints": ["websecure"],
@@ -186,7 +181,7 @@ class TraefikConfigWriter:
                             "certResolver": "letsencrypt",
                         },
                     },
-                    "api": {
+                    "api-tls": {
                         "rule": f"Host(`{domain}`) && PathPrefix(`/api`)",
                         "service": "api",
                         "entryPoints": ["websecure"],
@@ -195,7 +190,7 @@ class TraefikConfigWriter:
                             "certResolver": "letsencrypt",
                         },
                     },
-                    "web": {
+                    "web-tls": {
                         "rule": f"Host(`{domain}`)",
                         "service": "web",
                         "entryPoints": ["websecure"],
@@ -205,99 +200,7 @@ class TraefikConfigWriter:
                         },
                     },
                 },
-                "services": self._build_services(),
             }
-        }
-
-    def _build_ip_only_traefik_yml(self) -> dict:  # type: ignore[type-arg]
-        """Build traefik.yml config dict for IP-only (self-signed) mode."""
-        return {
-            "entryPoints": {
-                "web": {
-                    "address": ":80",
-                    "http": {
-                        "redirections": {
-                            "entryPoint": {
-                                "to": "websecure",
-                                "scheme": "https",
-                            }
-                        }
-                    },
-                },
-                "websecure": {
-                    "address": ":443",
-                },
-            },
-            "providers": {
-                "file": {
-                    "filename": self._dynamic_yml_path(),
-                    "watch": True,
-                }
-            },
-        }
-
-    def _build_ip_only_dynamic_yml(self) -> dict:  # type: ignore[type-arg]
-        """Build dynamic.yml config dict for IP-only (self-signed) mode."""
-        return {
-            "tls": {
-                "certificates": [
-                    {
-                        "certFile": "/certs/cert.pem",
-                        "keyFile": "/certs/key.pem",
-                    }
-                ]
-            },
-            "http": {
-                "routers": {
-                    "health": {
-                        "rule": "Path(`/health`)",
-                        "service": "api",
-                        "entryPoints": ["websecure"],
-                        "priority": 20,
-                        "tls": {},
-                    },
-                    "api": {
-                        "rule": "PathPrefix(`/api`)",
-                        "service": "api",
-                        "entryPoints": ["websecure"],
-                        "priority": 10,
-                        "tls": {},
-                    },
-                    "web": {
-                        "rule": "PathPrefix(`/`)",
-                        "service": "web",
-                        "entryPoints": ["websecure"],
-                        "priority": 1,
-                        "tls": {},
-                    },
-                },
-                "services": self._build_services(),
-            },
-        }
-
-    def _build_services(self) -> dict:  # type: ignore[type-arg]
-        """Build shared services config (api and web)."""
-        return {
-            "api": {
-                "loadBalancer": {
-                    "servers": [{"url": "http://api:8000"}],
-                    "healthCheck": {
-                        "path": "/health",
-                        "interval": "10s",
-                        "timeout": "5s",
-                    },
-                }
-            },
-            "web": {
-                "loadBalancer": {
-                    "servers": [{"url": "http://web:80"}],
-                    "healthCheck": {
-                        "path": "/health",
-                        "interval": "10s",
-                        "timeout": "5s",
-                    },
-                }
-            },
         }
 
     def _write_yaml(self, path: Path, data: dict) -> None:  # type: ignore[type-arg]

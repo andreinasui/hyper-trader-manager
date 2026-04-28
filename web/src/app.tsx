@@ -27,6 +27,7 @@ function AuthGuard(props: ParentProps) {
   const [initialized, setInitialized] = createSignal(false);
 
   onMount(async () => {
+    await authStore.checkSSL();
     await authStore.checkSetup();
     await authStore.checkAuth();
     setInitialized(true);

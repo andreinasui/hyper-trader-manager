@@ -119,9 +119,10 @@ export interface SetupStatusResponse {
 }
 
 export interface SSLStatusResponse {
-  configured: boolean;
-  mode?: "domain" | "ip";
+  ssl_configured: boolean;
+  mode?: "domain";
   domain?: string;
+  configured_at?: string;
 }
 
 export interface StartResponse {

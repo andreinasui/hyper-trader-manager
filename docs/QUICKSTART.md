@@ -203,22 +203,19 @@ curl http://localhost/health
 
 ### First-Time Setup (Web UI)
 
-1. Open `http://your-server-ip` in your browser
+1. Open `http://your-server-ip` (or `http://your-domain`) in your browser
 
-2. **Admin Setup**: Create your admin account
+2. **SSL Setup**: Configure HTTPS first — you'll be automatically redirected to `/setup/ssl`
+   - Enter your domain name (e.g., `trader.example.com`)
+   - Enter email for Let's Encrypt expiry notifications
+   - Traefik automatically obtains a trusted certificate via ACME HTTP-01 (~60 seconds)
+   - You are then redirected to `https://your-domain`
+
+3. **Admin Setup**: Once on HTTPS, create your admin account
    - Choose a username and strong password
    - This becomes your login for the dashboard
 
-3. **SSL Setup**: Configure HTTPS access
-   - **Option A: Domain + Let's Encrypt** (recommended)
-     - Enter your domain name (e.g., `trader.example.com`)
-     - Enter email for certificate notifications
-     - Traefik automatically obtains a trusted certificate
-   - **Option B: IP-only + Self-Signed**
-     - No domain required
-     - Browser will show security warning (expected)
-
-4. After SSL setup, you'll be redirected to HTTPS
+> **Note:** The admin bootstrap endpoint is gated on SSL being configured — you cannot create the admin user over plaintext HTTP. A real domain with public DNS is required; self-signed / IP-only deployments are not supported.
 
 ### Environment Variables
 
@@ -236,21 +233,16 @@ Key settings in `deploy/.env`:
 
 #### Let's Encrypt Requirements
 
-For automatic trusted certificates:
+HyperTrader uses Let's Encrypt for trusted HTTPS certificates. **A real domain is required** — self-signed / IP-only deployments are not supported.
+
 - Domain's DNS A record must point to your VPS IP
 - Ports 80 and 443 must be accessible from the internet
 - No firewall blocking inbound HTTP/HTTPS
-
-#### Self-Signed Certificates
-
-For IP-only access:
-- No domain required
-- Browser shows security warning on first visit
-- Click "Advanced" → "Proceed" to continue
+- Certificate issuance via ACME HTTP-01 takes up to 60 seconds
 
 #### Reconfigure SSL
 
-To change SSL settings:
+To change the domain or force re-issuance:
 
 ```bash
 # Delete SSL config from database

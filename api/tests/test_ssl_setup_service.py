@@ -1,14 +1,12 @@
 """
-Tests for SSL setup orchestration service.
+Tests for SSLSetupService.
 
 Covers:
-- SSLSetupError: custom exception class
-- SSLSetupService.get_ssl_config: returns current SSL config from DB
-- SSLSetupService.is_ssl_configured: checks if SSL is already configured
+- SSLSetupService.get_ssl_config: fetches the singleton SSLConfig
+- SSLSetupService.is_ssl_configured: checks if SSL has been set up
 - SSLSetupService.configure_domain_ssl: Let's Encrypt setup flow
-- SSLSetupService.configure_ip_only_ssl: self-signed cert setup flow
 - SSLSetupService._restart_traefik: Docker container restart
-- SSLSetupService._save_config: persists SSL config to DB
+- SSLSetupService._save_config: database persistence
 """
 
 from pathlib import Path
@@ -112,16 +110,6 @@ class TestIsSslConfigured:
         service = SSLSetupService(mock_db)
         assert service.is_ssl_configured() is True
 
-    def test_returns_true_when_ip_only_mode(self):
-        """is_ssl_configured returns True when mode is 'ip_only'."""
-        mock_db = MagicMock()
-        mock_config = MagicMock()
-        mock_config.mode = "ip_only"
-        mock_db.get.return_value = mock_config
-
-        service = SSLSetupService(mock_db)
-        assert service.is_ssl_configured() is True
-
 
 class TestRestartTraefik:
     """Tests for _restart_traefik private method."""
@@ -219,25 +207,12 @@ class TestSaveConfig:
 
         service = SSLSetupService(mock_db)
         before = datetime.now(UTC)
-        service._save_config(mode="ip_only", domain=None, email=None)
+        service._save_config(mode="domain", domain="example.com", email="admin@example.com")
         after = datetime.now(UTC)
 
         added_obj = mock_db.add.call_args[0][0]
         assert added_obj.configured_at is not None
         assert before <= added_obj.configured_at <= after
-
-    def test_ip_only_mode_has_no_domain_or_email(self):
-        """_save_config stores None domain and email for ip_only mode."""
-        mock_db = MagicMock()
-        mock_db.get.return_value = None
-
-        service = SSLSetupService(mock_db)
-        service._save_config(mode="ip_only", domain=None, email=None)
-
-        added_obj = mock_db.add.call_args[0][0]
-        assert added_obj.mode == "ip_only"
-        assert added_obj.domain is None
-        assert added_obj.email is None
 
 
 class TestConfigureDomainSsl:
@@ -261,16 +236,15 @@ class TestConfigureDomainSsl:
             ) as mock_writer_cls,
             patch("docker.from_env") as mock_docker,
         ):
-            mock_settings.return_value.data_dir = str(tmp_path)
+            mock_settings_obj = MagicMock()
+            mock_settings_obj.environment = "production"
+            mock_settings_obj.traefik_config_dir = str(tmp_path)
+            mock_settings.return_value = mock_settings_obj
             mock_writer = MagicMock()
             mock_writer_cls.return_value = mock_writer
             mock_writer.backup_config.return_value = None
             mock_container = MagicMock()
             mock_docker.return_value.containers.get.return_value = mock_container
-
-            # Create acme.json so the service doesn't fail
-            acme_dir = tmp_path / "letsencrypt"
-            acme_dir.mkdir(parents=True, exist_ok=True)
 
             result = service.configure_domain_ssl("example.com", "admin@example.com")
 
@@ -287,7 +261,10 @@ class TestConfigureDomainSsl:
             ) as mock_writer_cls,
             patch("docker.from_env") as mock_docker,
         ):
-            mock_settings.return_value.data_dir = str(tmp_path)
+            mock_settings_obj = MagicMock()
+            mock_settings_obj.environment = "production"
+            mock_settings_obj.traefik_config_dir = str(tmp_path)
+            mock_settings.return_value = mock_settings_obj
             mock_writer = MagicMock()
             mock_writer_cls.return_value = mock_writer
             mock_writer.backup_config.return_value = None
@@ -297,34 +274,6 @@ class TestConfigureDomainSsl:
             service.configure_domain_ssl("example.com", "admin@example.com")
 
         mock_writer.write_domain_config.assert_called_once_with("example.com", "admin@example.com")
-
-    def test_creates_acme_json_with_correct_permissions(self, tmp_path: Path):
-        """configure_domain_ssl creates acme.json with 0o600 permissions."""
-        service, mock_db = self._make_service_with_mocks(tmp_path)
-
-        with (
-            patch("hyper_trader_api.services.ssl_setup_service.get_settings") as mock_settings,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.TraefikConfigWriter"
-            ) as mock_writer_cls,
-            patch("docker.from_env") as mock_docker,
-        ):
-            mock_settings.return_value.data_dir = str(tmp_path)
-            mock_writer = MagicMock()
-            mock_writer_cls.return_value = mock_writer
-            mock_writer.backup_config.return_value = None
-            mock_container = MagicMock()
-            mock_docker.return_value.containers.get.return_value = mock_container
-
-            service.configure_domain_ssl("example.com", "admin@example.com")
-
-        acme_path = tmp_path / "letsencrypt" / "acme.json"
-        assert acme_path.exists()
-        # Check permissions: 0o600
-        import stat
-
-        file_mode = stat.S_IMODE(acme_path.stat().st_mode)
-        assert file_mode == 0o600
 
     def test_restarts_traefik_container(self, tmp_path: Path):
         """configure_domain_ssl restarts the Traefik container."""
@@ -337,7 +286,10 @@ class TestConfigureDomainSsl:
             ) as mock_writer_cls,
             patch("docker.from_env") as mock_docker,
         ):
-            mock_settings.return_value.data_dir = str(tmp_path)
+            mock_settings_obj = MagicMock()
+            mock_settings_obj.environment = "production"
+            mock_settings_obj.traefik_config_dir = str(tmp_path)
+            mock_settings.return_value = mock_settings_obj
             mock_writer = MagicMock()
             mock_writer_cls.return_value = mock_writer
             mock_writer.backup_config.return_value = None
@@ -361,7 +313,10 @@ class TestConfigureDomainSsl:
             ) as mock_writer_cls,
             patch("docker.from_env") as mock_docker,
         ):
-            mock_settings.return_value.data_dir = str(tmp_path)
+            mock_settings_obj = MagicMock()
+            mock_settings_obj.environment = "production"
+            mock_settings_obj.traefik_config_dir = str(tmp_path)
+            mock_settings.return_value = mock_settings_obj
             mock_writer = MagicMock()
             mock_writer_cls.return_value = mock_writer
             mock_writer.backup_config.return_value = None
@@ -387,10 +342,13 @@ class TestConfigureDomainSsl:
                 "hyper_trader_api.services.ssl_setup_service.TraefikConfigWriter"
             ) as mock_writer_cls,
         ):
-            mock_settings.return_value.data_dir = str(tmp_path)
+            mock_settings_obj = MagicMock()
+            mock_settings_obj.environment = "production"
+            mock_settings_obj.traefik_config_dir = str(tmp_path)
+            mock_settings.return_value = mock_settings_obj
             mock_writer = MagicMock()
             mock_writer_cls.return_value = mock_writer
-            backup = ("traefik: original\n", "dynamic: original\n")
+            backup = ("traefik: original\n", "http:\n  routers: {}\n")
             mock_writer.backup_config.return_value = backup
             mock_writer.write_domain_config.side_effect = TraefikConfigError("write failed")
 
@@ -410,10 +368,13 @@ class TestConfigureDomainSsl:
             ) as mock_writer_cls,
             patch("docker.from_env") as mock_docker,
         ):
-            mock_settings.return_value.data_dir = str(tmp_path)
+            mock_settings_obj = MagicMock()
+            mock_settings_obj.environment = "production"
+            mock_settings_obj.traefik_config_dir = str(tmp_path)
+            mock_settings.return_value = mock_settings_obj
             mock_writer = MagicMock()
             mock_writer_cls.return_value = mock_writer
-            backup = ("traefik: original\n", "dynamic: original\n")
+            backup = ("traefik: original\n", "http:\n  routers: {}\n")
             mock_writer.backup_config.return_value = backup
             mock_docker_client = MagicMock()
             mock_docker.return_value = mock_docker_client
@@ -426,204 +387,17 @@ class TestConfigureDomainSsl:
 
         mock_writer.restore_config.assert_called_once_with(backup)
 
-
-class TestConfigureIpOnlySsl:
-    """Tests for configure_ip_only_ssl method."""
-
-    def _make_service_with_mocks(self, tmp_path: Path):
-        """Create service with common mocks for IP-only SSL tests."""
+    def test_configure_domain_ssl_rejects_non_production_environment(self):
+        """configure_domain_ssl raises SSLSetupError when environment is not production."""
         mock_db = MagicMock()
         mock_db.get.return_value = None
         service = SSLSetupService(mock_db)
-        return service, mock_db
 
-    def test_returns_self_signed_message(self, tmp_path: Path):
-        """configure_ip_only_ssl returns a message about self-signed certificate."""
-        service, mock_db = self._make_service_with_mocks(tmp_path)
+        mock_settings = MagicMock()
+        mock_settings.environment = "development"
 
-        with (
-            patch("hyper_trader_api.services.ssl_setup_service.get_settings") as mock_settings,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.TraefikConfigWriter"
-            ) as mock_writer_cls,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.generate_self_signed_cert"
-            ) as mock_gen_cert,
-            patch("docker.from_env") as mock_docker,
+        with patch(
+            "hyper_trader_api.services.ssl_setup_service.get_settings", return_value=mock_settings
         ):
-            mock_settings.return_value.data_dir = str(tmp_path)
-            mock_writer = MagicMock()
-            mock_writer_cls.return_value = mock_writer
-            mock_writer.backup_config.return_value = None
-            mock_docker.return_value.containers.get.return_value = MagicMock()
-            mock_gen_cert.return_value = None
-
-            result = service.configure_ip_only_ssl()
-
-        assert isinstance(result, str)
-        assert len(result) > 0
-
-    def test_generates_self_signed_cert(self, tmp_path: Path):
-        """configure_ip_only_ssl calls generate_self_signed_cert."""
-        service, mock_db = self._make_service_with_mocks(tmp_path)
-
-        with (
-            patch("hyper_trader_api.services.ssl_setup_service.get_settings") as mock_settings,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.TraefikConfigWriter"
-            ) as mock_writer_cls,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.generate_self_signed_cert"
-            ) as mock_gen_cert,
-            patch("docker.from_env") as mock_docker,
-        ):
-            mock_settings.return_value.data_dir = str(tmp_path)
-            mock_writer = MagicMock()
-            mock_writer_cls.return_value = mock_writer
-            mock_writer.backup_config.return_value = None
-            mock_docker.return_value.containers.get.return_value = MagicMock()
-            mock_gen_cert.return_value = None
-
-            service.configure_ip_only_ssl()
-
-        mock_gen_cert.assert_called_once()
-
-    def test_writes_ip_only_traefik_config(self, tmp_path: Path):
-        """configure_ip_only_ssl calls TraefikConfigWriter.write_ip_only_config."""
-        service, mock_db = self._make_service_with_mocks(tmp_path)
-
-        with (
-            patch("hyper_trader_api.services.ssl_setup_service.get_settings") as mock_settings,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.TraefikConfigWriter"
-            ) as mock_writer_cls,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.generate_self_signed_cert"
-            ) as mock_gen_cert,
-            patch("docker.from_env") as mock_docker,
-        ):
-            mock_settings.return_value.data_dir = str(tmp_path)
-            mock_writer = MagicMock()
-            mock_writer_cls.return_value = mock_writer
-            mock_writer.backup_config.return_value = None
-            mock_docker.return_value.containers.get.return_value = MagicMock()
-            mock_gen_cert.return_value = None
-
-            service.configure_ip_only_ssl()
-
-        mock_writer.write_ip_only_config.assert_called_once()
-
-    def test_restarts_traefik_container(self, tmp_path: Path):
-        """configure_ip_only_ssl restarts the Traefik container."""
-        service, mock_db = self._make_service_with_mocks(tmp_path)
-
-        with (
-            patch("hyper_trader_api.services.ssl_setup_service.get_settings") as mock_settings,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.TraefikConfigWriter"
-            ) as mock_writer_cls,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.generate_self_signed_cert"
-            ) as mock_gen_cert,
-            patch("docker.from_env") as mock_docker,
-        ):
-            mock_settings.return_value.data_dir = str(tmp_path)
-            mock_writer = MagicMock()
-            mock_writer_cls.return_value = mock_writer
-            mock_writer.backup_config.return_value = None
-            mock_docker_client = MagicMock()
-            mock_container = MagicMock()
-            mock_docker.return_value = mock_docker_client
-            mock_docker_client.containers.get.return_value = mock_container
-            mock_gen_cert.return_value = None
-
-            service.configure_ip_only_ssl()
-
-        mock_container.restart.assert_called_once_with(timeout=30)
-
-    def test_saves_ip_only_config_to_database(self, tmp_path: Path):
-        """configure_ip_only_ssl saves ip_only config to the database."""
-        service, mock_db = self._make_service_with_mocks(tmp_path)
-
-        with (
-            patch("hyper_trader_api.services.ssl_setup_service.get_settings") as mock_settings,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.TraefikConfigWriter"
-            ) as mock_writer_cls,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.generate_self_signed_cert"
-            ) as mock_gen_cert,
-            patch("docker.from_env") as mock_docker,
-        ):
-            mock_settings.return_value.data_dir = str(tmp_path)
-            mock_writer = MagicMock()
-            mock_writer_cls.return_value = mock_writer
-            mock_writer.backup_config.return_value = None
-            mock_docker.return_value.containers.get.return_value = MagicMock()
-            mock_gen_cert.return_value = None
-
-            service.configure_ip_only_ssl()
-
-        mock_db.commit.assert_called_once()
-        added_obj = mock_db.add.call_args[0][0]
-        assert added_obj.mode == "ip_only"
-        assert added_obj.domain is None
-        assert added_obj.email is None
-
-    def test_restores_backup_and_raises_on_cert_generation_failure(self, tmp_path: Path):
-        """configure_ip_only_ssl restores backup and raises SSLSetupError on cert failure."""
-        from hyper_trader_api.services.cert_generator import CertGeneratorError
-
-        service, mock_db = self._make_service_with_mocks(tmp_path)
-
-        with (
-            patch("hyper_trader_api.services.ssl_setup_service.get_settings") as mock_settings,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.TraefikConfigWriter"
-            ) as mock_writer_cls,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.generate_self_signed_cert"
-            ) as mock_gen_cert,
-        ):
-            mock_settings.return_value.data_dir = str(tmp_path)
-            mock_writer = MagicMock()
-            mock_writer_cls.return_value = mock_writer
-            backup = ("traefik: original\n", "dynamic: original\n")
-            mock_writer.backup_config.return_value = backup
-            mock_gen_cert.side_effect = CertGeneratorError("cert generation failed")
-
-            with pytest.raises(SSLSetupError):
-                service.configure_ip_only_ssl()
-
-        mock_writer.restore_config.assert_called_once_with(backup)
-
-    def test_restores_backup_and_raises_on_traefik_restart_failure(self, tmp_path: Path):
-        """configure_ip_only_ssl restores backup and raises SSLSetupError on restart failure."""
-        service, mock_db = self._make_service_with_mocks(tmp_path)
-
-        with (
-            patch("hyper_trader_api.services.ssl_setup_service.get_settings") as mock_settings,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.TraefikConfigWriter"
-            ) as mock_writer_cls,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.generate_self_signed_cert"
-            ) as mock_gen_cert,
-            patch("docker.from_env") as mock_docker,
-        ):
-            mock_settings.return_value.data_dir = str(tmp_path)
-            mock_writer = MagicMock()
-            mock_writer_cls.return_value = mock_writer
-            backup = ("traefik: original\n", "dynamic: original\n")
-            mock_writer.backup_config.return_value = backup
-            mock_gen_cert.return_value = None
-            mock_docker_client = MagicMock()
-            mock_docker.return_value = mock_docker_client
-            mock_docker_client.containers.get.side_effect = SSLSetupError(
-                "Traefik container not found"
-            )
-
-            with pytest.raises(SSLSetupError):
-                service.configure_ip_only_ssl()
-
-        mock_writer.restore_config.assert_called_once_with(backup)
+            with pytest.raises(SSLSetupError, match="SSL setup is only available in production"):
+                service.configure_domain_ssl("example.com", "admin@example.com")

@@ -351,21 +351,6 @@ class TestSSLConfigModel:
         assert config.created_at is not None
         assert config.updated_at is not None
 
-    def test_ssl_config_creation_with_ip_only_mode(self, sqlite_session):
-        """SSLConfig can be created with ip_only (self-signed) mode."""
-        config = SSLConfig(
-            id=1,
-            mode="ip_only",
-        )
-        sqlite_session.add(config)
-        sqlite_session.commit()
-
-        assert config.id == 1
-        assert config.mode == "ip_only"
-        assert config.domain is None
-        assert config.email is None
-        assert config.configured_at is None
-
     def test_ssl_config_all_optional_fields_nullable(self, sqlite_session):
         """SSLConfig can be created with only id set (all optional fields null)."""
         config = SSLConfig(id=1)
@@ -386,18 +371,17 @@ class TestSSLConfigModel:
         sqlite_session.commit()
 
         # Attempting to add a second row with the same id should fail
-        config2 = SSLConfig(id=1, mode="ip_only")
+        config2 = SSLConfig(id=1, mode="domain", domain="second.com")
         sqlite_session.add(config2)
         with pytest.raises(IntegrityError):
             sqlite_session.commit()
 
     def test_ssl_config_update_mode(self, sqlite_session):
         """SSLConfig mode can be updated."""
-        config = SSLConfig(id=1, mode="ip_only")
+        config = SSLConfig(id=1, mode="domain", domain="initial.com", email="admin@initial.com")
         sqlite_session.add(config)
         sqlite_session.commit()
 
-        config.mode = "domain"
         config.domain = "updated.com"
         config.email = "new@updated.com"
         sqlite_session.commit()

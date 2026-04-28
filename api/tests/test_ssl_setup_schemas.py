@@ -42,35 +42,36 @@ class TestSSLStatusResponse:
         assert response.domain == "trader.example.com"
         assert response.configured_at == configured_at
 
-    def test_ssl_configured_with_ip_only_mode(self):
-        """SSLStatusResponse can represent ip_only (self-signed) mode."""
+    def test_mode_accepts_legacy_ip_only(self):
+        """Mode accepts 'ip_only' for legacy database rows (no migration)."""
         response = SSLStatusResponse(
             ssl_configured=True,
             mode="ip_only",
-            configured_at=datetime.now(UTC),
+            domain=None,
         )
-
-        assert response.ssl_configured is True
         assert response.mode == "ip_only"
-        assert response.domain is None
 
-    def test_mode_only_accepts_domain_or_ip_only(self):
-        """Mode must be 'domain' or 'ip_only' - rejects invalid values."""
-        with pytest.raises(ValidationError):
-            SSLStatusResponse(ssl_configured=True, mode="invalid_mode")
+    def test_mode_accepts_any_string(self):
+        """Mode accepts any string value for forward compatibility."""
+        response = SSLStatusResponse(
+            ssl_configured=True,
+            mode="future_mode",
+            domain=None,
+        )
+        assert response.mode == "future_mode"
 
     def test_from_attributes_enabled(self):
         """SSLStatusResponse supports ORM from_attributes mode."""
 
         class FakeORM:
             ssl_configured = True
-            mode = "ip_only"
-            domain = None
+            mode = "domain"
+            domain = "example.com"
             configured_at = None
 
         response = SSLStatusResponse.model_validate(FakeORM(), from_attributes=True)
         assert response.ssl_configured is True
-        assert response.mode == "ip_only"
+        assert response.mode == "domain"
 
 
 class TestSSLSetupRequest:
@@ -88,18 +89,32 @@ class TestSSLSetupRequest:
         assert request.domain == "trader.example.com"
         assert request.email == "admin@example.com"
 
-    def test_ip_only_mode_minimal(self):
-        """IP-only mode can be set with just the mode field."""
-        request = SSLSetupRequest(mode="ip_only")
+    def test_mode_defaults_to_domain(self):
+        """Mode defaults to 'domain' if not specified."""
+        request = SSLSetupRequest(
+            domain="trader.example.com",
+            email="admin@example.com",
+        )
+        assert request.mode == "domain"
 
-        assert request.mode == "ip_only"
-        assert request.domain is None
-        assert request.email is None
+    def test_domain_and_email_are_required(self):
+        """Domain and email are required fields."""
+        with pytest.raises(ValidationError) as exc_info:
+            SSLSetupRequest()
+
+        errors = exc_info.value.errors()
+        field_names = {error["loc"][0] for error in errors}
+        assert "domain" in field_names
+        assert "email" in field_names
 
     def test_mode_rejects_invalid_values(self):
-        """Mode only accepts 'domain' or 'ip_only'."""
+        """Mode only accepts 'domain'."""
         with pytest.raises(ValidationError):
-            SSLSetupRequest(mode="self_signed")
+            SSLSetupRequest(
+                mode="ip_only",
+                domain="example.com",
+                email="user@example.com",
+            )
 
     def test_domain_pattern_valid_simple(self):
         """Valid simple domain is accepted."""
@@ -147,14 +162,7 @@ class TestSSLSetupRequest:
         """Schema includes examples for documentation purposes."""
         schema = SSLSetupRequest.model_json_schema()
         examples = schema.get("examples") or []
-        assert len(examples) >= 2
-
-    def test_domain_and_email_are_optional_fields(self):
-        """Domain and email are optional fields (not required at the Pydantic level)."""
-        # This should not raise - business logic validation is in the router/service layer
-        request = SSLSetupRequest(mode="domain")
-        assert request.domain is None
-        assert request.email is None
+        assert len(examples) >= 1
 
 
 class TestSSLSetupResponse:
