@@ -24,8 +24,7 @@ PINNED_VERSION=""
 REPO_OWNER="andreinasui"
 REPO_NAME="hyper-trader-manager"
 INSTALL_DIR="/opt/hyper-trader"
-SERVICE_NAME="hyper-trader"
-SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+MANAGER_BIN="/usr/local/bin/hyper-trader-manager"
 GHCR_PREFIX="ghcr.io/${REPO_OWNER}"
 GITHUB_API="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}"
 GITHUB_RAW="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}"
@@ -38,12 +37,15 @@ BLUE='\033[0;34m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-info()    { echo -e "${BLUE}[INFO]${RESET}  $*"; }
+info() { echo -e "${BLUE}[INFO]${RESET}  $*"; }
 success() { echo -e "${GREEN}[OK]${RESET}    $*"; }
-warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
-error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
-die()     { error "$*"; exit 1; }
-header()  { echo -e "\n${BOLD}${BLUE}==> $*${RESET}"; }
+warn() { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
+error() { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
+die() {
+  error "$*"
+  exit 1
+}
+header() { echo -e "\n${BOLD}${BLUE}==> $*${RESET}"; }
 
 # ── Phase 1: Prerequisites ────────────────────────────────────────────────────
 header "Checking prerequisites"
@@ -60,57 +62,52 @@ command -v docker &>/dev/null || die "Docker is not installed. Install Docker fi
 # Docker daemon must be running
 docker info &>/dev/null || die "Docker daemon is not running. Start it with: systemctl start docker"
 
-# Detect compose command (plugin preferred, standalone fallback)
+# docker compose (plugin or standalone) must be available
 if docker compose version &>/dev/null 2>&1; then
-    COMPOSE_CMD="docker compose"
-    COMPOSE_BIN="/usr/bin/docker"
-    COMPOSE_ARGS="compose"
+  success "Compose: docker compose (plugin)"
 elif command -v docker-compose &>/dev/null; then
-    COMPOSE_CMD="docker-compose"
-    COMPOSE_BIN="$(command -v docker-compose)"
-    COMPOSE_ARGS=""
+  success "Compose: docker-compose (standalone)"
 else
-    die "Neither 'docker compose' plugin nor 'docker-compose' standalone was found. Install Docker Compose: https://docs.docker.com/compose/install/"
+  die "Neither 'docker compose' plugin nor 'docker-compose' standalone was found. Install Docker Compose: https://docs.docker.com/compose/install/"
 fi
-success "Compose command: ${COMPOSE_CMD}"
 
 # Detect the real user who invoked sudo (for ownership of install directory)
 if [[ -n "${SUDO_USER:-}" ]]; then
-    REAL_USER="${SUDO_USER}"
-    REAL_GROUP=$(id -gn "${SUDO_USER}")
+  REAL_USER="${SUDO_USER}"
+  REAL_GROUP=$(id -gn "${SUDO_USER}")
 else
-    REAL_USER="root"
-    REAL_GROUP="root"
-    warn "Not invoked via sudo — install directory will be owned by root."
+  REAL_USER="root"
+  REAL_GROUP="root"
+  warn "Not invoked via sudo — install directory will be owned by root."
 fi
 success "Install directory will be owned by: ${REAL_USER}:${REAL_GROUP}"
 
 # Already-installed guard
 if [[ -d "${INSTALL_DIR}" ]]; then
-    warn "Already installed at ${INSTALL_DIR}. To reinstall, remove that directory first."
-    exit 0
+  warn "Already installed at ${INSTALL_DIR}. To reinstall, remove that directory first."
+  exit 0
 fi
 
 # ── Phase 2: Resolve release version ─────────────────────────────────────────
 header "Resolving release version"
 
 if [[ -n "${PINNED_VERSION}" ]]; then
-    RELEASE_TAG="${PINNED_VERSION}"        # e.g. v0.2.0  — used as git ref
-    IMAGE_TAG="${PINNED_VERSION#v}"        # e.g.  0.2.0  — used as image tag
-    success "Using pinned version: ${RELEASE_TAG} (image tag: ${IMAGE_TAG})"
+  RELEASE_TAG="${PINNED_VERSION}" # e.g. v0.2.0  — used as git ref
+  IMAGE_TAG="${PINNED_VERSION#v}" # e.g.  0.2.0  — used as image tag
+  success "Using pinned version: ${RELEASE_TAG} (image tag: ${IMAGE_TAG})"
 else
-    RELEASE_JSON=$(curl -sf "${GITHUB_API}/releases/latest" 2>/dev/null || true)
+  RELEASE_JSON=$(curl -sf "${GITHUB_API}/releases/latest" 2>/dev/null || true)
 
-    if [[ -n "${RELEASE_JSON}" ]] && echo "${RELEASE_JSON}" | grep -q '"tag_name"'; then
-        RAW_TAG=$(echo "${RELEASE_JSON}" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
-        RELEASE_TAG="${RAW_TAG}"           # e.g. v0.2.0  — used as git ref
-        IMAGE_TAG="${RAW_TAG#v}"           # e.g.  0.2.0  — used as image tag
-        success "Latest release: ${RELEASE_TAG} (image tag: ${IMAGE_TAG})"
-    else
-        warn "No releases found — downloading files from 'main' branch and using 'latest' image tag."
-        RELEASE_TAG="main"
-        IMAGE_TAG="latest"
-    fi
+  if [[ -n "${RELEASE_JSON}" ]] && echo "${RELEASE_JSON}" | grep -q '"tag_name"'; then
+    RAW_TAG=$(echo "${RELEASE_JSON}" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+    RELEASE_TAG="${RAW_TAG}" # e.g. v0.2.0  — used as git ref
+    IMAGE_TAG="${RAW_TAG#v}" # e.g.  0.2.0  — used as image tag
+    success "Latest release: ${RELEASE_TAG} (image tag: ${IMAGE_TAG})"
+  else
+    warn "No releases found — downloading files from 'main' branch and using 'latest' image tag."
+    RELEASE_TAG="main"
+    IMAGE_TAG="latest"
+  fi
 fi
 
 # ── Phase 3: Create directory structure ──────────────────────────────────────
@@ -128,19 +125,20 @@ header "Downloading application files (ref: ${RELEASE_TAG})"
 RAW_BASE="${GITHUB_RAW}/${RELEASE_TAG}"
 
 download() {
-    local url="$1"
-    local dest="$2"
-    info "  ${url}"
-    if ! curl -fsSL "${url}" -o "${dest}"; then
-        die "Failed to download: ${url}"
-    fi
+  local url="$1"
+  local dest="$2"
+  info "  ${url}"
+  if ! curl -fsSL "${url}" -o "${dest}"; then
+    die "Failed to download: ${url}"
+  fi
 }
 
 download "${RAW_BASE}/deploy/docker-compose.prod.yml" "${INSTALL_DIR}/deploy/docker-compose.prod.yml"
-download "${RAW_BASE}/deploy/.env.example"            "${INSTALL_DIR}/deploy/.env.example"
-download "${RAW_BASE}/api/.env.example"               "${INSTALL_DIR}/deploy/api.env.example"
-download "${RAW_BASE}/data/traefik/traefik.yml"       "${INSTALL_DIR}/deploy/data/traefik/traefik.yml"
+download "${RAW_BASE}/deploy/.env.example" "${INSTALL_DIR}/deploy/.env.example"
+download "${RAW_BASE}/api/.env.example" "${INSTALL_DIR}/deploy/api.env.example"
+download "${RAW_BASE}/data/traefik/traefik.yml" "${INSTALL_DIR}/deploy/data/traefik/traefik.yml"
 download "${RAW_BASE}/data/traefik/dynamic/00-bootstrap.yml" "${INSTALL_DIR}/deploy/data/traefik/dynamic/00-bootstrap.yml"
+download "${RAW_BASE}/scripts/hyper-trader-manager.sh" "${MANAGER_BIN}"
 
 success "Files downloaded."
 
@@ -148,11 +146,11 @@ success "Files downloaded."
 header "Detecting Docker socket and GID"
 
 if [[ -S "/var/run/docker.sock" ]]; then
-    DOCKER_SOCK="/var/run/docker.sock"
+  DOCKER_SOCK="/var/run/docker.sock"
 elif [[ -S "/run/docker.sock" ]]; then
-    DOCKER_SOCK="/run/docker.sock"
+  DOCKER_SOCK="/run/docker.sock"
 else
-    die "Docker socket not found at /var/run/docker.sock or /run/docker.sock. Is Docker running?"
+  die "Docker socket not found at /var/run/docker.sock or /run/docker.sock. Is Docker running?"
 fi
 
 DOCKER_GID=$(stat -c '%g' "${DOCKER_SOCK}")
@@ -168,8 +166,8 @@ DEPLOY_DIR="${INSTALL_DIR}/deploy"
 # --- deploy/.env ---
 cp "${DEPLOY_DIR}/.env.example" "${DEPLOY_DIR}/.env"
 
-sed -i "s|^DOCKER_GID=.*|DOCKER_GID=${DOCKER_GID}|"         "${DEPLOY_DIR}/.env"
-sed -i "s|^DOCKER_SOCK=.*|DOCKER_SOCK=${DOCKER_SOCK}|"       "${DEPLOY_DIR}/.env"
+sed -i "s|^DOCKER_GID=.*|DOCKER_GID=${DOCKER_GID}|" "${DEPLOY_DIR}/.env"
+sed -i "s|^DOCKER_SOCK=.*|DOCKER_SOCK=${DOCKER_SOCK}|" "${DEPLOY_DIR}/.env"
 sed -i "s|^HYPERTRADER_API_IMAGE=.*|HYPERTRADER_API_IMAGE=${GHCR_PREFIX}/${REPO_NAME}-api:${IMAGE_TAG}|" "${DEPLOY_DIR}/.env"
 sed -i "s|^HYPERTRADER_WEB_IMAGE=.*|HYPERTRADER_WEB_IMAGE=${GHCR_PREFIX}/${REPO_NAME}-web:${IMAGE_TAG}|" "${DEPLOY_DIR}/.env"
 
@@ -184,52 +182,19 @@ success "Created ${DEPLOY_DIR}/api.env"
 chown -R "${REAL_USER}:${REAL_GROUP}" "${INSTALL_DIR}"
 success "Ownership set to ${REAL_USER}:${REAL_GROUP}"
 
-# ── Phase 7: Create systemd service ──────────────────────────────────────────
-header "Creating systemd service"
+# The API container runs as UID 1000 (hypertrader) and needs to write Traefik
+# config files into data/traefik. Ensure that directory is owned by UID 1000
+# regardless of who invoked the install script (e.g. root on a root-only VPS).
+chown -R 1000:1000 "${INSTALL_DIR}/deploy/data/traefik"
+success "Traefik config directory ownership set to 1000:1000 (API container user)"
 
-# Build ExecStart / ExecStop lines based on detected compose command
-if [[ "${COMPOSE_CMD}" == "docker compose" ]]; then
-    EXEC_START="${COMPOSE_BIN} ${COMPOSE_ARGS} -f ${DEPLOY_DIR}/docker-compose.prod.yml up -d --pull always"
-    EXEC_STOP="${COMPOSE_BIN} ${COMPOSE_ARGS} -f ${DEPLOY_DIR}/docker-compose.prod.yml down"
-else
-    EXEC_START="${COMPOSE_BIN} -f ${DEPLOY_DIR}/docker-compose.prod.yml up -d --pull always"
-    EXEC_STOP="${COMPOSE_BIN} -f ${DEPLOY_DIR}/docker-compose.prod.yml down"
-fi
+# ── Phase 7: Install management script ───────────────────────────────────────
+header "Installing management script"
 
-cat > "${SERVICE_FILE}" <<EOF
-[Unit]
-Description=HyperTrader Manager
-After=docker.service
-Requires=docker.service
+chmod +x "${MANAGER_BIN}"
+success "Installed: ${MANAGER_BIN}"
 
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=${DEPLOY_DIR}
-ExecStart=${EXEC_START}
-ExecStop=${EXEC_STOP}
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-success "Created ${SERVICE_FILE}"
-
-# ── Phase 8: Enable and start ─────────────────────────────────────────────────
-header "Enabling and starting service"
-
-systemctl daemon-reload
-systemctl enable "${SERVICE_NAME}"
-
-if systemctl start "${SERVICE_NAME}"; then
-    success "Service started."
-else
-    warn "Service failed to start. This may be expected if images are not yet available in the registry."
-    warn "Check logs with: journalctl -u ${SERVICE_NAME} -n 50"
-fi
-
-# ── Phase 9: Summary ──────────────────────────────────────────────────────────
+# ── Phase 8: Summary ──────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}${GREEN}════════════════════════════════════════${RESET}"
 echo -e "${BOLD}${GREEN}  HyperTrader Manager — Install Complete${RESET}"
@@ -239,9 +204,6 @@ echo -e "  ${BOLD}Install directory:${RESET} ${INSTALL_DIR}"
 echo -e "  ${BOLD}Release:${RESET}           ${RELEASE_TAG}"
 echo -e "  ${BOLD}API image:${RESET}         ${GHCR_PREFIX}/${REPO_NAME}-api:${IMAGE_TAG}"
 echo -e "  ${BOLD}Web image:${RESET}         ${GHCR_PREFIX}/${REPO_NAME}-web:${IMAGE_TAG}"
-echo ""
-echo -e "  ${BOLD}Service status:${RESET}"
-systemctl status "${SERVICE_NAME}" --no-pager --lines=5 2>/dev/null || true
 echo ""
 echo -e "${YELLOW}${BOLD}  !! Post-install configuration required:${RESET}"
 echo ""
@@ -253,6 +215,14 @@ echo -e "  Edit ${BOLD}${DEPLOY_DIR}/.env${RESET} if you need non-standard ports
 echo -e "    -> PUBLIC_PORT (default: 80)"
 echo -e "    -> HTTPS_PUBLIC_PORT (default: 443)"
 echo ""
-echo -e "  After editing, restart the service:"
-echo -e "    ${BOLD}systemctl restart ${SERVICE_NAME}${RESET}"
+echo -e "  After editing, start the service:"
+echo -e "    ${BOLD}hyper-trader-manager start${RESET}"
+echo ""
+echo -e "  Management commands:"
+echo -e "    ${BOLD}hyper-trader-manager start${RESET}    — pull images and start"
+echo -e "    ${BOLD}hyper-trader-manager stop${RESET}     — stop all containers"
+echo -e "    ${BOLD}hyper-trader-manager restart${RESET}  — stop then start"
+echo -e "    ${BOLD}hyper-trader-manager status${RESET}   — show container status"
+echo -e "    ${BOLD}hyper-trader-manager logs${RESET}     — follow logs"
+echo -e "    ${BOLD}hyper-trader-manager update${RESET}   — pull new images and restart"
 echo ""
