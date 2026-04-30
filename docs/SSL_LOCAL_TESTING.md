@@ -26,9 +26,16 @@ Traefik config; vitest covers the redirect guard. Run those first.
 
 ## Setup (one-time)
 
+Run from the **repo root**:
+
 ```bash
 cp deploy/.env.api.pebble.example deploy/.env.api.pebble
+cp data/traefik/traefik.template.yml data/traefik-pebble/traefik.yml
+touch data/traefik-pebble/acme.json && chmod 600 data/traefik-pebble/acme.json
 ```
+
+`data/traefik-pebble/traefik.yml` and `acme.json` are gitignored — they're safe to
+delete and recreate. `data/traefik/` is never touched by the Pebble stack.
 
 ## Run the stack
 
@@ -36,10 +43,9 @@ Use the combined `docker-compose.dev_ssl.yml` file (merges `docker-compose.dev.y
 `docker-compose.pebble.yml` into a single file):
 
 ```bash
-cd deploy
 docker compose \
-  -f docker-compose.dev_ssl.yml \
-  --env-file .env \
+  -f deploy/docker-compose.dev_ssl.yml \
+  --env-file deploy/.env \
   up -d --build
 ```
 
@@ -47,11 +53,10 @@ docker compose \
 <summary>Alternative: two-file overlay approach</summary>
 
 ```bash
-cd deploy
 docker compose \
-  -f docker-compose.dev.yml \
-  -f docker-compose.pebble.yml \
-  --env-file .env \
+  -f deploy/docker-compose.dev.yml \
+  -f deploy/docker-compose.pebble.yml \
+  --env-file deploy/.env \
   up -d --build
 ```
 </details>
@@ -117,12 +122,22 @@ Three things make the e2e work, all defined in `docker-compose.dev_ssl.yml`
 
 ## Reset
 
+Run from the **repo root**:
+
 ```bash
-cd deploy
-docker compose -f docker-compose.dev_ssl.yml down -v   # -v also wipes the sqlite volume
-rm -f data/traefik/acme.json data/traefik/dynamic/10-tls.yml
-git checkout -- data/traefik/traefik.yml   # if you committed the bootstrap
+docker compose -f deploy/docker-compose.dev_ssl.yml down -v
+
+# Wipe Pebble runtime files
+rm -f data/traefik-pebble/traefik.yml \
+      data/traefik-pebble/acme.json \
+      data/traefik-pebble/dynamic/10-tls.yml
+
+# Re-initialise for the next run
+cp data/traefik/traefik.template.yml data/traefik-pebble/traefik.yml
+touch data/traefik-pebble/acme.json && chmod 600 data/traefik-pebble/acme.json
 ```
+
+`data/traefik/` is never modified by the Pebble stack — no `git checkout` needed.
 
 ## Why not just run real Let's Encrypt locally?
 

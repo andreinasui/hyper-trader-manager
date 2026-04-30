@@ -233,6 +233,26 @@ docker compose restart
 | `data/traefik/certs/` | Self-signed certificate files |
 | `data/traefik/acme.json` | Let's Encrypt certificate store (mode 600) |
 
+## Docker Compose Dev Stack
+
+`deploy/docker-compose.dev.yml` runs the full stack locally in Docker (Traefik +
+API + Web). This is separate from the standard `just api` / `just web` dev workflow;
+use it when you need to test the containerised stack.
+
+`data/traefik/traefik.yml` is gitignored — create it from the template before first
+run:
+
+```bash
+# From repo root (one-time)
+cp data/traefik/traefik.template.yml data/traefik/traefik.yml
+touch data/traefik/acme.json && chmod 600 data/traefik/acme.json
+
+# Start
+docker compose -f deploy/docker-compose.dev.yml --env-file deploy/.env up -d --build
+```
+
+For local SSL testing with Pebble, see [docs/SSL_LOCAL_TESTING.md](docs/SSL_LOCAL_TESTING.md).
+
 ## Production Deployment
 
 See [README.md](README.md) for production deployment with Docker Compose.

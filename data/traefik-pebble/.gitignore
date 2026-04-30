@@ -1,0 +1,7 @@
+# Runtime files written during Pebble SSL testing.
+# Only dynamic/00-bootstrap.yml belongs in version control.
+traefik.yml
+acme.json
+certs/
+dynamic/*
+!dynamic/00-bootstrap.yml

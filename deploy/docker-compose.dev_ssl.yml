@@ -4,9 +4,14 @@
 # Combines docker-compose.dev.yml + docker-compose.pebble.yml into a single file.
 #
 # Usage:
-#   1. (one-time) cp deploy/.env.api.pebble.example deploy/.env.api.pebble
-#   2. cd deploy
-#      docker compose -f docker-compose.dev_ssl.yml --env-file .env up -d --build
+#   One-time setup (from repo root):
+#     cp deploy/.env.api.pebble.example deploy/.env.api.pebble
+#     cp data/traefik/traefik.template.yml data/traefik-pebble/traefik.yml
+#     touch data/traefik-pebble/acme.json && chmod 600 data/traefik-pebble/acme.json
+#
+#   Start the stack (from repo root):
+#     docker compose -f deploy/docker-compose.dev_ssl.yml --env-file deploy/.env up -d --build
+#
 #   3. browse to http://hypertrader.localtest.me/
 #   4. submit the SSL wizard with domain=hypertrader.localtest.me
 #   5. browser ends up on https://hypertrader.localtest.me (cert from Pebble —
@@ -33,8 +38,8 @@ services:
     environment:
       - LEGO_CA_CERTIFICATES=/etc/ssl/pebble.minica.pem
     volumes:
-      - ../data/traefik:/etc/traefik:ro
-      - ../data/traefik/acme.json:/letsencrypt/acme.json
+      - ../data/traefik-pebble:/etc/traefik:ro
+      - ../data/traefik-pebble/acme.json:/letsencrypt/acme.json
       - ./pebble/pebble.minica.pem:/etc/ssl/pebble.minica.pem:ro
     networks:
       hypertrader:
@@ -66,8 +71,8 @@ services:
       - ../data/sqlitedb/:/app/data
       # Docker socket access for managing trader containers
       - ${DOCKER_SOCK}:/var/run/docker.sock
-      # Bind mount for Traefik config (wizard writes here)
-      - ../data/traefik:/host-traefik
+      # Bind mount for Traefik config (wizard writes here — isolated from data/traefik/)
+      - ../data/traefik-pebble:/host-traefik
     networks:
       - hypertrader
     healthcheck:
