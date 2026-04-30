@@ -1,0 +1,136 @@
+# HyperTrader Manager Stack — dev with local SSL (Pebble)
+#
+# Self-contained compose file for testing the SSL wizard end-to-end locally.
+# Combines docker-compose.dev.yml + docker-compose.pebble.yml into a single file.
+#
+# Usage:
+#   1. (one-time) cp deploy/.env.api.pebble.example deploy/.env.api.pebble
+#   2. cd deploy
+#      docker compose -f docker-compose.dev_ssl.yml --env-file .env up -d --build
+#   3. browse to http://hypertrader.localtest.me/
+#   4. submit the SSL wizard with domain=hypertrader.localtest.me
+#   5. browser ends up on https://hypertrader.localtest.me (cert from Pebble —
+#      browser will warn; trust it once for testing)
+#
+# To return to vanilla dev: use docker-compose.dev.yml instead.
+
+services:
+  # ============================================
+  # Traefik reverse proxy
+  # Routes /api/* → api, /* → web
+  # Also answers to hypertrader.localtest.me on the internal docker network so
+  # Pebble's HTTP-01 challenge resolves to traefik (port 80) rather than leaving
+  # the network. LEGO_CA_CERTIFICATES makes Traefik's ACME client trust Pebble's
+  # MiniCA cert.
+  # ============================================
+  traefik:
+    image: traefik:v3.3
+    container_name: hypertrader-traefik
+    restart: unless-stopped
+    ports:
+      - "${PUBLIC_PORT:-80}:80"
+      - "${HTTPS_PUBLIC_PORT:-443}:443"
+    environment:
+      - LEGO_CA_CERTIFICATES=/etc/ssl/pebble.minica.pem
+    volumes:
+      - ../data/traefik:/etc/traefik:ro
+      - ../data/traefik/acme.json:/letsencrypt/acme.json
+      - ./pebble/pebble.minica.pem:/etc/ssl/pebble.minica.pem:ro
+    networks:
+      hypertrader:
+        aliases:
+          - hypertrader.localtest.me
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ============================================
+  # API service (FastAPI + uvicorn)
+  # ============================================
+  api:
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    container_name: hypertrader-api
+    restart: unless-stopped
+    env_file:
+      - .env.api.development
+      - .env.api.pebble
+    group_add:
+      - ${DOCKER_GID}
+    volumes:
+      # Persistent data: SQLite database and trader configs
+      - ../data/sqlitedb/:/app/data
+      # Docker socket access for managing trader containers
+      - ${DOCKER_SOCK}:/var/run/docker.sock
+      # Bind mount for Traefik config (wizard writes here)
+      - ../data/traefik:/host-traefik
+    networks:
+      - hypertrader
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      pebble:
+        condition: service_started
+
+  # ============================================
+  # Web service
+  # ============================================
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    container_name: hypertrader-web
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+    networks:
+      - hypertrader
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # ============================================
+  # Pebble — Let's Encrypt's test ACME server
+  # Listens on :14000 (ACME directory) and :15000 (management) inside the
+  # hypertrader docker network.
+  # ============================================
+  pebble:
+    image: ghcr.io/letsencrypt/pebble:latest
+    container_name: hypertrader-pebble
+    restart: unless-stopped
+    command:
+      - "-config"
+      - "/test/config/pebble-config.json"
+    environment:
+      - PEBBLE_VA_NOSLEEP=1
+      - PEBBLE_VA_ALWAYS_VALID=0
+    volumes:
+      - ./pebble/pebble-config.json:/test/config/pebble-config.json:ro
+    networks:
+      - hypertrader
+
+networks:
+  hypertrader:
+    driver: bridge

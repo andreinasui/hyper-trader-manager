@@ -32,6 +32,20 @@ cp deploy/.env.api.pebble.example deploy/.env.api.pebble
 
 ## Run the stack
 
+Use the combined `docker-compose.dev_ssl.yml` file (merges `docker-compose.dev.yml` +
+`docker-compose.pebble.yml` into a single file):
+
+```bash
+cd deploy
+docker compose \
+  -f docker-compose.dev_ssl.yml \
+  --env-file .env \
+  up -d --build
+```
+
+<details>
+<summary>Alternative: two-file overlay approach</summary>
+
 ```bash
 cd deploy
 docker compose \
@@ -40,6 +54,7 @@ docker compose \
   --env-file .env \
   up -d --build
 ```
+</details>
 
 Four containers come up:
 
@@ -84,7 +99,7 @@ If you want curl to validate the chain instead of `-k`, pass
 
 ## How the overlay wires Pebble in
 
-Three things make the e2e work, all defined in `docker-compose.pebble.yml`:
+Three things make the e2e work, all defined in `docker-compose.dev_ssl.yml`
 
 1. **Pebble service** — listens on `:14000` (ACME directory) inside the
    `hypertrader` docker network. Image is `ghcr.io/letsencrypt/pebble:latest`
@@ -104,10 +119,7 @@ Three things make the e2e work, all defined in `docker-compose.pebble.yml`:
 
 ```bash
 cd deploy
-docker compose \
-  -f docker-compose.dev.yml \
-  -f docker-compose.pebble.yml \
-  down -v   # -v also wipes the sqlite volume
+docker compose -f docker-compose.dev_ssl.yml down -v   # -v also wipes the sqlite volume
 rm -f data/traefik/acme.json data/traefik/dynamic/10-tls.yml
 git checkout -- data/traefik/traefik.yml   # if you committed the bootstrap
 ```
