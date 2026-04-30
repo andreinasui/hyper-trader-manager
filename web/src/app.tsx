@@ -1,9 +1,9 @@
-import { type ParentProps, Suspense, onMount, createSignal, Show, ErrorBoundary } from "solid-js";
+import { Suspense, ErrorBoundary } from "solid-js";
 import { Router } from "@solidjs/router";
 import { FileRoutes } from "@solidjs/start/router";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { MetaProvider } from "@solidjs/meta";
-import { authStore } from "~/stores/auth";
+import { RootGuard } from "~/components/RootGuard";
 import "./styles.css";
 
 const queryClient = new QueryClient({
@@ -20,23 +20,6 @@ function LoadingScreen() {
     <div class="min-h-screen flex items-center justify-center bg-surface-base">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
     </div>
-  );
-}
-
-function AuthGuard(props: ParentProps) {
-  const [initialized, setInitialized] = createSignal(false);
-
-  onMount(async () => {
-    await authStore.checkSSL();
-    await authStore.checkSetup();
-    await authStore.checkAuth();
-    setInitialized(true);
-  });
-
-  return (
-    <Show when={initialized()} fallback={<LoadingScreen />}>
-      {props.children}
-    </Show>
   );
 }
 
@@ -58,11 +41,15 @@ export default function App() {
     <ErrorBoundary fallback={(err) => <ErrorFallback error={err} />}>
       <MetaProvider>
         <QueryClientProvider client={queryClient}>
-          <AuthGuard>
-            <Router root={(props) => <Suspense fallback={<LoadingScreen />}>{props.children}</Suspense>}>
-              <FileRoutes />
-            </Router>
-          </AuthGuard>
+          <Router
+            root={(props) => (
+              <RootGuard>
+                <Suspense fallback={<LoadingScreen />}>{props.children}</Suspense>
+              </RootGuard>
+            )}
+          >
+            <FileRoutes />
+          </Router>
         </QueryClientProvider>
       </MetaProvider>
     </ErrorBoundary>

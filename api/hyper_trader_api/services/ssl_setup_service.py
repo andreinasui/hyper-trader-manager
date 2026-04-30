@@ -54,10 +54,14 @@ class SSLSetupService:
         return config.mode is not None
 
     def configure_domain_ssl(self, domain: str, email: str) -> str:
-        """Configure Let's Encrypt SSL for a domain.
+        """Configure Let's Encrypt SSL for a domain (config + DB only).
 
-        Writes Traefik config, creates acme.json, and restarts Traefik.
-        On failure, restores the previous Traefik config.
+        Writes Traefik config and persists DB row. Does NOT restart Traefik —
+        the caller MUST schedule ``restart_traefik`` as a background task so the
+        HTTP response can flush before Traefik stops listening (otherwise the
+        browser fetch is severed mid-flight with NetworkError).
+
+        On config-write failure, restores the previous Traefik config.
 
         Args:
             domain: The domain name for Let's Encrypt certificate.
@@ -71,7 +75,6 @@ class SSLSetupService:
         """
         settings = get_settings()
 
-        # Defense-in-depth: only allow SSL setup in production
         if settings.environment != "production":
             raise SSLSetupError("SSL setup is only available in production environment")
 
@@ -82,15 +85,16 @@ class SSLSetupService:
 
         try:
             # Write new Traefik config for domain mode
-            writer.write_domain_config(domain, email)
-
-            # Restart Traefik container
-            self._restart_traefik()
+            writer.write_domain_config(
+                domain,
+                email,
+                ca_server=settings.acme_ca_server,
+            )
 
             # Save config to database
             self._save_config(mode="domain", domain=domain, email=email)
 
-            logger.info(f"Domain SSL configured for {domain!r}")
+            logger.info(f"Domain SSL configured for {domain!r} (restart deferred)")
             return f"https://{domain}"
 
         except Exception as e:
@@ -105,21 +109,32 @@ class SSLSetupService:
                 raise
             raise SSLSetupError(f"Domain SSL setup failed: {e}") from e
 
-    def _restart_traefik(self) -> None:
+    def restart_traefik(self) -> None:
         """Restart the Traefik container via Docker socket.
 
-        Raises:
-            SSLSetupError: If the container is not found or restart fails.
+        Public so the SSL setup router can schedule it as a FastAPI BackgroundTask
+        (runs after the HTTP response is flushed to the client).
+
+        Errors are logged but not raised back to the caller, since by the time
+        this runs the HTTP response is already sent. If the restart fails, the
+        new Traefik config is still on disk and will be picked up on the next
+        Traefik or stack restart.
         """
         try:
             client = docker.from_env()  # type: ignore[attr-defined]
             container = client.containers.get("hypertrader-traefik")
             container.restart(timeout=30)
             logger.info("Restarted hypertrader-traefik container")
-        except docker.errors.NotFound as e:
-            raise SSLSetupError("Traefik container not found: hypertrader-traefik") from e
+        except docker.errors.NotFound:
+            logger.error(
+                "Traefik container not found: hypertrader-traefik. "
+                "New config is on disk; restart Traefik manually to apply."
+            )
         except docker.errors.APIError as e:
-            raise SSLSetupError(f"Failed to restart Traefik container: {e}") from e
+            logger.error(
+                f"Failed to restart Traefik container: {e}. "
+                "New config is on disk; restart Traefik manually to apply."
+            )
 
     def _save_config(
         self,

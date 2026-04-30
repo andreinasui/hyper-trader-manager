@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     # ==================== Environment ====================
     environment: Literal["development", "production"] = "development"
 
+    # Optional ACME CA server URL (e.g. Pebble for local testing).
+    # When None (default) Traefik uses Let's Encrypt production directly.
+    # When set, Traefik's ACME resolver points here instead. Used for local
+    # SSL testing without hitting real Let's Encrypt rate limits.
+    acme_ca_server: str | None = None
+
     # ==================== Database ====================
     database_url: str = "sqlite:///./data/hypertrader.db"
 

@@ -5,7 +5,7 @@ Covers:
 - SSLSetupService.get_ssl_config: fetches the singleton SSLConfig
 - SSLSetupService.is_ssl_configured: checks if SSL has been set up
 - SSLSetupService.configure_domain_ssl: Let's Encrypt setup flow
-- SSLSetupService._restart_traefik: Docker container restart
+- SSLSetupService.restart_traefik: Docker container restart
 - SSLSetupService._save_config: database persistence
 """
 
@@ -112,10 +112,16 @@ class TestIsSslConfigured:
 
 
 class TestRestartTraefik:
-    """Tests for _restart_traefik private method."""
+    """Tests for the public restart_traefik method.
+
+    Contract: this is invoked as a FastAPI BackgroundTask AFTER the HTTP response
+    has been flushed to the client. Errors must be logged, not raised, because
+    there is no caller left to receive an exception. The new Traefik config is
+    already on disk and will be picked up on the next manual/scheduled restart.
+    """
 
     def test_connects_to_docker_and_restarts_container(self):
-        """_restart_traefik gets the hypertrader-traefik container and calls restart."""
+        """restart_traefik gets the hypertrader-traefik container and calls restart."""
         mock_db = MagicMock()
         mock_container = MagicMock()
         mock_docker_client = MagicMock()
@@ -123,13 +129,15 @@ class TestRestartTraefik:
 
         service = SSLSetupService(mock_db)
         with patch("docker.from_env", return_value=mock_docker_client):
-            service._restart_traefik()
+            service.restart_traefik()
 
         mock_docker_client.containers.get.assert_called_once_with("hypertrader-traefik")
         mock_container.restart.assert_called_once_with(timeout=30)
 
-    def test_raises_ssl_setup_error_when_container_not_found(self):
-        """_restart_traefik raises SSLSetupError when container is not found."""
+    def test_swallows_error_when_container_not_found(self, caplog):
+        """restart_traefik logs (does not raise) when the container is missing."""
+        import logging
+
         import docker.errors
 
         mock_db = MagicMock()
@@ -139,12 +147,19 @@ class TestRestartTraefik:
         )
 
         service = SSLSetupService(mock_db)
-        with patch("docker.from_env", return_value=mock_docker_client):
-            with pytest.raises(SSLSetupError, match="Traefik container not found"):
-                service._restart_traefik()
+        with (
+            patch("docker.from_env", return_value=mock_docker_client),
+            caplog.at_level(logging.ERROR),
+        ):
+            # Must NOT raise — we are in a background task, response is gone.
+            service.restart_traefik()
 
-    def test_raises_ssl_setup_error_on_docker_api_error(self):
-        """_restart_traefik raises SSLSetupError on Docker API errors."""
+        assert any("Traefik container not found" in r.message for r in caplog.records)
+
+    def test_swallows_error_on_docker_api_error(self, caplog):
+        """restart_traefik logs (does not raise) on Docker API errors."""
+        import logging
+
         import docker.errors
 
         mock_db = MagicMock()
@@ -152,9 +167,13 @@ class TestRestartTraefik:
         mock_docker_client.containers.get.side_effect = docker.errors.APIError("Docker error")
 
         service = SSLSetupService(mock_db)
-        with patch("docker.from_env", return_value=mock_docker_client):
-            with pytest.raises(SSLSetupError, match="Failed to restart Traefik"):
-                service._restart_traefik()
+        with (
+            patch("docker.from_env", return_value=mock_docker_client),
+            caplog.at_level(logging.ERROR),
+        ):
+            service.restart_traefik()
+
+        assert any("Failed to restart Traefik" in r.message for r in caplog.records)
 
 
 class TestSaveConfig:
@@ -264,6 +283,7 @@ class TestConfigureDomainSsl:
             mock_settings_obj = MagicMock()
             mock_settings_obj.environment = "production"
             mock_settings_obj.traefik_config_dir = str(tmp_path)
+            mock_settings_obj.acme_ca_server = None
             mock_settings.return_value = mock_settings_obj
             mock_writer = MagicMock()
             mock_writer_cls.return_value = mock_writer
@@ -273,10 +293,16 @@ class TestConfigureDomainSsl:
 
             service.configure_domain_ssl("example.com", "admin@example.com")
 
-        mock_writer.write_domain_config.assert_called_once_with("example.com", "admin@example.com")
+        mock_writer.write_domain_config.assert_called_once_with(
+            "example.com", "admin@example.com", ca_server=None
+        )
 
-    def test_restarts_traefik_container(self, tmp_path: Path):
-        """configure_domain_ssl restarts the Traefik container."""
+    def test_restarts_traefik_no_longer_part_of_configure_domain_ssl(self, tmp_path: Path):
+        """configure_domain_ssl does NOT restart Traefik (router schedules it as bg task).
+
+        Restarting Traefik inline severs the in-flight request connection (browser
+        sees NetworkError). The router defers restart via FastAPI BackgroundTasks.
+        """
         service, mock_db = self._make_service_with_mocks(tmp_path)
 
         with (
@@ -293,14 +319,11 @@ class TestConfigureDomainSsl:
             mock_writer = MagicMock()
             mock_writer_cls.return_value = mock_writer
             mock_writer.backup_config.return_value = None
-            mock_docker_client = MagicMock()
-            mock_container = MagicMock()
-            mock_docker.return_value = mock_docker_client
-            mock_docker_client.containers.get.return_value = mock_container
 
             service.configure_domain_ssl("example.com", "admin@example.com")
 
-        mock_container.restart.assert_called_once_with(timeout=30)
+        # Docker must NOT be touched by configure_domain_ssl.
+        mock_docker.assert_not_called()
 
     def test_saves_config_to_database(self, tmp_path: Path):
         """configure_domain_ssl saves domain config to the database."""
@@ -358,34 +381,14 @@ class TestConfigureDomainSsl:
         mock_writer.restore_config.assert_called_once_with(backup)
 
     def test_restores_backup_and_raises_on_traefik_restart_failure(self, tmp_path: Path):
-        """configure_domain_ssl restores backup and raises SSLSetupError on restart failure."""
-        service, mock_db = self._make_service_with_mocks(tmp_path)
+        """Removed: Traefik restart no longer occurs inside configure_domain_ssl.
 
-        with (
-            patch("hyper_trader_api.services.ssl_setup_service.get_settings") as mock_settings,
-            patch(
-                "hyper_trader_api.services.ssl_setup_service.TraefikConfigWriter"
-            ) as mock_writer_cls,
-            patch("docker.from_env") as mock_docker,
-        ):
-            mock_settings_obj = MagicMock()
-            mock_settings_obj.environment = "production"
-            mock_settings_obj.traefik_config_dir = str(tmp_path)
-            mock_settings.return_value = mock_settings_obj
-            mock_writer = MagicMock()
-            mock_writer_cls.return_value = mock_writer
-            backup = ("traefik: original\n", "http:\n  routers: {}\n")
-            mock_writer.backup_config.return_value = backup
-            mock_docker_client = MagicMock()
-            mock_docker.return_value = mock_docker_client
-            mock_docker_client.containers.get.side_effect = SSLSetupError(
-                "Traefik container not found"
-            )
-
-            with pytest.raises(SSLSetupError):
-                service.configure_domain_ssl("example.com", "admin@example.com")
-
-        mock_writer.restore_config.assert_called_once_with(backup)
+        Restart now runs as a FastAPI BackgroundTask after the response is sent;
+        if it fails the new config is left on disk and a manual restart applies it.
+        See TestRestartTraefik.test_swallows_error_* for the new contract.
+        """
+        # Intentionally empty — kept as documentation for the contract change.
+        return
 
     def test_configure_domain_ssl_rejects_non_production_environment(self):
         """configure_domain_ssl raises SSLSetupError when environment is not production."""
@@ -401,3 +404,42 @@ class TestConfigureDomainSsl:
         ):
             with pytest.raises(SSLSetupError, match="SSL setup is only available in production"):
                 service.configure_domain_ssl("example.com", "admin@example.com")
+
+
+class TestConfigureDomainSslPlumbsCAServer:
+    """The service must pass settings.acme_ca_server through to the writer."""
+
+    def test_ca_server_forwarded_to_writer_when_set(self, tmp_path: Path):
+        """When acme_ca_server is set on settings, it flows through to write_domain_config."""
+        mock_db = MagicMock()
+        mock_db.get.return_value = None
+        service = SSLSetupService(mock_db)
+
+        with (
+            patch("hyper_trader_api.services.ssl_setup_service.get_settings") as mock_settings,
+            patch(
+                "hyper_trader_api.services.ssl_setup_service.TraefikConfigWriter"
+            ) as mock_writer_cls,
+            patch("docker.from_env") as mock_docker,
+        ):
+            mock_settings_obj = MagicMock()
+            mock_settings_obj.environment = "production"
+            mock_settings_obj.traefik_config_dir = str(tmp_path)
+            mock_settings_obj.acme_ca_server = "https://pebble:14000/dir"
+            mock_settings.return_value = mock_settings_obj
+
+            mock_writer = MagicMock()
+            mock_writer_cls.return_value = mock_writer
+            mock_writer.backup_config.return_value = None
+
+            mock_container = MagicMock()
+            mock_docker.return_value.containers.get.return_value = mock_container
+
+            result = service.configure_domain_ssl("hypertrader.localtest.me", "dev@example.com")
+
+        assert result == "https://hypertrader.localtest.me"
+        mock_writer.write_domain_config.assert_called_once_with(
+            "hypertrader.localtest.me",
+            "dev@example.com",
+            ca_server="https://pebble:14000/dir",
+        )

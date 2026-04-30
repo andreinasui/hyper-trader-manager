@@ -28,7 +28,12 @@ class TraefikConfigWriter:
     def __init__(self, config_dir: Path) -> None:
         self.config_dir = config_dir
 
-    def write_domain_config(self, domain: str, email: str) -> None:
+    def write_domain_config(
+        self,
+        domain: str,
+        email: str,
+        ca_server: str | None = None,
+    ) -> None:
         """Write Traefik config files for Let's Encrypt (domain) mode.
 
         Creates traefik.yml (static config with ACME resolver) and
@@ -38,6 +43,10 @@ class TraefikConfigWriter:
         Args:
             domain: The domain name for routing and TLS certificate.
             email: Email address for Let's Encrypt ACME registration.
+            ca_server: Optional ACME CA server URL. When None (default),
+                Traefik uses Let's Encrypt's production endpoint. When set
+                (e.g. Pebble's "https://pebble:14000/dir"), the resolver
+                targets that directory instead — used for local SSL testing.
 
         Raises:
             TraefikConfigError: If writing configuration files fails.
@@ -47,7 +56,7 @@ class TraefikConfigWriter:
             dynamic_dir = self.config_dir / "dynamic"
             dynamic_dir.mkdir(parents=True, exist_ok=True)
 
-            traefik_config = self._build_domain_traefik_yml(email)
+            traefik_config = self._build_domain_traefik_yml(email, ca_server)
             dynamic_config = self._build_domain_dynamic_yml(domain)
 
             self._write_yaml(self.config_dir / "traefik.yml", traefik_config)
@@ -122,8 +131,22 @@ class TraefikConfigWriter:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _build_domain_traefik_yml(self, email: str) -> dict:  # type: ignore[type-arg]
+    def _build_domain_traefik_yml(
+        self,
+        email: str,
+        ca_server: str | None = None,
+    ) -> dict:  # type: ignore[type-arg]
         """Build traefik.yml config dict for domain (Let's Encrypt) mode."""
+        acme: dict = {
+            "email": email,
+            "storage": "/letsencrypt/acme.json",
+            "httpChallenge": {
+                "entryPoint": "web",
+            },
+        }
+        if ca_server is not None:
+            acme["caServer"] = ca_server
+
         return {
             "entryPoints": {
                 "web": {
@@ -144,13 +167,7 @@ class TraefikConfigWriter:
             "ping": {},
             "certificatesResolvers": {
                 "letsencrypt": {
-                    "acme": {
-                        "email": email,
-                        "storage": "/letsencrypt/acme.json",
-                        "httpChallenge": {
-                            "entryPoint": "web",
-                        },
-                    }
+                    "acme": acme,
                 }
             },
             "providers": {

@@ -71,7 +71,7 @@ class TestSSLStatus:
             MockService.assert_called_once_with(mock_db)
 
     def test_ssl_status_returns_configured_in_development_mode(self, client, mock_db):
-        """Test ssl-status always returns ssl_configured=True in development mode."""
+        """Test ssl-status always returns ssl_configured=True in development mode (default behavior)."""
         mock_settings = MagicMock()
         mock_settings.environment = "development"
         with patch("hyper_trader_api.routers.ssl_setup.get_settings", return_value=mock_settings):
@@ -237,6 +237,63 @@ class TestSSLSetup:
             )
 
             MockService.assert_called_once_with(mock_db)
+
+    def test_restart_traefik_scheduled_as_background_task(
+        self, client, mock_db, mock_production_env
+    ):
+        """POST /ssl must NOT call restart_traefik synchronously inside the request.
+
+        The Traefik restart severs in-flight TCP connections (browser fetch fails with
+        NetworkError). Restart must be deferred via FastAPI BackgroundTasks so the HTTP
+        response flushes to the client BEFORE Traefik stops listening.
+
+        We verify by inspecting the BackgroundTasks attached to the request: the
+        service's restart_traefik must be scheduled as a background task, and must NOT
+        be invoked during the synchronous handler execution.
+        """
+        from starlette.background import BackgroundTasks
+
+        captured: dict[str, object] = {}
+
+        # Patch BackgroundTasks.add_task to record what gets scheduled.
+        original_add_task = BackgroundTasks.add_task
+
+        def spy_add_task(self, func, *args, **kwargs):  # type: ignore[no-untyped-def]
+            captured.setdefault("tasks", []).append((func, args, kwargs))  # type: ignore[union-attr]
+            return original_add_task(self, func, *args, **kwargs)
+
+        with (
+            patch("hyper_trader_api.routers.ssl_setup.SSLSetupService") as MockService,
+            patch.object(BackgroundTasks, "add_task", spy_add_task),
+        ):
+            mock_service = MockService.return_value
+            mock_service.is_ssl_configured.return_value = False
+            mock_service.configure_domain_ssl.return_value = "https://trader.example.com"
+
+            response = client.post(
+                "/api/v1/setup/ssl",
+                json={
+                    "mode": "domain",
+                    "domain": "trader.example.com",
+                    "email": "admin@example.com",
+                },
+            )
+
+            assert response.status_code == 200
+
+            # Service must NOT have called restart_traefik synchronously.
+            # (Sync call would happen during configure_domain_ssl or directly in handler.)
+            # configure_domain_ssl is allowed to be called; restart_traefik is not — except
+            # via the background task that runs AFTER response. With TestClient, background
+            # tasks DO run before the context manager exits, so by the time we inspect
+            # mock_service.restart_traefik, it MAY have been called once via the bg task.
+            # The key guarantee: it was scheduled, not invoked inline.
+            tasks = captured.get("tasks", [])
+            assert tasks, "Expected restart_traefik to be scheduled as a background task"
+            scheduled_funcs = [t[0] for t in tasks]  # type: ignore[index]
+            assert mock_service.restart_traefik in scheduled_funcs, (
+                "service.restart_traefik must be scheduled via BackgroundTasks.add_task"
+            )
 
     def test_domain_ssl_message_in_response(self, client, mock_db, mock_production_env):
         """Test POST /ssl domain mode includes a message in the response."""

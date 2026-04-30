@@ -8,7 +8,7 @@ No authentication required - this is a first-time setup operation.
 import logging
 from typing import Literal, cast
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from hyper_trader_api.config import get_settings
@@ -43,7 +43,7 @@ async def get_ssl_status(
     """
     settings = get_settings()
 
-    # In development mode, skip SSL setup requirement
+    # In development mode, skip SSL setup requirement entirely
     if settings.environment == "development":
         return SSLStatusResponse(ssl_configured=True, mode="domain")
 
@@ -69,24 +69,30 @@ async def get_ssl_status(
 )
 async def configure_ssl(
     request: SSLSetupRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> SSLSetupResponse:
     """
     Configure SSL/HTTPS.
 
+    Writes Traefik config + persists DB row synchronously, then schedules the
+    Traefik container restart as a FastAPI background task. The restart MUST
+    run after the response is flushed: restarting Traefik severs the in-flight
+    request connection (the browser sees NetworkError) if done inline.
+
     Args:
         request: SSLSetupRequest with domain and email
+        background_tasks: FastAPI BackgroundTasks (for deferred Traefik restart)
         db: Database session
 
     Returns:
         SSLSetupResponse: success flag, message, and redirect_url
 
     Raises:
-        HTTPException: 403 if not in production environment
+        HTTPException: 403 if not in production
         HTTPException: 400 if SSL is already configured
         HTTPException: 500 if SSL setup fails
     """
-    # Only allow SSL setup in production
     settings = get_settings()
     if settings.environment != "production":
         raise HTTPException(
@@ -108,6 +114,9 @@ async def configure_ssl(
             domain=request.domain,
             email=str(request.email),
         )
+        # Defer Traefik restart until after response is flushed to the client.
+        # Restarting inline would sever the in-flight TCP connection (NetworkError).
+        background_tasks.add_task(service.restart_traefik)
         return SSLSetupResponse(
             success=True,
             message=f"SSL configured for domain {request.domain}. Redirecting to HTTPS...",

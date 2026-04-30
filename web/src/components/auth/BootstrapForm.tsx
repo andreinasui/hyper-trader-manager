@@ -32,7 +32,7 @@ export function BootstrapForm() {
 
     try {
       await authStore.bootstrap(username(), password());
-      navigate("/dashboard");
+      navigate("/traders", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Setup failed");
     } finally {
