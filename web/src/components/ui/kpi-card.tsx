@@ -41,11 +41,20 @@ export function KpiCard(props: KpiCardProps) {
 
 export interface KpiStripProps extends JSX.HTMLAttributes<HTMLDivElement> {}
 
+/**
+ * Responsive KPI strip. 2 columns on phone, scales up to 4 on tablet+.
+ * Uses container queries so it adapts inside narrow contexts.
+ */
 export function KpiStrip(props: KpiStripProps) {
   const [local, others] = splitProps(props, ["class", "children"]);
   return (
-    <div class={cn("grid grid-cols-3 gap-4", local.class)} {...others}>
-      {local.children}
+    <div class="@container">
+      <div
+        class={cn("grid grid-cols-2 gap-4 @sm:grid-cols-3 @md:grid-cols-4", local.class)}
+        {...others}
+      >
+        {local.children}
+      </div>
     </div>
   );
 }

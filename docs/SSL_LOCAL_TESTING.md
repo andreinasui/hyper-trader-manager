@@ -29,37 +29,25 @@ Traefik config; vitest covers the redirect guard. Run those first.
 Run from the **repo root**:
 
 ```bash
-cp deploy/.env.api.pebble.example deploy/.env.api.pebble
-cp data/traefik/traefik.template.yml data/traefik-pebble/traefik.yml
-touch data/traefik-pebble/acme.json && chmod 600 data/traefik-pebble/acme.json
+cp environments/dev-ssl/.env.example environments/dev-ssl/.env
+cp environments/dev-ssl/api.env.example environments/dev-ssl/api.env
+cp environments/dev-ssl/api-pebble.env.example environments/dev-ssl/api-pebble.env
+cp environments/dev-ssl/traefik/traefik.template.yml environments/dev-ssl/traefik/traefik.yml
 ```
 
-`data/traefik-pebble/traefik.yml` and `acme.json` are gitignored — they're safe to
-delete and recreate. `data/traefik/` is never touched by the Pebble stack.
+`environments/dev-ssl/traefik/traefik.yml` is gitignored — it's safe to delete and
+recreate. `acme.json` is created automatically by the `traefik-acme-init` service on
+first stack-up (no manual `touch` required). `environments/dev/` is never touched by
+the dev-ssl stack.
 
 ## Run the stack
 
-Use the combined `docker-compose.dev_ssl.yml` file (merges `docker-compose.dev.yml` +
-`docker-compose.pebble.yml` into a single file):
-
 ```bash
 docker compose \
-  -f deploy/docker-compose.dev_ssl.yml \
-  --env-file deploy/.env \
+  -f environments/dev-ssl/docker-compose.yml \
+  --env-file environments/dev-ssl/.env \
   up -d --build
 ```
-
-<details>
-<summary>Alternative: two-file overlay approach</summary>
-
-```bash
-docker compose \
-  -f deploy/docker-compose.dev.yml \
-  -f deploy/docker-compose.pebble.yml \
-  --env-file deploy/.env \
-  up -d --build
-```
-</details>
 
 Four containers come up:
 
@@ -100,11 +88,11 @@ echo | openssl s_client -connect hypertrader.localtest.me:443 \
 ```
 
 If you want curl to validate the chain instead of `-k`, pass
-`--cacert deploy/pebble/pebble.minica.pem`.
+`--cacert environments/dev-ssl/pebble/pebble.minica.pem`.
 
 ## How the overlay wires Pebble in
 
-Three things make the e2e work, all defined in `docker-compose.dev_ssl.yml`
+Three things make the e2e work, all defined in `environments/dev-ssl/docker-compose.yml`
 
 1. **Pebble service** — listens on `:14000` (ACME directory) inside the
    `hypertrader` docker network. Image is `ghcr.io/letsencrypt/pebble:latest`
@@ -116,7 +104,7 @@ Three things make the e2e work, all defined in `docker-compose.dev_ssl.yml`
    place) instead of trying to leave the docker network.
 3. **`LEGO_CA_CERTIFICATES` on traefik** — Traefik's embedded ACME client
    (Lego) won't talk to a directory whose TLS cert it doesn't trust. We
-   mount Pebble's MiniCA root (`deploy/pebble/pebble.minica.pem`, copied
+   mount Pebble's MiniCA root (`environments/dev-ssl/pebble/pebble.minica.pem`, copied
    out of the Pebble image at `/test/certs/pebble.minica.pem`) and point
    Lego at it.
 
@@ -125,19 +113,19 @@ Three things make the e2e work, all defined in `docker-compose.dev_ssl.yml`
 Run from the **repo root**:
 
 ```bash
-docker compose -f deploy/docker-compose.dev_ssl.yml down -v
+docker compose -f environments/dev-ssl/docker-compose.yml down -v
 
 # Wipe Pebble runtime files
-rm -f data/traefik-pebble/traefik.yml \
-      data/traefik-pebble/acme.json \
-      data/traefik-pebble/dynamic/10-tls.yml
+rm -f environments/dev-ssl/traefik/traefik.yml \
+      environments/dev-ssl/traefik/acme.json \
+      environments/dev-ssl/traefik/dynamic/10-tls.yml
 
 # Re-initialise for the next run
-cp data/traefik/traefik.template.yml data/traefik-pebble/traefik.yml
-touch data/traefik-pebble/acme.json && chmod 600 data/traefik-pebble/acme.json
+cp environments/dev-ssl/traefik/traefik.template.yml environments/dev-ssl/traefik/traefik.yml
+# acme.json is re-created automatically by traefik-acme-init on next stack-up
 ```
 
-`data/traefik/` is never modified by the Pebble stack — no `git checkout` needed.
+`environments/dev/` is never modified by the dev-ssl stack.
 
 ## Why not just run real Let's Encrypt locally?
 

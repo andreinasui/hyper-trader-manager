@@ -138,7 +138,7 @@ cd hyper-trader-manager
 
 The installer will:
 - Check prerequisites (Docker, Docker Compose)
-- Create `deploy/.env` with auto-generated secrets
+- Create `/opt/hyper-trader/.env` from the downloaded example
 - Set up initial Traefik configuration
 - Build and start the Docker stack
 - Wait for services to be healthy
@@ -148,56 +148,39 @@ The installer will:
 If you prefer manual setup:
 
 ```bash
-# 1. Create environment file
-cp deploy/.env.example deploy/.env
+# 1. Run the install script (handles all of the below automatically)
+curl -sSL https://raw.githubusercontent.com/andreinasui/hyper-trader-manager/main/scripts/install.sh | sudo bash
 
-# 2. Edit deploy/.env — set ADMIN_PASSWORD, DOCKER_GID, and any other required values
-#    (No encryption key needed — private keys are stored as Docker Swarm secrets)
+# Or manually:
 
-# 3. Get your Docker group ID
-getent group docker | cut -d: -f3
-# Copy to DOCKER_GID in deploy/.env
+# 1. Create install directory and Traefik config directory
+sudo mkdir -p /opt/hyper-trader/traefik/dynamic
+sudo touch /opt/hyper-trader/traefik/acme.json
+sudo chmod 600 /opt/hyper-trader/traefik/acme.json
 
-# 4. Create Traefik config directories
-mkdir -p data/traefik/certs
+# 2. Download production files
+RAW="https://raw.githubusercontent.com/andreinasui/hyper-trader-manager/main"
+sudo curl -fsSL "${RAW}/environments/prod/docker-compose.yml" -o /opt/hyper-trader/docker-compose.yml
+sudo curl -fsSL "${RAW}/environments/prod/.env.example" -o /opt/hyper-trader/.env.example
+sudo curl -fsSL "${RAW}/environments/prod/api.env.example" -o /opt/hyper-trader/api.env.example
+sudo curl -fsSL "${RAW}/environments/prod/traefik/traefik.template.yml" -o /opt/hyper-trader/traefik/traefik.yml
+sudo curl -fsSL "${RAW}/environments/prod/traefik/dynamic/00-bootstrap.yml" -o /opt/hyper-trader/traefik/dynamic/00-bootstrap.yml
+sudo curl -fsSL "${RAW}/scripts/hyper-trader-manager.sh" -o /usr/local/bin/hyper-trader-manager
+sudo chmod +x /usr/local/bin/hyper-trader-manager
 
-# 5. Create initial Traefik config
-cat > data/traefik/traefik.yml << 'EOF'
-entryPoints:
-  web:
-    address: ":80"
-providers:
-  file:
-    filename: /etc/traefik/dynamic.yml
-    watch: true
-EOF
+# 3. Create env files
+sudo cp /opt/hyper-trader/.env.example /opt/hyper-trader/.env
+sudo cp /opt/hyper-trader/api.env.example /opt/hyper-trader/api.env
+# Edit /opt/hyper-trader/.env and /opt/hyper-trader/api.env with your values
 
-cat > data/traefik/dynamic.yml << 'EOF'
-http:
-  routers:
-    api:
-      rule: "PathPrefix(`/api`)"
-      service: api
-      entryPoints: [web]
-    web:
-      rule: "PathPrefix(`/`)"
-      service: web
-      entryPoints: [web]
-  services:
-    api:
-      loadBalancer:
-        servers:
-          - url: "http://api:8000"
-    web:
-      loadBalancer:
-        servers:
-          - url: "http://web:80"
-EOF
+# 4. Set ownership (replace 'youruser' with the user that will manage the stack)
+sudo chown -R youruser:youruser /opt/hyper-trader
+sudo chown -R 1000:1000 /opt/hyper-trader/traefik
 
-# 6. Start the stack
-docker compose up -d --build
+# 5. Start the stack
+hyper-trader-manager start
 
-# 7. Check health
+# 6. Check health
 curl http://localhost/health
 ```
 
@@ -219,7 +202,7 @@ curl http://localhost/health
 
 ### Environment Variables
 
-Key settings in `deploy/.env`:
+Key settings in `/opt/hyper-trader/.env`:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -245,11 +228,11 @@ HyperTrader uses Let's Encrypt for trusted HTTPS certificates. **A real domain i
 To change the domain or force re-issuance:
 
 ```bash
-# Delete SSL config from database
-sqlite3 data/hypertrader.db "DELETE FROM ssl_config;"
+# Delete SSL config from database (database is in the hypertrader-data Docker named volume)
+docker exec hypertrader-api sqlite3 /app/data/hypertrader.db "DELETE FROM ssl_config;"
 
 # Restart to trigger SSL wizard
-docker compose restart
+hyper-trader-manager restart
 ```
 
 ### Operations
@@ -276,15 +259,16 @@ docker compose up -d --build
 
 ### Data Persistence
 
-All data is stored in `./data/` on the host:
+All data is stored under `/opt/hyper-trader/` on the VPS host:
 
 | Path | Contents |
 |------|----------|
-| `data/hypertrader.db` | SQLite database |
-| `data/traders/` | Trader configuration files |
-| `data/traefik/` | Traefik config and SSL certs |
-| `data/traefik/acme.json` | Let's Encrypt certificates |
-| `data/traefik/certs/` | Self-signed certificates |
+| `hypertrader-data` (Docker named volume) | SQLite database and trader configs |
+| `traefik/` | Traefik config and SSL certs |
+| `traefik/traefik.yml` | Active Traefik static config |
+| `traefik/dynamic/` | Traefik dynamic routing config |
+| `traefik/acme.json` | Let's Encrypt certificates (mode 600) |
+| `traefik/certs/` | Self-signed certificate files |
 
 ### Firewall Setup
 

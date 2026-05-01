@@ -2,9 +2,11 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * Playwright E2E Test Configuration
- * 
- * Tests use mocked Privy authentication to avoid real wallet connections.
- * API responses are also mocked for fast, reliable tests.
+ *
+ * Authentication is mocked by setting `auth_token` in localStorage
+ * (see e2e/utils/auth-helpers.ts) and intercepting `/api/v1/auth/*`.
+ * API responses are mocked via e2e/fixtures/api-handlers.ts for fast,
+ * reliable tests with no real backend or external service dependencies.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -32,6 +34,24 @@ export default defineConfig({
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'mobile',
+      use: { ...devices['Pixel 7'] },
+    },
+    {
+      name: 'tablet',
+      // 820 x 1180 portrait, 2x DPR — iPad Air-ish form factor.
+      // Reserved for manual smoke runs (`--project=tablet`); no specs target
+      // it by default. Useful for verifying tablet container-query breakpoints
+      // when the layout changes.
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 820, height: 1180 },
+        deviceScaleFactor: 2,
+        isMobile: true,
+        hasTouch: true,
+      },
     },
     // WebKit requires system dependencies (libjpeg-turbo8) - disable for now
     // Uncomment when system dependencies are installed

@@ -21,8 +21,7 @@
 set -euo pipefail
 
 INSTALL_DIR="/opt/hyper-trader"
-DEPLOY_DIR="${INSTALL_DIR}/deploy"
-COMPOSE_FILE="${DEPLOY_DIR}/docker-compose.prod.yml"
+COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
 
 # ── Colours ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'

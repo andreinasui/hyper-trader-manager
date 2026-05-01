@@ -75,6 +75,18 @@ export async function setupApiMocks(page: Page) {
     });
   });
 
+  // Mock SSL setup status (default to configured so RootGuard does not
+  // redirect every route to /setup/ssl). Without this mock, the request
+  // falls through to the dev-server proxy, fails, and the auth store
+  // sets sslConfigured=false → setupGuard redirects to /setup/ssl on
+  // every navigation, producing a "Too many redirects" error.
+  await page.route('**/api/v1/setup/ssl-status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      json: { ssl_configured: true },
+    });
+  });
+
   // Mock login
   await page.route('**/api/v1/auth/login', async (route) => {
     if (route.request().method() === 'POST') {

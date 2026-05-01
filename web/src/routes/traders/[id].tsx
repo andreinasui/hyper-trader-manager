@@ -2,12 +2,12 @@ import { type Component, Show, Suspense, createSignal, createEffect } from "soli
 import TraderOverview from "~/components/traders/overviews/TraderOverview";
 import { useParams, useNavigate } from "@solidjs/router";
 import { createQuery, createMutation, useQueryClient } from "@tanstack/solid-query";
-import { Trash2, RefreshCw, Play, Square, Loader2, AlertCircle } from "lucide-solid";
+import { Trash2, RefreshCw, Play, Square, AlertCircle } from "lucide-solid";
 import { ProtectedRoute } from "~/components/auth/ProtectedRoute";
 import { AppShell } from "~/components/layout/AppShell";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { PageContent } from "~/components/layout/PageContent";
-import { Button } from "~/components/ui/button";
+import { PageActions } from "~/components/layout/PageActions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Toast } from "~/components/ui/toast";
 import { Panel, PanelBody } from "~/components/ui/panel";
@@ -20,11 +20,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
 import { StatusDot } from "~/components/ui/status-badge";
 import { LogViewer } from "~/components/traders/LogViewer";
 import { TraderConfigForm } from "~/components/traders/TraderConfigForm";
+import { canStart, canStop } from "~/components/traders/trader-page-utils";
 import { api } from "~/lib/api";
 import { traderKeys, imageKeys } from "~/lib/query-keys";
 import type { Trader, RuntimeStatus } from "~/lib/types";
@@ -51,7 +51,7 @@ type AnyStatus = Trader["status"] | RuntimeStatus["state"];
 
 function LoadingSkeleton() {
   return (
-    <div class="p-6 space-y-6">
+    <div class="p-6 space-y-6 @container">
       <div class="flex items-start justify-between">
         <div class="space-y-2">
           <div class="h-8 w-48 bg-surface-raised rounded-md animate-pulse" />
@@ -66,7 +66,7 @@ function LoadingSkeleton() {
       <div class="border-b border-border-default pb-0">
         <div class="h-10 w-64 bg-surface-raised rounded-md animate-pulse" />
       </div>
-      <div class="grid gap-6 md:grid-cols-2">
+      <div class="grid gap-6 @md:grid-cols-2">
         <div class="bg-surface-raised border border-border-default rounded-md p-5 h-64" />
         <div class="bg-surface-raised border border-border-default rounded-md p-5 h-64" />
       </div>
@@ -234,6 +234,13 @@ const TraderDetailPage: Component = () => {
     setInfoError(null);
   };
 
+  const busy = () =>
+    startMutation.isPending ||
+    stopMutation.isPending ||
+    restartMutation.isPending ||
+    updateImageMutation.isPending ||
+    deleteMutation.isPending;
+
   return (
     <ProtectedRoute>
       <AppShell>
@@ -278,106 +285,84 @@ const TraderDetailPage: Component = () => {
                       </div>
 
                       {/* Action buttons */}
-                      <div class="flex items-center gap-2">
-                        <Show when={["configured", "stopped", "failed"].includes(trader().status)}>
-                          <Button
-                            onClick={() => startMutation.mutate()}
-                            disabled={startMutation.isPending}
-                          >
-                            <Show
-                              when={startMutation.isPending}
-                              fallback={<Play class="h-4 w-4 mr-2" stroke-width={1.5} />}
-                            >
-                              <Loader2 class="h-4 w-4 mr-2 animate-spin" stroke-width={1.5} />
-                            </Show>
-                            {trader().status === "failed" ? "Retry" : "Start"}
-                          </Button>
-                        </Show>
-
-                        <Show when={["running", "starting"].includes(trader().status)}>
-                          <Button
-                            variant="outline"
-                            onClick={() => stopMutation.mutate()}
-                            disabled={stopMutation.isPending}
-                          >
-                            <Show
-                              when={stopMutation.isPending}
-                              fallback={<Square class="h-4 w-4 mr-2" stroke-width={1.5} />}
-                            >
-                              <Loader2 class="h-4 w-4 mr-2 animate-spin" stroke-width={1.5} />
-                            </Show>
-                            Stop
-                          </Button>
-                        </Show>
-
-                        <Show when={trader().status === "running"}>
-                          <Button
-                            variant="outline"
-                            onClick={() => restartMutation.mutate()}
-                            disabled={restartMutation.isPending}
-                          >
-                            <RefreshCw
-                              class={`h-4 w-4 mr-2 ${restartMutation.isPending ? "animate-spin" : ""}`}
-                              stroke-width={1.5}
-                            />
-                            Restart
-                          </Button>
-                        </Show>
-
-                        <Show when={needsImageUpdate()}>
-                          <Button
-                            variant="outline"
-                            onClick={() => updateImageMutation.mutate(imageQuery.data!.latest_remote!)}
-                            disabled={updateImageMutation.isPending}
-                          >
-                            <Show
-                              when={updateImageMutation.isPending}
-                              fallback={<RefreshCw class="h-4 w-4 mr-2" stroke-width={1.5} />}
-                            >
-                              <Loader2 class="h-4 w-4 mr-2 animate-spin" stroke-width={1.5} />
-                            </Show>
-                            Update Image
-                          </Button>
-                        </Show>
-
-                        <AlertDialog open={deleteOpen()} onOpenChange={setDeleteOpen}>
-                          <AlertDialogTrigger
-                            as={(triggerProps: Record<string, unknown>) => (
-                              <Button
-                                {...triggerProps}
-                                variant="outline"
-                                class="border-error-muted text-error hover:bg-error-surface"
-                              >
-                                <Trash2 class="h-4 w-4 mr-2" stroke-width={1.5} />
-                                Delete
-                              </Button>
-                            )}
-                          />
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <div class="flex items-start gap-3">
-                                <div class="flex shrink-0 items-center justify-center size-9 rounded-lg bg-destructive/10 border border-destructive/20 mt-0.5">
-                                  <Trash2 class="size-4 text-destructive" stroke-width={1.5} />
-                                </div>
-                                <div>
-                                  <AlertDialogTitle>Delete Trader</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will permanently delete "{trader().display_name}" and all its configuration.
-                                    This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </div>
-                              </div>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction variant="destructive" onClick={() => deleteMutation.mutate()}>
-                                {deleteMutation.isPending ? "Deleting..." : "Delete"}
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+                      <PageActions
+                        actions={[
+                          ...(canStart(trader())
+                            ? [{
+                                label: trader().status === "failed" ? "Retry" : "Start",
+                                icon: Play,
+                                onClick: () => startMutation.mutate(),
+                                priority: "primary" as const,
+                                disabled: busy(),
+                                loading: startMutation.isPending,
+                              }]
+                            : []),
+                          ...(canStop(trader())
+                            ? [{
+                                label: "Stop",
+                                icon: Square,
+                                onClick: () => stopMutation.mutate(),
+                                priority: "primary" as const,
+                                disabled: busy(),
+                                loading: stopMutation.isPending,
+                              }]
+                            : []),
+                          ...(trader().status === "running"
+                            ? [{
+                                label: "Restart",
+                                icon: RefreshCw,
+                                onClick: () => restartMutation.mutate(),
+                                priority: "secondary" as const,
+                                disabled: busy(),
+                                loading: restartMutation.isPending,
+                              }]
+                            : []),
+                          ...(needsImageUpdate()
+                            ? [{
+                                label: "Update Image",
+                                icon: RefreshCw,
+                                onClick: () => updateImageMutation.mutate(imageQuery.data!.latest_remote!),
+                                priority: "secondary" as const,
+                                disabled: busy(),
+                                loading: updateImageMutation.isPending,
+                              }]
+                            : []),
+                          {
+                            label: "Delete",
+                            icon: Trash2,
+                            onClick: () => setDeleteOpen(true),
+                            priority: "secondary" as const,
+                            variant: "danger" as const,
+                            disabled: busy(),
+                          },
+                        ]}
+                      />
                     </div>
+
+                    <AlertDialog open={deleteOpen()} onOpenChange={setDeleteOpen}>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <div class="flex items-start gap-3">
+                            <div class="flex shrink-0 items-center justify-center size-9 rounded-lg bg-destructive/10 border border-destructive/20 mt-0.5">
+                              <Trash2 class="size-4 text-destructive" stroke-width={1.5} />
+                            </div>
+                            <div>
+                              <AlertDialogTitle>Delete Trader</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete "{trader().display_name}" and all its configuration.
+                                This action cannot be undone.
+                              </AlertDialogDescription>
+                            </div>
+                          </div>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction variant="destructive" onClick={() => deleteMutation.mutate()}>
+                            {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
 
                     {/* Tabs */}
                      <Tabs defaultValue="overview" class="space-y-6">

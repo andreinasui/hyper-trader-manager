@@ -215,40 +215,45 @@ Alternatively, to start completely fresh (including Traefik configs and certs):
 
 ```bash
 # Remove SSL-related Traefik files
-rm -rf data/traefik/
+rm -f environments/dev/traefik/traefik.yml \
+      environments/dev/traefik/acme.json \
+      environments/dev/traefik/dynamic/10-tls.yml
+cp environments/dev/traefik/traefik.template.yml environments/dev/traefik/traefik.yml
 
 # Reset the SSL config in the database
-sqlite3 data/hypertrader.db "DELETE FROM ssl_config;"
+sqlite3 environments/dev/sqlitedb/hypertrader.db "DELETE FROM ssl_config;"
 
 # Restart the stack
-docker compose restart
+docker compose -f environments/dev/docker-compose.yml --env-file environments/dev/.env restart
 ```
 
 ### SSL File Locations (Production)
 
 | File / Directory | Purpose |
 |-----------------|---------|
-| `data/traefik/traefik.yml` | Main Traefik static config |
-| `data/traefik/dynamic/` | Traefik dynamic routing config |
-| `data/traefik/certs/` | Self-signed certificate files |
-| `data/traefik/acme.json` | Let's Encrypt certificate store (mode 600) |
+| `traefik/traefik.yml` | Main Traefik static config (on the VPS: `/opt/hyper-trader/traefik/traefik.yml`) |
+| `traefik/dynamic/` | Traefik dynamic routing config |
+| `traefik/certs/` | Self-signed certificate files |
+| `traefik/acme.json` | Let's Encrypt certificate store (mode 600) |
 
 ## Docker Compose Dev Stack
 
-`deploy/docker-compose.dev.yml` runs the full stack locally in Docker (Traefik +
+`environments/dev/docker-compose.yml` runs the full stack locally in Docker (Traefik +
 API + Web). This is separate from the standard `just api` / `just web` dev workflow;
 use it when you need to test the containerised stack.
 
-`data/traefik/traefik.yml` is gitignored — create it from the template before first
+`environments/dev/traefik/traefik.yml` is gitignored — create it from the template before first
 run:
 
 ```bash
 # From repo root (one-time)
-cp data/traefik/traefik.template.yml data/traefik/traefik.yml
-touch data/traefik/acme.json && chmod 600 data/traefik/acme.json
+cp environments/dev/.env.example environments/dev/.env
+cp environments/dev/api.env.example environments/dev/api.env
+cp environments/dev/traefik/traefik.template.yml environments/dev/traefik/traefik.yml
+touch environments/dev/traefik/acme.json && chmod 600 environments/dev/traefik/acme.json
 
 # Start
-docker compose -f deploy/docker-compose.dev.yml --env-file deploy/.env up -d --build
+docker compose -f environments/dev/docker-compose.yml --env-file environments/dev/.env up -d --build
 ```
 
 For local SSL testing with Pebble, see [docs/SSL_LOCAL_TESTING.md](docs/SSL_LOCAL_TESTING.md).
@@ -258,10 +263,8 @@ For local SSL testing with Pebble, see [docs/SSL_LOCAL_TESTING.md](docs/SSL_LOCA
 See [README.md](README.md) for production deployment with Docker Compose.
 
 ```bash
-# Quick production start
-cp deploy/.env.example .env
-# Edit .env with your settings
-docker compose up -d --build
+# Quick production start (via install script)
+curl -sSL https://raw.githubusercontent.com/andreinasui/hyper-trader-manager/main/scripts/install.sh | sudo bash
 ```
 
 ## Project Structure
@@ -288,10 +291,10 @@ hyper-trader-manager/
 │   │   ├── components/     # React components
 │   │   └── lib/            # Utilities
 │   └── ...
-├── deploy/                 # Production deployment configs
-│   ├── traefik/            # Traefik routing config
-│   └── .env.example        # Production env template
-├── docker-compose.yml      # Production stack
+├── environments/           # Per-environment Docker stacks
+│   ├── dev/                # Local dev (Traefik + API + Web)
+│   ├── dev-ssl/            # Local dev with Pebble SSL testing
+│   └── prod/               # Production (downloaded by install.sh)
 ├── justfile                # Root commands
 └── DEV_SETUP.md           # This file
 ```

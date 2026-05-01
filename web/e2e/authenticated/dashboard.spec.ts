@@ -54,8 +54,12 @@ test.describe('Dashboard - Authenticated', () => {
     await page.goto('/dashboard');
     await page.waitForLoadState('networkidle');
 
-    // The API mock returns one trader named "Test Trader"
-    await expect(page.getByText('Test Trader')).toBeVisible();
+    // The API mock returns one trader named "Test Trader". ResponsiveTable
+    // renders both desktop and phone variants in DOM (CSS picks one); scope
+    // to the desktop row to avoid strict-mode violations.
+    await expect(
+      page.locator('[data-rt-row-desktop] >> text=Test Trader')
+    ).toBeVisible();
     
     // Should show running status (use .first() — appears in KPI strip AND status indicator)
     await expect(page.getByText('running').first()).toBeVisible();

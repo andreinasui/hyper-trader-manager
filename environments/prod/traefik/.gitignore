@@ -1,0 +1,7 @@
+# Runtime-written files — overwritten by the API and Traefik at startup.
+# Only the template and seed config belong in version control.
+traefik.yml
+acme.json
+certs/
+dynamic/*
+!dynamic/00-bootstrap.yml

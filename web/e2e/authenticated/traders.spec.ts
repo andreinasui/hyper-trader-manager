@@ -49,7 +49,7 @@ test.describe('Trader Creation - Authenticated', () => {
 
     // Check for account settings content
     await expect(page.getByText('Account Settings')).toBeVisible();
-    await expect(page.getByText('Configure your wallet and copy target')).toBeVisible();
+    await expect(page.getByText('Wallet, copy target')).toBeVisible();
   });
 
   test('can create trader with valid data', async ({ page }) => {
@@ -109,7 +109,7 @@ test.describe('Trader Creation - Authenticated', () => {
     // The exchange is not a selectable field - Hyperliquid is the only supported exchange
     // Check that the form loads with Account Settings card
     await expect(page.getByText('Account Settings')).toBeVisible();
-    await expect(page.getByText('Configure your wallet and copy target')).toBeVisible();
+    await expect(page.getByText('Wallet, copy target')).toBeVisible();
   });
 
   test('network field allows selection', async ({ page }) => {
@@ -177,8 +177,10 @@ test.describe('Trader List', () => {
     // Wait for page heading to load (indicates auth completed)
     await expect(page.getByRole('heading', { name: 'Traders' })).toBeVisible();
 
-    // Should show traders (mock API returns one trader)
-    const traderItem = page.locator('text=Test Trader');
+    // Should show traders (mock API returns one trader). The ResponsiveTable
+    // primitive renders both desktop and phone row variants; scope to the
+    // desktop variant to avoid strict-mode violation.
+    const traderItem = page.locator('[data-rt-row-desktop]').getByText('Test Trader');
     await expect(traderItem).toBeVisible();
   });
 });

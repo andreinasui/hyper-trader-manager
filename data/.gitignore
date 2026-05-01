@@ -1,6 +1,0 @@
-# Generated when using local development docker containers
-sqlitedb/*.db
-
-deploy/.env
-
-

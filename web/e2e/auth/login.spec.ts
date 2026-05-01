@@ -9,6 +9,16 @@ test.describe('Authentication Flow', () => {
       // Track initialization state: starts false, becomes true after bootstrap
       let isInitialized = false;
 
+      // Mock SSL setup status (default to configured) so RootGuard does
+      // not redirect /setup → /setup/ssl. Without this, the SSL wizard
+      // pre-empts the bootstrap account-creation form.
+      await page.route('**/api/v1/setup/ssl-status', async (route) => {
+        await route.fulfill({
+          status: 200,
+          json: { ssl_configured: true },
+        });
+      });
+
       // Mock setup status - returns current initialization state
       await page.route('**/api/v1/auth/setup-status', async (route) => {
         await route.fulfill({

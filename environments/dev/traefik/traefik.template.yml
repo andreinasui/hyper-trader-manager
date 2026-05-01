@@ -1,9 +1,8 @@
 # Bootstrap template for Traefik static config.
 # This file is the committed source of truth.
 #
-# Usage (one-time, before running any docker compose stack):
-#   cp data/traefik/traefik.template.yml data/traefik/traefik.yml
-#   cp data/traefik/traefik.template.yml data/traefik-pebble/traefik.yml
+# Usage (one-time, before running the dev docker compose stack):
+#   cp environments/dev/traefik/traefik.template.yml environments/dev/traefik/traefik.yml
 #
 # traefik.yml is gitignored — the SSL wizard overwrites it with domain/ACME config.
 # Never edit traefik.yml directly; update this template instead.

@@ -1,0 +1,18 @@
+# Bootstrap template for Traefik static config.
+# This file is the committed source of truth.
+#
+# Usage (one-time, before running the dev-ssl docker compose stack):
+#   cp environments/dev-ssl/traefik/traefik.template.yml environments/dev-ssl/traefik/traefik.yml
+#
+# traefik.yml is gitignored — the SSL wizard overwrites it with domain/ACME config.
+# Never edit traefik.yml directly; update this template instead.
+entryPoints:
+  web:
+    address: :80
+  websecure:
+    address: :443
+ping: {}
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true

@@ -19,6 +19,7 @@ import { Panel, PanelHeader, PanelBody } from "~/components/ui/panel";
 import { SectionLabel } from "~/components/ui/section-label";
 import { ToggleGroup } from "~/components/ui/toggle-group";
 import { Textarea } from "~/components/ui/textarea";
+import { FormGrid } from "~/components/ui/form-grid";
 import { cn } from "~/lib/utils";
 import {
   createTraderFormSchema,
@@ -60,8 +61,32 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
   const isEditing = props.isEditing ?? false;
 
   const schema = isEditing ? editTraderFormSchema : createTraderFormSchema;
+
+  // Deep-merge two plain objects. Values from `b` override `a`, but unset
+  // keys in `b` fall back to `a`. Used so collapsed form sections (whose
+  // <Field> components are unmounted and thus not present in modular-forms'
+  // `values`) still contribute their initial values during validation.
+  const deepMerge = (a: unknown, b: unknown): unknown => {
+    if (
+      a &&
+      b &&
+      typeof a === "object" &&
+      typeof b === "object" &&
+      !Array.isArray(a) &&
+      !Array.isArray(b)
+    ) {
+      const out: Record<string, unknown> = { ...(a as Record<string, unknown>) };
+      for (const [k, v] of Object.entries(b as Record<string, unknown>)) {
+        out[k] = k in out ? deepMerge(out[k], v) : v;
+      }
+      return out;
+    }
+    return b === undefined ? a : b;
+  };
+
   const validateForm = (values: PartialValues<CreateTraderForm>) => {
-    const result = schema.safeParse(values);
+    const merged = deepMerge(initialValues, values) as PartialValues<CreateTraderForm>;
+    const result = schema.safeParse(merged);
     if (!result.success) {
       const errors: Record<string, string> = {};
       result.error.errors.forEach((err) => {
@@ -72,52 +97,64 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
     return {};
   };
 
-  const [form, { Form: FormComponent, Field: FormField }] =
-    createForm<CreateTraderForm>({
-      validate: validateForm,
-      initialValues: props.initialValues ?? {
-        wallet_address: "",
-        private_key: "",
-        name: "",
-        description: "",
-        config: {
-          provider_settings: {
-            exchange: "hyperliquid",
-            network: "mainnet",
-            self_account: { address: "", is_sub: false },
-            copy_account: { address: "" },
-            slippage_bps: DEFAULTS.slippageBps,
+  // Default form values when no initialValues are provided (create flow).
+  // Extracted as a named const so handleSubmit/validate can deep-merge with
+  // it: <FormField> children for collapsed sections (Advanced Settings) are
+  // not mounted, so modular-forms' getValues() omits them. Without this
+  // merge, validation reports "trader_settings: Required" on submit and the
+  // form silently refuses to submit.
+  const initialValues: PartialValues<CreateTraderForm> = props.initialValues ?? {
+    wallet_address: "",
+    private_key: "",
+    name: "",
+    description: "",
+    config: {
+      provider_settings: {
+        exchange: "hyperliquid",
+        network: "mainnet",
+        self_account: { address: "", is_sub: false },
+        copy_account: { address: "" },
+        slippage_bps: DEFAULTS.slippageBps,
+      },
+      trader_settings: {
+        trading_strategy: {
+          type: "order_based",
+          risk_parameters: {
+            blocked_assets: [],
+            self_proportionality_multiplier: DEFAULTS.multiplier,
+            open_on_low_pnl: { enabled: true, max_pnl: DEFAULTS.maxPnl },
           },
-          trader_settings: {
-            trading_strategy: {
-              type: "order_based",
-              risk_parameters: {
-                blocked_assets: [],
-                self_proportionality_multiplier: DEFAULTS.multiplier,
-                open_on_low_pnl: { enabled: true, max_pnl: DEFAULTS.maxPnl },
-              },
-              bucket_config: {
-                pricing_strategy: "vwap",
-                auto: {
-                  ratio_threshold: DEFAULTS.ratioThreshold,
-                  wide_bucket_percent: DEFAULTS.wideBucketPct,
-                  narrow_bucket_percent: DEFAULTS.narrowBucketPct,
-                },
-              },
+          bucket_config: {
+            pricing_strategy: "vwap",
+            auto: {
+              ratio_threshold: DEFAULTS.ratioThreshold,
+              wide_bucket_percent: DEFAULTS.wideBucketPct,
+              narrow_bucket_percent: DEFAULTS.narrowBucketPct,
             },
           },
         },
       },
+    },
+  };
+
+  const [form, { Form: FormComponent, Field: FormField }] =
+    createForm<CreateTraderForm>({
+      validate: validateForm,
+      initialValues,
     });
 
   const handleSubmit = async (values: CreateTraderForm) => {
     setError(null);
     try {
+      // Merge with initial values so collapsed/unregistered sections are
+      // preserved when saving (otherwise editing only the visible top
+      // section would wipe out the trader's existing bucket_config etc.).
+      const merged = deepMerge(initialValues, values) as CreateTraderForm;
       const walletAddress = isEditing
         ? props.initialValues?.wallet_address
-        : values.wallet_address;
-      values.config.provider_settings.self_account.address = walletAddress ?? "";
-      await props.onSubmit(values);
+        : merged.wallet_address;
+      merged.config.provider_settings.self_account.address = walletAddress ?? "";
+      await props.onSubmit(merged);
     } catch (e) {
       setError(e instanceof Error ? e.message : "An error occurred");
     }
@@ -141,7 +178,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
         <PanelBody class="space-y-4">
           {/* Name + Description — create mode only; edit mode uses Overview tab */}
           <Show when={!props.isEditing}>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormGrid>
               <FormField name="name">
                 {(field, fieldProps) => (
                   <div class="space-y-1.5">
@@ -186,7 +223,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                   </div>
                 )}
               </FormField>
-            </div>
+            </FormGrid>
           </Show>
 
           <Show when={!props.isEditing}>
@@ -266,7 +303,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
             )}
           </FormField>
 
-          <div class="grid grid-cols-2 gap-4">
+          <FormGrid>
             <FormField name="config.provider_settings.network">
               {(field, fieldProps) => (
                 <div class="space-y-1.5">
@@ -301,11 +338,11 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     />
                   </div>
                 </div>
-              )}
-            </FormField>
-          </div>
+                )}
+              </FormField>
+            </FormGrid>
 
-        </PanelBody>
+          </PanelBody>
       </Panel>
 
       {/* ── Advanced Settings panel (collapsible) ───────────────────────── */}
@@ -390,7 +427,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                 )}
               </FormField>
 
-              <div class="grid grid-cols-2 gap-4">
+              <FormGrid>
                 <div class="space-y-2">
                   <Label class="text-xs text-text-muted">Max Leverage</Label>
                   <div class="flex items-center justify-between rounded-md border border-border-default bg-surface-raised px-3 h-9">
@@ -455,9 +492,9 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     </div>
                   )}
                 </FormField>
-              </div>
+              </FormGrid>
 
-              <div class="grid grid-cols-2 gap-4">
+              <FormGrid>
                 <FormField name="config.trader_settings.trading_strategy.risk_parameters.open_on_low_pnl.enabled" type="boolean">
                   {(field, _fieldProps) => (
                     <div class="space-y-1.5">
@@ -507,7 +544,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     </div>
                   )}
                 </FormField>
-              </div>
+              </FormGrid>
             </div>
 
             {/* Slippage section */}
@@ -580,7 +617,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
               </Show>
 
               <Show when={bucketMode() === "auto"}>
-                <div class="grid grid-cols-3 gap-4">
+                <FormGrid cols={3}>
                   {/* @ts-expect-error - bucket_config.auto path exists when bucketMode is "auto" */}
                   <FormField name="config.trader_settings.trading_strategy.bucket_config.auto.ratio_threshold" type="number">
                     {(field, fieldProps) => (
@@ -656,7 +693,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                       </div>
                     )}
                   </FormField>
-                </div>
+                </FormGrid>
               </Show>
 
               <FormField name="config.trader_settings.trading_strategy.bucket_config.pricing_strategy" type="string">

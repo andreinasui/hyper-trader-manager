@@ -28,6 +28,11 @@ export function IconButton(props: IconButtonProps) {
       <TooltipTrigger
         as="button"
         type="button"
+        // Provide accessible name + native title fallback for icon-only buttons.
+        // Kobalte tooltips render visually on hover but don't set the accessible
+        // name on the trigger, leaving these buttons unnamed for screen readers.
+        aria-label={local.tooltip}
+        title={local.tooltip}
         disabled={local.disabled || local.loading}
         class={cn(
           "p-1.5 rounded transition-colors disabled:opacity-50",

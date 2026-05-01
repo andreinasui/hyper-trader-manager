@@ -8,7 +8,7 @@ export const DropdownMenuGroup = DropdownMenuPrimitive.Group;
 export const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 export const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
 
-export interface DropdownMenuContentProps {
+export interface DropdownMenuContentProps extends ParentProps {
   class?: string;
 }
 

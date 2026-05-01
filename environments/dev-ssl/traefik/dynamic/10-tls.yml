@@ -1,0 +1,26 @@
+http:
+  routers:
+    health-tls:
+      rule: Host(`hypertrader.localtest.me`) && Path(`/health`)
+      service: api
+      entryPoints:
+      - websecure
+      priority: 20
+      tls:
+        certResolver: letsencrypt
+    api-tls:
+      rule: Host(`hypertrader.localtest.me`) && PathPrefix(`/api`)
+      service: api
+      entryPoints:
+      - websecure
+      priority: 10
+      tls:
+        certResolver: letsencrypt
+    web-tls:
+      rule: Host(`hypertrader.localtest.me`)
+      service: web
+      entryPoints:
+      - websecure
+      priority: 1
+      tls:
+        certResolver: letsencrypt

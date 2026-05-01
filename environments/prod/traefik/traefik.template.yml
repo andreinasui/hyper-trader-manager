@@ -1,0 +1,16 @@
+# Bootstrap template for Traefik static config.
+# This file is the committed source of truth.
+#
+# install.sh downloads this file as traefik/traefik.yml on the VPS.
+# traefik.yml is gitignored — the SSL wizard overwrites it with domain/ACME config.
+# Never edit traefik.yml directly; update this template instead.
+entryPoints:
+  web:
+    address: :80
+  websecure:
+    address: :443
+ping: {}
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true

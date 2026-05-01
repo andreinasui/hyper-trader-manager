@@ -1,25 +1,39 @@
 # HyperTrader Manager Stack — dev with local SSL (Pebble)
 #
 # Self-contained compose file for testing the SSL wizard end-to-end locally.
-# Combines docker-compose.dev.yml + docker-compose.pebble.yml into a single file.
+# Uses Pebble (Let's Encrypt's test ACME server) instead of real Let's Encrypt.
 #
-# Usage:
-#   One-time setup (from repo root):
-#     cp deploy/.env.api.pebble.example deploy/.env.api.pebble
-#     cp data/traefik/traefik.template.yml data/traefik-pebble/traefik.yml
-#     touch data/traefik-pebble/acme.json && chmod 600 data/traefik-pebble/acme.json
+# Usage (from repo root):
+#   One-time setup:
+#     cp environments/dev-ssl/.env.example environments/dev-ssl/.env
+#     cp environments/dev-ssl/api.env.example environments/dev-ssl/api.env
+#     cp environments/dev-ssl/api-pebble.env.example environments/dev-ssl/api-pebble.env
+#     cp environments/dev-ssl/traefik/traefik.template.yml environments/dev-ssl/traefik/traefik.yml
 #
-#   Start the stack (from repo root):
-#     docker compose -f deploy/docker-compose.dev_ssl.yml --env-file deploy/.env up -d --build
+#   Start the stack:
+#     docker compose -f environments/dev-ssl/docker-compose.yml \
+#       --env-file environments/dev-ssl/.env up -d --build
 #
-#   3. browse to http://hypertrader.localtest.me/
-#   4. submit the SSL wizard with domain=hypertrader.localtest.me
-#   5. browser ends up on https://hypertrader.localtest.me (cert from Pebble —
-#      browser will warn; trust it once for testing)
+#   Browse to http://hypertrader.localtest.me/
+#   Submit the SSL wizard with domain=hypertrader.localtest.me
+#   Browser ends up on https://hypertrader.localtest.me (cert from Pebble —
+#   browser will warn; trust it once for testing)
 #
-# To return to vanilla dev: use docker-compose.dev.yml instead.
+# To return to vanilla dev: use environments/dev/docker-compose.yml instead.
 
 services:
+  # ============================================
+  # Init: ensure acme.json exists with mode 600 before Traefik starts.
+  # Traefik refuses to use the file if permissions are too open (>600).
+  # If Docker created acme.json as a directory (happens when the file didn't
+  # exist on the host at first stack-up), remove it before creating the file.
+  # ============================================
+  traefik-acme-init:
+    image: busybox
+    command: sh -c "[ -d /data/acme.json ] && rm -rf /data/acme.json; touch /data/acme.json && chmod 600 /data/acme.json"
+    volumes:
+      - ./traefik:/data
+
   # ============================================
   # Traefik reverse proxy
   # Routes /api/* → api, /* → web
@@ -38,8 +52,8 @@ services:
     environment:
       - LEGO_CA_CERTIFICATES=/etc/ssl/pebble.minica.pem
     volumes:
-      - ../data/traefik-pebble:/etc/traefik:ro
-      - ../data/traefik-pebble/acme.json:/letsencrypt/acme.json
+      - ./traefik:/etc/traefik:ro
+      - ./traefik/acme.json:/letsencrypt/acme.json
       - ./pebble/pebble.minica.pem:/etc/ssl/pebble.minica.pem:ro
     networks:
       hypertrader:
@@ -51,28 +65,31 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+    depends_on:
+      traefik-acme-init:
+        condition: service_completed_successfully
 
   # ============================================
   # API service (FastAPI + uvicorn)
   # ============================================
   api:
     build:
-      context: ../api
+      context: ../../api
       dockerfile: Dockerfile
     container_name: hypertrader-api
     restart: unless-stopped
     env_file:
-      - .env.api.development
-      - .env.api.pebble
+      - api.env
+      - api-pebble.env
     group_add:
       - ${DOCKER_GID}
     volumes:
       # Persistent data: SQLite database and trader configs
-      - ../data/sqlitedb/:/app/data
+      - ./sqlitedb/:/app/data
       # Docker socket access for managing trader containers
       - ${DOCKER_SOCK}:/var/run/docker.sock
-      # Bind mount for Traefik config (wizard writes here — isolated from data/traefik/)
-      - ../data/traefik-pebble:/host-traefik
+      # Bind mount for Traefik config (wizard writes here — isolated from dev/traefik/)
+      - ./traefik:/host-traefik
     networks:
       - hypertrader
     healthcheck:
@@ -90,7 +107,7 @@ services:
   # ============================================
   web:
     build:
-      context: ../web
+      context: ../../web
       dockerfile: Dockerfile
     container_name: hypertrader-web
     restart: unless-stopped

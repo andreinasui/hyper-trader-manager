@@ -163,3 +163,25 @@ pnpm test:e2e:headed     # Run e2e in headed mode
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000 (see `/api` folder)
 - **API Docs**: http://localhost:8000/docs
+
+## Responsive Design Conventions
+
+The app supports phone (≤640px), tablet (641–1024px), and desktop (>1024px). Adaptation lives in shared primitives, not in route files.
+
+### Rules
+
+1. **Pages contain almost no `md:` / `lg:` / `sm:` classes.** Route files describe layout in terms of primitives; the primitives decide breakpoints internally.
+2. **Primitives use container queries** (`@container`, `@sm:`, `@lg:` Tailwind v4 native) so they adapt to their parent's width, not the viewport. This makes them work correctly inside narrow contexts (modals, sidebars).
+3. **Viewport breakpoints (`md:`, `lg:`) are reserved for app-chrome layout decisions** — sidebar drawer toggle, top-level grid splits — never for component-internal responsiveness.
+4. **Fluid typography is global** (see `styles.css` `@theme` `--text-*` tokens). Don't override `font-size` per breakpoint.
+
+### Mobile-friendly primitives
+
+| Primitive | Location | Purpose |
+|-----------|----------|---------|
+| `<FormGrid>` | `~/components/ui/form-grid` | Auto-stacks form fields by container width |
+| `<PageActions>` | `~/components/layout/PageActions` | Collapses secondary actions into `⋯` menu on narrow containers |
+| `<ResponsiveTable>` | `~/components/ui/responsive-table` | Renders 12-col table on tablet+, stacked cards on phone |
+| `<KpiStrip>` | `~/components/ui/kpi-card` | 2×2 on phone, 1×N on tablet+ |
+
+If you find yourself writing `class="grid grid-cols-2 md:grid-cols-3"` in a route file, that's a sign the primitive needs to grow — extend it, don't branch in the page.

@@ -190,6 +190,29 @@ const TraderOverview: Component<OverviewDesignProps> = (props) => {
         </div>
       </Show>
 
+      {/* Persisted last_error (e.g., crash/start-failure recorded in DB).
+          Shown only when no live runtime_status.error is available, to avoid
+          duplicating the same message. */}
+      <Show
+        when={
+          props.trader.status === "failed" &&
+          props.trader.last_error &&
+          !props.statusQuery.data?.runtime_status?.error
+        }
+      >
+        <div class="bg-error/10 border border-error/30 rounded-lg p-4">
+          <div class="flex items-start gap-3">
+            <AlertCircle class="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-error mb-1">Last error</div>
+              <div class="text-sm text-text-secondary font-mono break-all">
+                {props.trader.last_error}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Show>
+
       {/* Trader Info Panel */}
       <Panel>
         <div class="px-5 py-3.5 border-b border-border-default">
@@ -203,6 +226,7 @@ const TraderOverview: Component<OverviewDesignProps> = (props) => {
                 value={props.editName()}
                 onInput={(e) => props.handleNameChange(e.currentTarget.value)}
                 placeholder="Enter trader name"
+                maxLength={50}
               />
             </div>
 
@@ -213,6 +237,7 @@ const TraderOverview: Component<OverviewDesignProps> = (props) => {
                 onInput={(e) => props.handleDescriptionChange(e.currentTarget.value)}
                 placeholder="Optional description"
                 rows={3}
+                maxLength={255}
               />
             </div>
 

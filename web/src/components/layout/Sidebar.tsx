@@ -158,6 +158,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       {/* Mobile menu button */}
       <div class="lg:hidden fixed top-4 left-4 z-50">
         <button
+          data-mobile-sidebar-trigger
           onClick={() => setMobileOpen(!mobileOpen())}
           class="h-10 w-10 rounded-md bg-surface-raised border border-border-default flex items-center justify-center text-text-muted hover:text-text-secondary hover:bg-surface-overlay transition-all duration-150"
         >
@@ -170,6 +171,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
       {/* Mobile overlay */}
       <Show when={mobileOpen()}>
         <div
+          data-mobile-sidebar-backdrop
           class="lg:hidden fixed inset-0 bg-black/50 z-40"
           onClick={() => setMobileOpen(false)}
         />
@@ -177,6 +179,7 @@ export const Sidebar: Component<SidebarProps> = (props) => {
 
       {/* Mobile sidebar */}
       <aside
+        data-mobile-sidebar
         class={cn(
           "lg:hidden fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200",
           mobileOpen() ? "translate-x-0" : "-translate-x-full"

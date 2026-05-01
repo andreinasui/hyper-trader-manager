@@ -113,9 +113,9 @@ fi
 # ── Phase 3: Create directory structure ──────────────────────────────────────
 header "Creating install directory"
 
-mkdir -p "${INSTALL_DIR}/deploy/data/traefik/dynamic"
-touch "${INSTALL_DIR}/deploy/data/traefik/acme.json"
-chmod 600 "${INSTALL_DIR}/deploy/data/traefik/acme.json"
+mkdir -p "${INSTALL_DIR}/traefik/dynamic"
+touch "${INSTALL_DIR}/traefik/acme.json"
+chmod 600 "${INSTALL_DIR}/traefik/acme.json"
 
 success "Created ${INSTALL_DIR}"
 
@@ -133,11 +133,11 @@ download() {
   fi
 }
 
-download "${RAW_BASE}/deploy/docker-compose.prod.yml" "${INSTALL_DIR}/deploy/docker-compose.prod.yml"
-download "${RAW_BASE}/deploy/.env.example" "${INSTALL_DIR}/deploy/.env.example"
-download "${RAW_BASE}/api/.env.example" "${INSTALL_DIR}/deploy/api.env.example"
-download "${RAW_BASE}/data/traefik/traefik.template.yml" "${INSTALL_DIR}/deploy/data/traefik/traefik.yml"
-download "${RAW_BASE}/data/traefik/dynamic/00-bootstrap.yml" "${INSTALL_DIR}/deploy/data/traefik/dynamic/00-bootstrap.yml"
+download "${RAW_BASE}/environments/prod/docker-compose.yml" "${INSTALL_DIR}/docker-compose.yml"
+download "${RAW_BASE}/environments/prod/.env.example" "${INSTALL_DIR}/.env.example"
+download "${RAW_BASE}/environments/prod/api.env.example" "${INSTALL_DIR}/api.env.example"
+download "${RAW_BASE}/environments/prod/traefik/traefik.template.yml" "${INSTALL_DIR}/traefik/traefik.yml"
+download "${RAW_BASE}/environments/prod/traefik/dynamic/00-bootstrap.yml" "${INSTALL_DIR}/traefik/dynamic/00-bootstrap.yml"
 download "${RAW_BASE}/scripts/hyper-trader-manager.sh" "${MANAGER_BIN}"
 
 success "Files downloaded."
@@ -161,31 +161,29 @@ success "Docker GID:    ${DOCKER_GID}"
 # ── Phase 6: Create env files ─────────────────────────────────────────────────
 header "Generating environment files"
 
-DEPLOY_DIR="${INSTALL_DIR}/deploy"
+# --- .env ---
+cp "${INSTALL_DIR}/.env.example" "${INSTALL_DIR}/.env"
 
-# --- deploy/.env ---
-cp "${DEPLOY_DIR}/.env.example" "${DEPLOY_DIR}/.env"
+sed -i "s|^DOCKER_GID=.*|DOCKER_GID=${DOCKER_GID}|" "${INSTALL_DIR}/.env"
+sed -i "s|^DOCKER_SOCK=.*|DOCKER_SOCK=${DOCKER_SOCK}|" "${INSTALL_DIR}/.env"
+sed -i "s|^HYPERTRADER_API_IMAGE=.*|HYPERTRADER_API_IMAGE=${GHCR_PREFIX}/${REPO_NAME}-api:${IMAGE_TAG}|" "${INSTALL_DIR}/.env"
+sed -i "s|^HYPERTRADER_WEB_IMAGE=.*|HYPERTRADER_WEB_IMAGE=${GHCR_PREFIX}/${REPO_NAME}-web:${IMAGE_TAG}|" "${INSTALL_DIR}/.env"
 
-sed -i "s|^DOCKER_GID=.*|DOCKER_GID=${DOCKER_GID}|" "${DEPLOY_DIR}/.env"
-sed -i "s|^DOCKER_SOCK=.*|DOCKER_SOCK=${DOCKER_SOCK}|" "${DEPLOY_DIR}/.env"
-sed -i "s|^HYPERTRADER_API_IMAGE=.*|HYPERTRADER_API_IMAGE=${GHCR_PREFIX}/${REPO_NAME}-api:${IMAGE_TAG}|" "${DEPLOY_DIR}/.env"
-sed -i "s|^HYPERTRADER_WEB_IMAGE=.*|HYPERTRADER_WEB_IMAGE=${GHCR_PREFIX}/${REPO_NAME}-web:${IMAGE_TAG}|" "${DEPLOY_DIR}/.env"
+success "Created ${INSTALL_DIR}/.env"
 
-success "Created ${DEPLOY_DIR}/.env"
+# --- api.env ---
+cp "${INSTALL_DIR}/api.env.example" "${INSTALL_DIR}/api.env"
 
-# --- deploy/api.env ---
-cp "${DEPLOY_DIR}/api.env.example" "${DEPLOY_DIR}/api.env"
-
-success "Created ${DEPLOY_DIR}/api.env"
+success "Created ${INSTALL_DIR}/api.env"
 
 # Fix ownership: entire install directory belongs to the invoking user, not root
 chown -R "${REAL_USER}:${REAL_GROUP}" "${INSTALL_DIR}"
 success "Ownership set to ${REAL_USER}:${REAL_GROUP}"
 
 # The API container runs as UID 1000 (hypertrader) and needs to write Traefik
-# config files into data/traefik. Ensure that directory is owned by UID 1000
+# config files into traefik/. Ensure that directory is owned by UID 1000
 # regardless of who invoked the install script (e.g. root on a root-only VPS).
-chown -R 1000:1000 "${INSTALL_DIR}/deploy/data/traefik"
+chown -R 1000:1000 "${INSTALL_DIR}/traefik"
 success "Traefik config directory ownership set to 1000:1000 (API container user)"
 
 # ── Phase 7: Install management script ───────────────────────────────────────
@@ -207,11 +205,11 @@ echo -e "  ${BOLD}Web image:${RESET}         ${GHCR_PREFIX}/${REPO_NAME}-web:${I
 echo ""
 echo -e "${YELLOW}${BOLD}  !! Post-install configuration required:${RESET}"
 echo ""
-echo -e "  Edit ${BOLD}${DEPLOY_DIR}/api.env${RESET}"
+echo -e "  Edit ${BOLD}${INSTALL_DIR}/api.env${RESET}"
 echo -e "    -> Set ${BOLD}CORS_ORIGINS${RESET} to your domain or VPS IP"
 echo -e "       e.g.  CORS_ORIGINS=https://yourdomain.com"
 echo ""
-echo -e "  Edit ${BOLD}${DEPLOY_DIR}/.env${RESET} if you need non-standard ports"
+echo -e "  Edit ${BOLD}${INSTALL_DIR}/.env${RESET} if you need non-standard ports"
 echo -e "    -> PUBLIC_PORT (default: 80)"
 echo -e "    -> HTTPS_PUBLIC_PORT (default: 443)"
 echo ""

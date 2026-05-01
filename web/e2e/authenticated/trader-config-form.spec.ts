@@ -174,14 +174,14 @@ test.describe('Trader Config Form - Advanced Settings', () => {
 
   test('can expand advanced settings', async ({ page }) => {
     // Advanced settings should be collapsed by default - Risk Parameters should not be visible
-    await expect(page.locator('h4:has-text("Risk Parameters")')).not.toBeVisible();
+    await expect(page.getByText('Risk Parameters', { exact: true })).not.toBeVisible();
     
     // Click to expand Advanced Settings
     const advancedSettingsButton = page.locator('button').filter({ hasText: 'Advanced Settings' });
     await advancedSettingsButton.click();
     
     // Advanced settings should now be visible
-    await expect(page.locator('h4:has-text("Risk Parameters")')).toBeVisible();
+    await expect(page.getByText('Risk Parameters', { exact: true })).toBeVisible();
   });
 
   test('blocked assets tag input works', async ({ page }) => {
@@ -190,7 +190,7 @@ test.describe('Trader Config Form - Advanced Settings', () => {
     await advancedSettingsButton.click();
     
     // Wait for advanced settings to be visible
-    await expect(page.locator('h4:has-text("Risk Parameters")')).toBeVisible();
+    await expect(page.getByText('Risk Parameters', { exact: true })).toBeVisible();
     
     // Find the blocked assets section by its label
     const blockedAssetsLabel = page.getByText('Blocked Assets', { exact: true });

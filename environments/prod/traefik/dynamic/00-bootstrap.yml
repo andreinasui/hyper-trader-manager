@@ -1,0 +1,41 @@
+# Initial Traefik dynamic config - HTTP only.
+# Routes /api/* to the API container, everything else to the web container.
+# Overwritten by the SSL setup wizard once a domain certificate is provisioned.
+http:
+  routers:
+    health:
+      rule: "Path(`/health`)"
+      service: web
+      entryPoints:
+        - web
+      priority: 20
+    api:
+      rule: "PathPrefix(`/api`)"
+      service: api
+      entryPoints:
+        - web
+      priority: 10
+    web:
+      rule: "PathPrefix(`/`)"
+      service: web
+      entryPoints:
+        - web
+      priority: 1
+
+  services:
+    api:
+      loadBalancer:
+        servers:
+          - url: "http://api:8000"
+        healthCheck:
+          path: /health
+          interval: "10s"
+          timeout: "5s"
+    web:
+      loadBalancer:
+        servers:
+          - url: "http://web:3000"
+        healthCheck:
+          path: /
+          interval: "10s"
+          timeout: "5s"

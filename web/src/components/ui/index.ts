@@ -17,7 +17,6 @@ export * from "./tooltip";
 export * from "./kpi-card";
 export * from "./empty-state";
 export * from "./icon-button";
-export * from "./data-table";
 export * from "./section-label";
 export * from "./textarea";
 export * from "./toggle-group";

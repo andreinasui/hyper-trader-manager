@@ -1,5 +1,15 @@
-# HyperTrader Manager Stack
-#   docker compose -f docker-compose.prod.yml up -d
+# HyperTrader Manager Stack — local development
+#
+# Usage (from repo root):
+#   One-time setup:
+#     cp environments/dev/.env.example environments/dev/.env
+#     cp environments/dev/api.env.example environments/dev/api.env
+#     cp environments/dev/traefik/traefik.template.yml environments/dev/traefik/traefik.yml
+#     touch environments/dev/traefik/acme.json && chmod 600 environments/dev/traefik/acme.json
+#
+#   Start the stack:
+#     docker compose -f environments/dev/docker-compose.yml \
+#       --env-file environments/dev/.env up -d --build
 
 services:
   # ============================================
@@ -14,8 +24,8 @@ services:
       - "${PUBLIC_PORT:-80}:80"
       - "${HTTPS_PUBLIC_PORT:-443}:443"
     volumes:
-      - ./data/traefik:/etc/traefik:ro
-      - ./data/traefik/acme.json:/letsencrypt/acme.json
+      - ./traefik:/etc/traefik:ro
+      - ./traefik/acme.json:/letsencrypt/acme.json
     networks:
       - hypertrader
     healthcheck:
@@ -29,20 +39,22 @@ services:
   # API service (FastAPI + uvicorn)
   # ============================================
   api:
-    image: ${HYPERTRADER_API_IMAGE}
+    build:
+      context: ../../api
+      dockerfile: Dockerfile
     container_name: hypertrader-api
     restart: unless-stopped
     env_file:
       - api.env
     group_add:
-      - ${DOCKER_GID:-999}
+      - ${DOCKER_GID}
     volumes:
       # Persistent data: SQLite database and trader configs
-      - hypertrader-data:/app/data
+      - ./sqlitedb/:/app/data
       # Docker socket access for managing trader containers
       - ${DOCKER_SOCK}:/var/run/docker.sock
       # Bind mount for Traefik config (wizard writes here)
-      - ./data/traefik:/host-traefik
+      - ./traefik:/host-traefik
     networks:
       - hypertrader
     healthcheck:
@@ -56,11 +68,13 @@ services:
   # Web service
   # ============================================
   web:
-    image: ${HYPERTRADER_WEB_IMAGE}
+    build:
+      context: ../../web
+      dockerfile: Dockerfile
     container_name: hypertrader-web
     restart: unless-stopped
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
     networks:
       - hypertrader
     healthcheck:
@@ -84,6 +98,3 @@ services:
 networks:
   hypertrader:
     driver: bridge
-
-volumes:
-  hypertrader-data:
