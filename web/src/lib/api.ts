@@ -15,6 +15,7 @@ import type {
   StopResponse,
   ImageVersionInfo,
 } from "./types";
+import type { UpdateStatusResponse, ApplyUpdateResponse } from "./updates";
 import { config } from "~/config";
 
 const baseUrl = config.VITE_API_URL;
@@ -181,5 +182,24 @@ export const api = {
 
   async adminGetStats(): Promise<SystemStats> {
     return fetchJson("/v1/admin/stats");
+  },
+
+  // Updates
+  updates: {
+    async getStatus(): Promise<UpdateStatusResponse> {
+      return fetchJson("/api/updates/status");
+    },
+
+    async apply(): Promise<ApplyUpdateResponse> {
+      return fetchJson("/api/updates/apply", { method: "POST" });
+    },
+
+    async acknowledge(): Promise<ApplyUpdateResponse> {
+      return fetchJson("/api/updates/acknowledge", { method: "POST" });
+    },
+
+    async check(): Promise<UpdateStatusResponse> {
+      return fetchJson("/api/updates/check", { method: "POST" });
+    },
   },
 };

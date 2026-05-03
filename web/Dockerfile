@@ -39,5 +39,8 @@ COPY --from=builder /app/.output /app/.output
 # Expose port
 EXPOSE 3000
 
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD wget -q --spider http://localhost:3000/ 2>/dev/null || exit 1
+
 # Run the server
 CMD ["node", ".output/server/index.mjs"]

@@ -55,6 +55,7 @@ The script will:
   3. Update api/pyproject.toml and web/package.json
   4. Commit and push the version bump
   5. Create annotated tag vX.Y.Z and push it
+  6. CI will build and push api, web, and helper Docker images on tag push
 EOF
 }
 
@@ -231,6 +232,9 @@ if [[ "$DRY_RUN" == true ]]; then
   echo "  git add scripts/install.sh"
   echo "  git commit -m \"chore: reset install.sh after ${TAG} release\""
   echo "  git push origin main"
+  echo "  [CI] docker build/push ghcr.io/andreinasui/hyper-trader-manager-api:${VERSION}"
+  echo "  [CI] docker build/push ghcr.io/andreinasui/hyper-trader-manager-web:${VERSION}"
+  echo "  [CI] docker build/push ghcr.io/andreinasui/hyper-trader-manager-update-helper:${VERSION}"
   echo ""
   echo -e "${GREEN}Dry run complete. Remove --dry-run to create the release.${NC}"
   exit 0
@@ -336,4 +340,8 @@ echo "  ✓ Stamped scripts/install.sh with PINNED_VERSION=${TAG}"
 echo "  ✓ Committed and pushed version bump"
 echo "  ✓ Created and pushed tag ${TAG}"
 echo "  ✓ Reset scripts/install.sh PINNED_VERSION on main"
+echo "  → CI will build and push Docker images:"
+echo "      ghcr.io/andreinasui/hyper-trader-manager-api:${VERSION}"
+echo "      ghcr.io/andreinasui/hyper-trader-manager-web:${VERSION}"
+echo "      ghcr.io/andreinasui/hyper-trader-manager-update-helper:${VERSION}"
 echo ""

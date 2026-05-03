@@ -54,6 +54,14 @@ class Settings(BaseSettings):
         "/host-traefik"  # Path to Traefik config directory (bind-mounted from host)
     )
 
+    # ==================== Update System ====================
+    github_repo: str = "andreinasui/hyper-trader-manager"
+    update_state_dir: str = "/var/lib/update-state"
+    compose_project_dir: str | None = None  # None disables the update system (e.g. in dev)
+    update_check_interval_hours: int = 24
+    update_health_check_timeout_seconds: int = 60
+    helper_image: str = "ghcr.io/andreinasui/hyper-trader-manager-update-helper:latest"
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def debug(self) -> str:

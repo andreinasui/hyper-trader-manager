@@ -28,3 +28,8 @@ export const imageKeys = {
   all: ["images"] as const,
   versions: () => [...imageKeys.all, "versions"] as const,
 };
+
+export const updateKeys = {
+  all: ["updates"] as const,
+  status: () => [...updateKeys.all, "status"] as const,
+};

@@ -37,6 +37,12 @@ services:
       - api.env
     group_add:
       - ${DOCKER_GID:-999}
+    environment:
+      - UPDATE_STATE_DIR=/var/lib/update-state
+      - COMPOSE_PROJECT_DIR=${COMPOSE_PROJECT_DIR}
+      - GITHUB_REPO=${GITHUB_REPO:-andreinasui/hyper-trader-manager}
+      - HELPER_IMAGE=${HELPER_IMAGE}
+      - UPDATE_INTERVAL_SECONDS=${UPDATE_INTERVAL_SECONDS:-3600}
     volumes:
       # Persistent data: SQLite database and trader configs
       - hypertrader-data:/app/data
@@ -44,6 +50,10 @@ services:
       - ${DOCKER_SOCK}:/var/run/docker.sock
       # Bind mount for Traefik config (wizard writes here)
       - ./traefik:/host-traefik
+      # Update state persistence
+      - update-state:/var/lib/update-state
+      # Stack directory (read-only) for update system
+      - ${COMPOSE_PROJECT_DIR}:${COMPOSE_PROJECT_DIR}:ro
     networks:
       - hypertrader
     healthcheck:
@@ -88,3 +98,4 @@ networks:
 
 volumes:
   hypertrader-data:
+  update-state:

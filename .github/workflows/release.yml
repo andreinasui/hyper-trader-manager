@@ -10,6 +10,7 @@ env:
   REGISTRY: ghcr.io
   API_IMAGE: ghcr.io/andreinasui/hyper-trader-manager-api
   WEB_IMAGE: ghcr.io/andreinasui/hyper-trader-manager-web
+  HELPER_IMAGE: ghcr.io/andreinasui/hyper-trader-manager-update-helper
 
 jobs:
   test-api:
@@ -212,9 +213,85 @@ jobs:
           echo "docker pull ${{ env.WEB_IMAGE }}:${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
+  build-push-helper:
+    name: Build and Push Helper Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Helper Docker image
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.HELPER_IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ !contains(github.ref, '-') }}
+          labels: |
+            org.opencontainers.image.title=HyperTrader Manager Update Helper
+            org.opencontainers.image.description=HyperTrader Manager Update Helper - System update helper service
+            org.opencontainers.image.vendor=HyperTrader
+
+      - name: Build and push Helper Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: helper
+          file: helper/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ steps.version.outputs.VERSION }}
+            VCS_REF=${{ github.sha }}
+
+      - name: Generate Helper image summary
+        run: |
+          echo "## Docker Helper Image Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.HELPER_IMAGE }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Available Tags:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Pull Command:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.HELPER_IMAGE }}:${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
   notify:
     name: Notify Discord
-    needs: [build-push-api, build-push-web]
+    needs: [build-push-api, build-push-web, build-push-helper]
     runs-on: ubuntu-latest
     if: always()
 
@@ -226,7 +303,7 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Notify Discord - Success
-        if: needs.build-push-api.result == 'success' && needs.build-push-web.result == 'success'
+        if: needs.build-push-api.result == 'success' && needs.build-push-web.result == 'success' && needs.build-push-helper.result == 'success'
         uses: sarisia/actions-status-discord@v1
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
@@ -236,18 +313,20 @@ jobs:
             **Version:** `${{ steps.version.outputs.VERSION }}`
             **API Image:** `${{ env.API_IMAGE }}:${{ steps.version.outputs.VERSION }}`
             **Web Image:** `${{ env.WEB_IMAGE }}:${{ steps.version.outputs.VERSION }}`
+            **Helper Image:** `${{ env.HELPER_IMAGE }}:${{ steps.version.outputs.VERSION }}`
 
             **Pull Commands:**
             ```
             docker pull ${{ env.API_IMAGE }}:${{ steps.version.outputs.VERSION }}
             docker pull ${{ env.WEB_IMAGE }}:${{ steps.version.outputs.VERSION }}
+            docker pull ${{ env.HELPER_IMAGE }}:${{ steps.version.outputs.VERSION }}
             ```
           color: 0x00ff00
           username: GitHub Actions
           avatar_url: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png
 
       - name: Notify Discord - Failure
-        if: needs.build-push-api.result == 'failure' || needs.build-push-web.result == 'failure'
+        if: needs.build-push-api.result == 'failure' || needs.build-push-web.result == 'failure' || needs.build-push-helper.result == 'failure'
         uses: sarisia/actions-status-discord@v1
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}

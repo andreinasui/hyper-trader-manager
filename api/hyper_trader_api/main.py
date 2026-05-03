@@ -4,6 +4,7 @@ HyperTrader API - Main Application
 Multi-tenant trading bot management platform.
 """
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -20,6 +21,7 @@ from hyper_trader_api.database import engine
 from hyper_trader_api.db.bootstrap import bootstrap_database
 from hyper_trader_api.routers import auth_router, images_router, traders_router
 from hyper_trader_api.routers.ssl_setup import router as ssl_setup_router
+from hyper_trader_api.routers.updates import router as updates_router
 
 settings = get_settings()
 
@@ -74,10 +76,39 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     logger.info("HyperTrader API started successfully")
 
+    # Start UpdateChecker background worker if compose_project_dir is configured
+    checker = None
+    checker_task = None
+    if settings.compose_project_dir is not None:
+        from hyper_trader_api.services.update_service import UpdateService
+        from hyper_trader_api.workers.update_checker import UpdateChecker
+
+        svc = UpdateService(
+            state_dir=settings.update_state_dir,
+            compose_project_dir=settings.compose_project_dir,
+        )
+        checker = UpdateChecker(
+            service=svc,
+            repo=settings.github_repo,
+            interval=settings.update_check_interval_hours * 3600,
+        )
+        checker_task = asyncio.create_task(checker.start())
+        logger.info(f"UpdateChecker started for repo {settings.github_repo}")
+    else:
+        logger.debug("compose_project_dir not configured — UpdateChecker skipped (dev mode)")
+
     yield
 
     # Shutdown
     logger.info("Shutting down HyperTrader API...")
+
+    if checker_task is not None and checker is not None:
+        checker.stop()
+        checker_task.cancel()
+        try:
+            await asyncio.wait_for(checker_task, timeout=5.0)
+        except (asyncio.CancelledError, TimeoutError):
+            pass
 
     engine.dispose()
     logger.info("HyperTrader API shutdown complete")
@@ -172,6 +203,7 @@ app.include_router(auth_router)
 app.include_router(traders_router)
 app.include_router(images_router)
 app.include_router(ssl_setup_router)
+app.include_router(updates_router)
 # app.include_router(admin_router)  # Disabled - no admin functionality currently implemented
 
 
