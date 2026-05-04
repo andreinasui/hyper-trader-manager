@@ -69,6 +69,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         logger.debug("Bootstrapping database...")
         bootstrap_database(engine)
+
+        # Repair stale SSL config (handles reinstall scenario where traefik.yml
+        # was reset to bootstrap but the DB still shows ssl_configured=true)
+        from hyper_trader_api.database import SessionLocal
+        from hyper_trader_api.services.ssl_setup_service import SSLSetupService
+
+        with SessionLocal() as db:
+            SSLSetupService(db).repair_if_inconsistent()
+
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")

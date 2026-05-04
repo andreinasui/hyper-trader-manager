@@ -109,6 +109,54 @@ class SSLSetupService:
                 raise
             raise SSLSetupError(f"Domain SSL setup failed: {e}") from e
 
+    def repair_if_inconsistent(self) -> None:
+        """Detect and repair stale SSL config on startup.
+
+        Called during application lifespan startup. If the DB records SSL as
+        configured (mode='domain') but ``traefik.yml`` is missing or lacks a
+        ``certificatesResolvers`` section, the Traefik config files are
+        re-written from the stored domain/email and Traefik is restarted.
+
+        This handles the reinstall scenario: ``rm -rf /opt/hyper-trader`` resets
+        ``traefik.yml`` to the bootstrap template, but named volumes survive so
+        the DB still shows ``ssl_configured=true``.
+
+        Errors are logged but never raised — a startup failure here must not
+        prevent the API from starting.
+        """
+        settings = get_settings()
+        if settings.environment != "production":
+            return
+
+        config = self.get_ssl_config()
+        if config is None or config.mode is None or not config.domain or not config.email:
+            return
+
+        traefik_config_dir = Path(settings.traefik_config_dir)
+        traefik_path = traefik_config_dir / "traefik.yml"
+
+        consistent = traefik_path.exists() and "certificatesResolvers" in traefik_path.read_text()
+        if consistent:
+            return
+
+        logger.warning(
+            "Stale SSL config detected — traefik.yml missing or has no certificatesResolvers. "
+            "Re-writing from stored domain/email."
+        )
+        try:
+            writer = TraefikConfigWriter(traefik_config_dir)
+            writer.write_domain_config(
+                config.domain,
+                config.email,
+                ca_server=settings.acme_ca_server,
+            )
+        except Exception as e:
+            logger.error(f"SSL config repair failed (write): {e}")
+            return
+
+        self.restart_traefik()
+        logger.info("SSL config repaired. Traefik restarted.")
+
     def restart_traefik(self) -> None:
         """Restart the Traefik container via Docker socket.
 

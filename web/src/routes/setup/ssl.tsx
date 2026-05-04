@@ -44,8 +44,7 @@ const SSLSetupPage: Component = () => {
   }
 
   function startPolling(httpsUrl: string): void {
-    const httpUrl =
-      httpsUrl.replace(/^https:\/\//, "http://").replace(/\/$/, "") + "/health";
+    const httpsHealthUrl = httpsUrl.replace(/\/$/, "") + "/health";
 
     let hasRedirected = false;
 
@@ -56,7 +55,7 @@ const SSLSetupPage: Component = () => {
 
     pollTimer = setInterval(async () => {
       try {
-        const resp = await fetch(httpUrl, { redirect: "manual" });
+        const resp = await fetch(httpsHealthUrl, { redirect: "manual" });
         if ((resp.type === "opaqueredirect" || resp.ok) && !hasRedirected) {
           hasRedirected = true;
           clearInterval(pollTimer);
@@ -164,7 +163,7 @@ const SSLSetupPage: Component = () => {
                   <label for="email" class="text-sm font-medium text-text-tertiary block">
                     Email Address
                   </label>
-                   <Input
+                  <Input
                     id="email"
                     type="email"
                     value={email()}
