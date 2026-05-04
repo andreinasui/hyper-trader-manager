@@ -10,9 +10,7 @@ services:
   # ============================================
   init:
     image: busybox
-    command: >
-      sh -c "touch /letsencrypt/acme.json && chmod 600 /letsencrypt/acme.json
-             && chown -R 1000:1000 /var/lib/update-state"
+    command: sh -c "touch /letsencrypt/acme.json && chmod 600 /letsencrypt/acme.json && chown -R 1000:1000 /var/lib/update-state"
     volumes:
       - traefik-acme:/letsencrypt
       - update-state:/var/lib/update-state
