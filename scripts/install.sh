@@ -104,9 +104,8 @@ else
     IMAGE_TAG="${RAW_TAG#v}" # e.g.  0.2.0  — used as image tag
     success "Latest release: ${RELEASE_TAG} (image tag: ${IMAGE_TAG})"
   else
-    warn "No releases found — downloading files from 'main' branch and using 'latest' image tag."
-    RELEASE_TAG="main"
-    IMAGE_TAG="latest"
+    error "No releases found. Cannot determine a version tag — aborting."
+    exit 1
   fi
 fi
 
