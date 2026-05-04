@@ -187,19 +187,19 @@ export const api = {
   // Updates
   updates: {
     async getStatus(): Promise<UpdateStatusResponse> {
-      return fetchJson("/api/updates/status");
+      return fetchJson("/updates/status");
     },
 
     async apply(): Promise<ApplyUpdateResponse> {
-      return fetchJson("/api/updates/apply", { method: "POST" });
+      return fetchJson("/updates/apply", { method: "POST" });
     },
 
     async acknowledge(): Promise<ApplyUpdateResponse> {
-      return fetchJson("/api/updates/acknowledge", { method: "POST" });
+      return fetchJson("/updates/acknowledge", { method: "POST" });
     },
 
     async check(): Promise<UpdateStatusResponse> {
-      return fetchJson("/api/updates/check", { method: "POST" });
+      return fetchJson("/updates/check", { method: "POST" });
     },
   },
 };
