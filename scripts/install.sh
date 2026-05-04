@@ -113,8 +113,7 @@ fi
 header "Creating install directory"
 
 mkdir -p "${INSTALL_DIR}/traefik/dynamic"
-touch "${INSTALL_DIR}/traefik/acme.json"
-chmod 600 "${INSTALL_DIR}/traefik/acme.json"
+# acme.json is managed by the traefik-acme-init Docker volume init container
 
 success "Created ${INSTALL_DIR}"
 

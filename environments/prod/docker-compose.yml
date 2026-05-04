@@ -4,6 +4,20 @@
 
 services:
   # ============================================
+  # Init: volume setup
+  #   - acme.json must be mode 600 or Traefik refuses to start
+  #   - update-state must be owned by uid 1000 (the API user)
+  # ============================================
+  init:
+    image: busybox
+    command: >
+      sh -c "touch /letsencrypt/acme.json && chmod 600 /letsencrypt/acme.json
+             && chown -R 1000:1000 /var/lib/update-state"
+    volumes:
+      - traefik-acme:/letsencrypt
+      - update-state:/var/lib/update-state
+
+  # ============================================
   # Traefik reverse proxy
   # Routes /api/* → api, /* → web
   # ============================================
@@ -16,9 +30,12 @@ services:
       - "${HTTPS_PUBLIC_PORT:-443}:443"
     volumes:
       - ./traefik:/etc/traefik:ro
-      - ./traefik/acme.json:/letsencrypt/acme.json
+      - traefik-acme:/letsencrypt
     networks:
       - hypertrader
+    depends_on:
+      init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "traefik", "healthcheck"]
       interval: 10s
@@ -56,6 +73,9 @@ services:
       - ${COMPOSE_PROJECT_DIR}:${COMPOSE_PROJECT_DIR}:ro
     networks:
       - hypertrader
+    depends_on:
+      init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -98,4 +118,5 @@ networks:
 
 volumes:
   hypertrader-data:
+  traefik-acme:
   update-state:
