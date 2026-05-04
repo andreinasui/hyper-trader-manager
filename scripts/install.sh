@@ -17,7 +17,7 @@
 # =============================================================================
 set -euo pipefail
 
-# ── Version (set at release time; empty = fetch latest from GitHub API) ───────
+# ── Version (set at release time; empty = fetch latest tag from GitHub API) ───
 PINNED_VERSION=""
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -96,15 +96,15 @@ if [[ -n "${PINNED_VERSION}" ]]; then
   IMAGE_TAG="${PINNED_VERSION#v}" # e.g.  0.2.0  — used as image tag
   success "Using pinned version: ${RELEASE_TAG} (image tag: ${IMAGE_TAG})"
 else
-  RELEASE_JSON=$(curl -sf "${GITHUB_API}/releases/latest" 2>/dev/null || true)
+  TAGS_JSON=$(curl -sf "${GITHUB_API}/tags" 2>/dev/null || true)
 
-  if [[ -n "${RELEASE_JSON}" ]] && echo "${RELEASE_JSON}" | grep -q '"tag_name"'; then
-    RAW_TAG=$(echo "${RELEASE_JSON}" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+  if [[ -n "${TAGS_JSON}" ]] && echo "${TAGS_JSON}" | grep -q '"name"'; then
+    RAW_TAG=$(echo "${TAGS_JSON}" | grep '"name"' | head -1 | sed 's/.*"name": *"\([^"]*\)".*/\1/')
     RELEASE_TAG="${RAW_TAG}" # e.g. v0.2.0  — used as git ref
     IMAGE_TAG="${RAW_TAG#v}" # e.g.  0.2.0  — used as image tag
-    success "Latest release: ${RELEASE_TAG} (image tag: ${IMAGE_TAG})"
+    success "Latest tag: ${RELEASE_TAG} (image tag: ${IMAGE_TAG})"
   else
-    error "No releases found. Cannot determine a version tag — aborting."
+    error "No tags found. Cannot determine a version tag — aborting."
     exit 1
   fi
 fi
