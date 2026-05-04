@@ -30,6 +30,7 @@ import type { Trader } from "~/lib/types";
 import { ImageVersionBanner } from "~/components/traders/ImageVersionBanner";
 import {
   relTime,
+  formatUptime,
   semverGt,
   shortWallet,
   canStart,
@@ -176,11 +177,25 @@ function RowActions(props: { trader: Trader }) {
   );
 }
 
-function rowActivity(t: Trader): string {
-  if (t.status === "running") return relTime(t.updated_at);
-  if ((t.status === "stopped" || t.status === "failed") && t.stopped_at)
-    return relTime(t.stopped_at);
-  return relTime(t.created_at);
+function ActivityCell(props: { trader: Trader }) {
+  const statusQuery = createQuery(() => ({
+    queryKey: traderKeys.status(props.trader.id),
+    queryFn: () => api.getTraderStatus(props.trader.id),
+    enabled: props.trader.status === "running",
+    staleTime: 30_000,
+  }));
+
+  const value = () => {
+    if (props.trader.status === "running") {
+      return formatUptime(statusQuery.data?.runtime_status?.started_at);
+    }
+    if ((props.trader.status === "stopped" || props.trader.status === "failed") && props.trader.stopped_at) {
+      return relTime(props.trader.stopped_at);
+    }
+    return relTime(props.trader.created_at);
+  };
+
+  return <span class="text-xs text-text-subtle">{value()}</span>;
 }
 
 function statusBorderClass(t: Trader): string {
@@ -338,7 +353,7 @@ const TradersPage: Component = () => {
                       { key: "wallet",   label: "Wallet",   span: 2, hideOnPhone: true,
                         render: (t) => <span class="font-mono text-xs text-text-subtle">{shortWallet(t.wallet_address)}</span> },
                       { key: "activity", label: "Activity", span: 2,
-                        render: (t) => <span class="text-xs text-text-subtle">{rowActivity(t)}</span> },
+                        render: (t) => <ActivityCell trader={t} /> },
                       { key: "version",  label: "Ver",      span: 1, hideOnPhone: true,
                         render: (t) => <VersionCell trader={t} /> },
                       { key: "actions",  label: "Actions",  span: 2, align: "end",
