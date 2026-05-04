@@ -104,7 +104,14 @@ const TraderDetailPage: Component = () => {
     return {
       queryKey: traderKeys.status(params.id),
       queryFn: () => api.getTraderStatus(params.id),
-      refetchInterval: status === "starting" ? 500 : status === "running" ? 1000 : false,
+      refetchInterval: (query) => {
+        if (status === "starting") return 500;
+        if (status !== "running") return false;
+        const startedAt = query.state.data?.runtime_status?.started_at;
+        if (!startedAt) return 10_000;
+        const elapsedMs = Date.now() - new Date(startedAt).getTime();
+        return elapsedMs < 60 * 60 * 1000 ? 10_000 : 60_000;
+      },
       enabled: status === "running" || status === "starting",
     };
   });
