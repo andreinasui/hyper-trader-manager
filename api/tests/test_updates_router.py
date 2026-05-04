@@ -52,7 +52,8 @@ def test_status_reflects_written_state(tmp_path):
     state.error_message = "boom"
     svc.write_state(state)
     client = TestClient(app)
-    r = client.get("/api/updates/status")
+    with patch("hyper_trader_api.routers.updates._get_current_version", return_value="0.1.1"):
+        r = client.get("/api/updates/status")
     body = r.json()
     assert body["status"] == "failed"
     assert body["error_message"] == "boom"
@@ -122,6 +123,7 @@ def test_apply_spawns_helper_when_update_available(tmp_path):
     svc.write_state(state)
 
     with (
+        patch("hyper_trader_api.routers.updates._get_current_version", return_value="0.1.0"),
         patch.object(svc, "collect_service_status") as mock_status,
         patch.object(svc, "spawn_helper") as mock_spawn,
     ):
