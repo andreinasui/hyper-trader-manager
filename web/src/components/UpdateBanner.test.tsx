@@ -14,6 +14,10 @@ vi.mock("~/lib/api", () => ({
   },
 }));
 
+vi.mock("~/components/UpdateProgressOverlay", () => ({
+  UpdateProgressOverlay: () => <div data-testid="update-progress-overlay" />,
+}));
+
 function makeClient() {
   return new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -142,5 +146,71 @@ describe("UpdateBanner", () => {
     await vi.waitFor(() => {
       expect(api.updates.apply).toHaveBeenCalledOnce();
     });
+  });
+
+  it("shows progress overlay when status is 'updating'", async () => {
+    const { api } = await import("~/lib/api");
+    vi.mocked(api.updates.getStatus).mockResolvedValue({
+      configured: true,
+      update_available: false,
+      status: "updating",
+      current_version: null,
+      latest_version: null,
+      last_checked: null,
+      error_message: null,
+      finished_at: null,
+      service_status: null,
+    });
+
+    renderBanner(client);
+    expect(await screen.findByTestId("update-progress-overlay")).toBeInTheDocument();
+  });
+
+  it("hides the banner when Dismiss is clicked", async () => {
+    const { api } = await import("~/lib/api");
+    vi.mocked(api.updates.getStatus).mockResolvedValue({
+      configured: true,
+      update_available: true,
+      status: "idle",
+      current_version: "1.0.0",
+      latest_version: "1.1.0",
+      last_checked: null,
+      error_message: null,
+      finished_at: null,
+      service_status: null,
+    });
+
+    renderBanner(client);
+    // Banner is visible
+    expect(await screen.findByText(/update available/i)).toBeInTheDocument();
+
+    // Click Dismiss
+    fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+
+    // Banner should be gone
+    await vi.waitFor(() => {
+      expect(screen.queryByText(/update available/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows progress overlay when 'Update now' succeeds", async () => {
+    const { api } = await import("~/lib/api");
+    vi.mocked(api.updates.getStatus).mockResolvedValue({
+      configured: true,
+      update_available: true,
+      status: "idle",
+      current_version: "1.0.0",
+      latest_version: "1.1.0",
+      last_checked: null,
+      error_message: null,
+      finished_at: null,
+      service_status: null,
+    });
+    vi.mocked(api.updates.apply).mockResolvedValue({ status: "updating", message: "ok" });
+
+    renderBanner(client);
+    const btn = await screen.findByRole("button", { name: /update now/i });
+    fireEvent.click(btn);
+    expect(await screen.findByTestId("update-progress-overlay")).toBeInTheDocument();
   });
 });

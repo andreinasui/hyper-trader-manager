@@ -28,6 +28,10 @@ install:
 release version *args:
     ./scripts/release.sh {{version}} {{args}}
 
+# Simulate update UI states for manual testing (dev compose only)
+update-test *args:
+    ./scripts/dev-update-test.sh {{args}}
+
 # ─────────────────────────────────────────────────────────────
 # Docker Build Commands
 # ─────────────────────────────────────────────────────────────

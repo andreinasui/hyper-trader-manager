@@ -1,14 +1,13 @@
-// web/src/routes/updates/progress.tsx
 import { type Component, createSignal, Show, Switch, Match, onCleanup, onMount } from "solid-js";
 import { Loader2, AlertCircle, CheckCircle2, XCircle, RefreshCw } from "lucide-solid";
 import { api } from "~/lib/api";
 
 const POLL_INTERVAL_MS = 2000;
 const TIMEOUT_MS = 5 * 60 * 1000;
-// If we land on the page and the backend is already idle but reports a recent
-// finished_at, treat that as a completion signal. This handles the case where
-// the API container was restarted by the helper (wiping any in-memory
-// "seenUpdating" state) and the new API reports idle from the very first poll.
+// If we land on the overlay and the backend is already idle but reports a
+// recent finished_at, treat that as a completion signal. This handles the
+// case where the API container was restarted by the helper (wiping any
+// in-memory "seenUpdating" state) and the new API reports idle on first poll.
 const RECENT_FINISH_WINDOW_MS = 10 * 60 * 1000;
 
 type Phase = "INITIATING" | "POLLING" | "DONE" | "FAILED" | "ROLLED_BACK" | "TIMEOUT";
@@ -24,7 +23,7 @@ const STEPS: Step[] = [
   { label: "Verifying health" },
 ];
 
-const UpdateProgress: Component = () => {
+export const UpdateProgressOverlay: Component = () => {
   const [phase, setPhase] = createSignal<Phase>("INITIATING");
   const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
   const [consecutiveFailures, setConsecutiveFailures] = createSignal(0);
@@ -51,7 +50,7 @@ const UpdateProgress: Component = () => {
           setSeenUpdating(true);
         } else if (status.status === "idle") {
           // Two paths to "DONE":
-          //  1) We previously observed an "updating" poll on this page.
+          //  1) We previously observed an "updating" poll on this overlay.
           //  2) The backend reports a recent finished_at — meaning the helper
           //     just completed (likely while the API container was restarting,
           //     so we never got to observe "updating" ourselves).
@@ -88,7 +87,7 @@ const UpdateProgress: Component = () => {
   const isReconnecting = () => consecutiveFailures() >= 3;
 
   return (
-    <div class="min-h-screen bg-surface-base flex items-center justify-center p-4">
+    <div class="fixed inset-0 z-50 bg-surface-base flex items-center justify-center p-4">
       <div class="w-full max-w-md bg-surface-raised border border-border-default rounded-md overflow-hidden">
         {/* Header */}
         <div class="px-8 pt-8 pb-6 border-b border-border-default">
@@ -218,12 +217,12 @@ const UpdateProgress: Component = () => {
                     status.
                   </p>
                 </div>
-                <a
-                  href="/updates/progress"
+                <button
+                  onClick={() => window.location.reload()}
                   class="text-sm text-primary underline underline-offset-2"
                 >
                   Try again
-                </a>
+                </button>
               </div>
             </Match>
           </Switch>
@@ -232,5 +231,3 @@ const UpdateProgress: Component = () => {
     </div>
   );
 };
-
-export default UpdateProgress;
