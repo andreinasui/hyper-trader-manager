@@ -18,7 +18,7 @@
 set -euo pipefail
 
 # ── Version (set at release time; empty = fetch latest tag from GitHub API) ───
-PINNED_VERSION=""
+PINNED_VERSION="v0.2.5"
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 REPO_OWNER="andreinasui"
