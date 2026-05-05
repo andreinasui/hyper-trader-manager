@@ -176,6 +176,9 @@ cp "${INSTALL_DIR}/api.env.example" "${INSTALL_DIR}/api.env"
 
 success "Created ${INSTALL_DIR}/api.env"
 
+# Remove example files — only the configured env files are needed
+rm "${INSTALL_DIR}/.env.example" "${INSTALL_DIR}/api.env.example"
+
 # Fix ownership: entire install directory belongs to the invoking user, not root
 chown -R "${REAL_USER}:${REAL_GROUP}" "${INSTALL_DIR}"
 success "Ownership set to ${REAL_USER}:${REAL_GROUP}"
