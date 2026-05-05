@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import socket
 import tempfile
 from collections.abc import Iterable
 from pathlib import Path
@@ -17,6 +18,30 @@ log = logging.getLogger(__name__)
 
 STATE_FILENAME = "update-state.json"
 TAG_RE = re.compile(r"^v(\d+\.\d+\.\d+)$")
+
+
+def _find_volume_name_for_path(client, container_path: str) -> str | None:
+    """Return the Docker volume name mounted at *container_path* in this container.
+
+    Docker Compose prefixes volume names with the project name (e.g.
+    ``hyper-trader_update-state``).  If we hard-code the short name
+    (``update-state``) when spawning the helper, Docker creates a *new*,
+    unrelated volume instead of reusing the one the API is already using.
+    Self-inspection via the Docker socket is the only reliable way to get the
+    correct prefixed name regardless of project name or install path.
+    """
+    try:
+        # In Docker the container hostname is set to the (short) container ID.
+        container = client.containers.get(socket.gethostname())
+        for mount in container.attrs.get("Mounts", []):
+            if mount.get("Type") == "volume" and mount.get("Destination") == container_path:
+                name: str | None = mount.get("Name")
+                return name
+    except Exception:
+        log.warning(
+            "Could not resolve volume name for path %s via self-inspection", container_path
+        )
+    return None
 
 
 def _entry_for(client, name: str) -> ServiceStatusEntry:
@@ -119,6 +144,22 @@ class UpdateService:
         if not self.compose_project_dir:
             raise RuntimeError("update system not configured")
         project_dir = str(self.compose_project_dir)
+
+        # Discover the actual Docker volume name mounted at state_dir.  Compose
+        # prefixes volumes with the project name (e.g. "hyper-trader_update-state"),
+        # so we must not hard-code the short name or Docker will create a second,
+        # unrelated volume and the helper will write completion state there while
+        # the API keeps reading the original (still-"updating") volume.
+        state_dir_str = str(self.state_dir)
+        state_volume = _find_volume_name_for_path(client, state_dir_str)
+        if state_volume is None:
+            # Fallback: use the short name (works in dev / non-Compose setups).
+            log.warning(
+                "Could not discover volume name for %s; falling back to bare 'update-state'",
+                state_dir_str,
+            )
+            state_volume = "update-state"
+
         client.containers.run(
             image=helper_image,
             name="hyper-trader-update-helper",
@@ -134,7 +175,7 @@ class UpdateService:
             volumes={
                 "/var/run/docker.sock": {"bind": "/var/run/docker.sock", "mode": "rw"},
                 project_dir: {"bind": project_dir, "mode": "rw"},
-                "update-state": {"bind": "/var/lib/update-state", "mode": "rw"},
+                state_volume: {"bind": state_dir_str, "mode": "rw"},
             },
         )
 

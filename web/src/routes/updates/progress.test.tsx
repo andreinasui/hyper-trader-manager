@@ -86,6 +86,58 @@ describe("UpdateProgress", () => {
     expect(screen.getByText(/update complete/i)).toBeInTheDocument();
   });
 
+  it("transitions to DONE when first poll is idle with recent finished_at", async () => {
+    const { api } = await import("~/lib/api");
+
+    // Simulate the case where the helper completed the update while the API
+    // container was restarting — the page mounts and the very first poll
+    // returns idle (no prior "updating" observation), but with a recent
+    // finished_at indicating completion.
+    vi.mocked(api.updates.getStatus).mockResolvedValue({
+      status: "idle",
+      current_version: "1.1.0",
+      latest_version: "1.1.0",
+      update_available: false,
+      last_checked: null,
+      error_message: null,
+      finished_at: new Date().toISOString(),
+      configured: true,
+      service_status: null,
+    });
+
+    render(() => <UpdateProgress />);
+
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(screen.getByText(/update complete/i)).toBeInTheDocument();
+  });
+
+  it("does not transition to DONE on idle with stale finished_at and no prior updating", async () => {
+    const { api } = await import("~/lib/api");
+
+    // finished_at is older than the recent-finish window — should not be
+    // treated as a completion signal (e.g., user navigated to the page
+    // manually long after a previous update).
+    const stale = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    vi.mocked(api.updates.getStatus).mockResolvedValue({
+      status: "idle",
+      current_version: "1.1.0",
+      latest_version: "1.1.0",
+      update_available: false,
+      last_checked: null,
+      error_message: null,
+      finished_at: stale,
+      configured: true,
+      service_status: null,
+    });
+
+    render(() => <UpdateProgress />);
+
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(screen.getByText(/applying update/i)).toBeInTheDocument();
+  });
+
   it("transitions to FAILED when status is failed", async () => {
     const { api } = await import("~/lib/api");
 

@@ -107,6 +107,10 @@ def test_fetch_latest_tag_handles_network_error(tmp_path, httpx_mock: HTTPXMock)
 
 def test_spawn_helper_calls_docker_run_with_correct_args(tmp_path):
     docker_client = MagicMock()
+    # Simulate volume self-inspection returning nothing (e.g. in dev / unit
+    # tests where the API isn't running inside a real Docker container).
+    # spawn_helper should fall back to the bare "update-state" volume name.
+    docker_client.containers.get.return_value.attrs = {"Mounts": []}
     svc = UpdateService(
         state_dir=tmp_path,
         compose_project_dir=tmp_path / "stack",
@@ -133,7 +137,48 @@ def test_spawn_helper_calls_docker_run_with_correct_args(tmp_path):
     vols = kwargs["volumes"]
     assert "/var/run/docker.sock" in vols
     assert str(tmp_path / "stack") in vols
-    assert "update-state" in vols  # named volume
+    assert "update-state" in vols  # fallback bare name when discovery finds nothing
+
+
+def test_spawn_helper_uses_compose_prefixed_volume_when_discovered(tmp_path):
+    """Helper must mount the same compose-prefixed volume that the API is using.
+
+    Docker Compose creates volumes as ``<project>_<name>`` (e.g.
+    ``hyper-trader_update-state``).  If we pass the bare short name instead,
+    Docker creates a second, unrelated volume and the helper writes completion
+    state there while the API keeps reading the original (still-"updating") one.
+    """
+    docker_client = MagicMock()
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    # Simulate self-inspection finding the compose-prefixed volume.
+    docker_client.containers.get.return_value.attrs = {
+        "Mounts": [
+            {
+                "Type": "volume",
+                "Name": "hyper-trader_update-state",
+                "Destination": str(state_dir),
+            }
+        ]
+    }
+    svc = UpdateService(
+        state_dir=state_dir,
+        compose_project_dir=tmp_path / "stack",
+    )
+    svc.spawn_helper(
+        client=docker_client,
+        helper_image="ghcr.io/h:1",
+        old_api_image="api:1",
+        old_web_image="web:1",
+        new_api_image="api:2",
+        new_web_image="web:2",
+    )
+    vols = docker_client.containers.run.call_args.kwargs["volumes"]
+    # Must use the compose-prefixed name, NOT the bare "update-state".
+    assert "hyper-trader_update-state" in vols
+    assert "update-state" not in vols
+    assert vols["hyper-trader_update-state"]["bind"] == str(state_dir)
+    assert vols["hyper-trader_update-state"]["mode"] == "rw"
 
 
 def test_spawn_helper_raises_when_not_configured(tmp_path):

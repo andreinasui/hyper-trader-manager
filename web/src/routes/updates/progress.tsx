@@ -5,6 +5,11 @@ import { api } from "~/lib/api";
 
 const POLL_INTERVAL_MS = 2000;
 const TIMEOUT_MS = 5 * 60 * 1000;
+// If we land on the page and the backend is already idle but reports a recent
+// finished_at, treat that as a completion signal. This handles the case where
+// the API container was restarted by the helper (wiping any in-memory
+// "seenUpdating" state) and the new API reports idle from the very first poll.
+const RECENT_FINISH_WINDOW_MS = 10 * 60 * 1000;
 
 type Phase = "INITIATING" | "POLLING" | "DONE" | "FAILED" | "ROLLED_BACK" | "TIMEOUT";
 
@@ -44,12 +49,26 @@ const UpdateProgress: Component = () => {
 
         if (status.status === "updating") {
           setSeenUpdating(true);
-        } else if (status.status === "idle" && seenUpdating()) {
-          clearInterval(intervalId);
-          setPhase("DONE");
-          setTimeout(() => {
-            window.location.href = "/";
-          }, 2000);
+        } else if (status.status === "idle") {
+          // Two paths to "DONE":
+          //  1) We previously observed an "updating" poll on this page.
+          //  2) The backend reports a recent finished_at — meaning the helper
+          //     just completed (likely while the API container was restarting,
+          //     so we never got to observe "updating" ourselves).
+          const finishedAt = status.finished_at
+            ? Date.parse(status.finished_at)
+            : NaN;
+          const finishedRecently =
+            Number.isFinite(finishedAt) &&
+            Date.now() - finishedAt < RECENT_FINISH_WINDOW_MS;
+
+          if (seenUpdating() || finishedRecently) {
+            clearInterval(intervalId);
+            setPhase("DONE");
+            setTimeout(() => {
+              window.location.href = "/";
+            }, 2000);
+          }
         } else if (status.status === "failed") {
           clearInterval(intervalId);
           setErrorMessage(status.error_message);
