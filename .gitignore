@@ -9,3 +9,4 @@
 # Note: Frontend-specific ignores could be added to web/.gitignore if needed
 
 .worktrees/
+environments/dev/sqlitedb/
