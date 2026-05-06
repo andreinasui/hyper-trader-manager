@@ -605,7 +605,7 @@ wheels = [
 
 [[package]]
 name = "hyper-trader-api"
-version = "0.2.3"
+version = "0.2.5"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

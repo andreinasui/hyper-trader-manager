@@ -231,6 +231,9 @@ class TraderService:
 
         trader = self.get_trader(trader_id, user_id)
 
+        if trader.status == "stopping":
+            raise ValueError("Trader is still stopping, please wait until it has fully stopped")
+
         # Validate trader is in a startable state
         startable_states = ("configured", "stopped", "failed")
         if trader.status not in startable_states:
@@ -288,25 +291,25 @@ class TraderService:
 
     def stop_trader(self, trader_id: uuid.UUID, user_id: str) -> Trader:
         """
-        Stop a trader by removing its Docker Swarm service.
+        Initiate stop of a trader.
 
-        Keeps the Docker secret and DB record for later restart.
+        Sets DB status to 'stopping' and asks Docker Swarm to remove the service.
+        Returns immediately — the actual transition to 'stopped' is performed by
+        get_trader_status() once the swarm service no longer exists.
 
         Args:
             trader_id: Trader's UUID
             user_id: Owner's user ID
 
         Returns:
-            Updated Trader model
+            Updated Trader model with status='stopping'
 
         Raises:
             TraderNotFoundError: If trader doesn't exist
             TraderOwnershipError: If user doesn't own trader
             ValueError: If trader is not in a stoppable state
-            TraderServiceError: If stop fails
+            TraderServiceError: If the swarm remove call fails
         """
-        from datetime import datetime
-
         trader = self.get_trader(trader_id, user_id)
 
         # Validate trader is in a stoppable state
@@ -317,20 +320,18 @@ class TraderService:
                 f"Must be one of: {stoppable_states}"
             )
 
+        # Mark as stopping in DB FIRST so concurrent reads see the new state.
+        trader.status = "stopping"
+        self.db.commit()
+        self.db.refresh(trader)
+
         try:
-            # Remove service only (keep secret)
             if self.runtime.service_exists(trader.runtime_name):
                 self.runtime.remove_service(trader.runtime_name)
-
-            trader.status = "stopped"
-            trader.stopped_at = datetime.now(UTC)
-            self.db.commit()
-            self.db.refresh(trader)
-            logger.info(f"Trader stopped: {trader.runtime_name}")
+            logger.info(f"Trader stop initiated: {trader.runtime_name}")
             return trader
-
         except Exception as e:
-            logger.error(f"Failed to stop trader {trader.runtime_name}: {e}")
+            logger.error(f"Failed to initiate stop for trader {trader.runtime_name}: {e}")
             raise TraderServiceError(f"Failed to stop trader: {e}") from e
 
     def list_traders(self, user_id: str) -> list[Trader]:
@@ -531,6 +532,9 @@ class TraderService:
         """
         trader = self.get_trader(trader_id, user_id)
 
+        if trader.status == "stopping":
+            raise ValueError("Trader is still stopping, please wait until it has fully stopped")
+
         # Stop the running service (keep secret + DB records)
         try:
             if self.runtime.service_exists(trader.runtime_name):
@@ -564,7 +568,26 @@ class TraderService:
             TraderNotFoundError: If trader doesn't exist
             TraderOwnershipError: If user doesn't own trader
         """
+        from datetime import datetime
+
         trader = self.get_trader(trader_id, user_id)
+
+        # Reconciliation: stopping -> stopped once swarm service is fully gone.
+        if trader.status == "stopping":
+            try:
+                if not self.runtime.service_exists(trader.runtime_name):
+                    trader.status = "stopped"
+                    trader.stopped_at = datetime.now(UTC)
+                    self.db.commit()
+                    self.db.refresh(trader)
+                    logger.info(
+                        f"Trader stop completed (swarm service removed): {trader.runtime_name}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to check service_exists during reconciliation for "
+                    f"{trader.runtime_name}: {e}"
+                )
 
         try:
             runtime_status = self.runtime.get_status(trader.runtime_name)

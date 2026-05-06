@@ -12,6 +12,7 @@ export function getStatusColor(status: AnyStatus): string {
     case "not_found":
       return "bg-error";
     case "starting":
+    case "stopping":
     case "pending":
     case "restarting":
       return "bg-warning";
@@ -28,6 +29,7 @@ export function getStatusLabel(status: AnyStatus): string {
     configured: "Configured",
     starting: "Starting",
     running: "Running",
+    stopping: "Stopping",
     stopped: "Stopped",
     failed: "Failed",
     pending: "Pending",
@@ -47,6 +49,7 @@ interface StatusDotProps {
 export function StatusDot(props: StatusDotProps): JSX.Element {
   const isPulsing = () =>
     props.status === "starting" ||
+    props.status === "stopping" ||
     props.status === "pending" ||
     props.status === "restarting";
 

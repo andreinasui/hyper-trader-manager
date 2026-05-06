@@ -106,14 +106,25 @@ const TraderDetailPage: Component = () => {
       queryFn: () => api.getTraderStatus(params.id),
       refetchInterval: (query) => {
         if (status === "starting") return 500;
+        if (status === "stopping") return 1000;
         if (status !== "running") return false;
         const startedAt = query.state.data?.runtime_status?.started_at;
         if (!startedAt) return 10_000;
         const elapsedMs = Date.now() - new Date(startedAt).getTime();
         return elapsedMs < 60 * 60 * 1000 ? 10_000 : 60_000;
       },
-      enabled: status === "running" || status === "starting",
+      enabled: status === "running" || status === "starting" || status === "stopping",
     };
+  });
+
+  createEffect(() => {
+    // When polling during "stopping", every status response could carry the
+    // reconciliation that flipped DB status to "stopped". Refetch the trader
+    // detail so the UI updates promptly.
+    const trader = traderQuery.data;
+    if (trader?.status === "stopping" && statusQuery.dataUpdatedAt) {
+      queryClient.invalidateQueries({ queryKey: traderKeys.detail(params.id) });
+    }
   });
 
   const restartMutation = createMutation(() => ({
@@ -147,17 +158,13 @@ const TraderDetailPage: Component = () => {
   const stopMutation = createMutation(() => ({
     mutationFn: () => api.stopTrader(params.id),
     onSuccess: () => {
-      // Optimistically mark trader as stopped so the UI reflects it immediately,
-      // before the detail query refetches from the server.
+      // Optimistically mark trader as "stopping" — the backend has set this
+      // server-side and will reconcile to "stopped" when the swarm service is
+      // fully removed. This keeps the UI in sync until the next refetch.
       queryClient.setQueryData<Trader>(traderKeys.detail(params.id), (old) =>
-        old ? { ...old, status: "stopped" } : old
+        old ? { ...old, status: "stopping" } : old
       );
-      // Remove stale runtime status data — the container is gone so the next
-      // status poll would return "not_found", which we don't want to show.
-      queryClient.removeQueries({ queryKey: traderKeys.status(params.id) });
-      // Kick off a background refetch to confirm the server-side state.
       queryClient.invalidateQueries({ queryKey: traderKeys.detail(params.id) });
-      // Invalidate all trader queries so list view updates when navigating back
       queryClient.invalidateQueries({ queryKey: traderKeys.all });
     },
   }));
@@ -314,6 +321,16 @@ const TraderDetailPage: Component = () => {
                                 loading: stopMutation.isPending,
                               }]
                             : []),
+                          ...(trader().status === "stopping"
+                            ? [{
+                                label: "Stopping…",
+                                icon: Square,
+                                onClick: () => {},
+                                priority: "primary" as const,
+                                disabled: true,
+                                loading: true,
+                              }]
+                            : []),
                           ...(trader().status === "running"
                             ? [{
                                 label: "Restart",
@@ -340,7 +357,7 @@ const TraderDetailPage: Component = () => {
                             onClick: () => setDeleteOpen(true),
                             priority: "secondary" as const,
                             variant: "danger" as const,
-                            disabled: busy(),
+                            disabled: busy() || trader().status === "stopping",
                           },
                         ]}
                       />

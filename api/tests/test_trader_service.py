@@ -336,34 +336,52 @@ class TestStopTrader:
         with pytest.raises(ValueError, match="Trader cannot be stopped from status 'configured'"):
             trader_service.stop_trader(trader_id, mock_user.id)
 
-    def test_stop_trader_from_running_state(
+    def test_stop_trader_sets_stopping_and_returns_immediately(
         self,
         mock_db: Session,
         mock_user: User,
         trader_service: TraderService,
         mock_runtime,
     ):
-        """Test that stopping a running trader works."""
+        """Stop sets DB status to 'stopping', calls remove_service, does NOT set 'stopped'."""
         trader_id = uuid.uuid4()
 
-        # Mock trader in "running" state
         trader = Mock()
         trader.id = str(trader_id)
         trader.user_id = mock_user.id
         trader.status = "running"
         trader.runtime_name = "trader-12345678"
+        trader.stopped_at = None
 
         mock_db.query.return_value.filter.return_value.first.return_value = trader
-
-        # Mock service exists to return True (service is running)
         mock_runtime.service_exists.return_value = True
 
         result = trader_service.stop_trader(trader_id, mock_user.id)
 
-        # Verify trader status was updated to "stopped"
-        assert trader.status == "stopped"
+        assert trader.status == "stopping"
+        assert trader.stopped_at is None
         assert result == trader
         mock_runtime.remove_service.assert_called_once_with(trader.runtime_name)
+
+    def test_stop_trader_rejects_already_stopping(
+        self,
+        mock_db: Session,
+        mock_user: User,
+        trader_service: TraderService,
+    ):
+        """Stop is a no-op-error when trader is already stopping."""
+        trader_id = uuid.uuid4()
+
+        trader = Mock()
+        trader.id = str(trader_id)
+        trader.user_id = mock_user.id
+        trader.status = "stopping"
+        trader.runtime_name = "trader-12345678"
+
+        mock_db.query.return_value.filter.return_value.first.return_value = trader
+
+        with pytest.raises(ValueError, match="Trader cannot be stopped from status 'stopping'"):
+            trader_service.stop_trader(trader_id, mock_user.id)
 
 
 class TestUpdateTraderInfo:
@@ -834,3 +852,110 @@ class TestUpdateImage:
 
         with pytest.raises(TraderOwnershipError, match="does not own trader"):
             trader_service.update_image(trader_id, mock_user.id, "0.4.4")
+
+
+class TestGetTraderStatusReconciliation:
+    """Tests for stopping→stopped reconciliation in get_trader_status."""
+
+    def test_get_status_keeps_stopping_when_service_still_exists(
+        self,
+        mock_db: Session,
+        mock_user: User,
+        trader_service: TraderService,
+        mock_runtime,
+    ):
+        """While DB=stopping and swarm service still exists, status stays 'stopping'."""
+        trader_id = uuid.uuid4()
+
+        trader = Mock()
+        trader.id = str(trader_id)
+        trader.user_id = mock_user.id
+        trader.status = "stopping"
+        trader.runtime_name = "trader-12345678"
+        trader.wallet_address = "0x" + "a" * 40
+        trader.stopped_at = None
+
+        mock_db.query.return_value.filter.return_value.first.return_value = trader
+        mock_runtime.service_exists.return_value = True
+        mock_runtime.get_status.return_value = {
+            "state": "stopped",
+            "running": False,
+            "replicas": "0/1",
+        }
+
+        result = trader_service.get_trader_status(trader_id, mock_user.id)
+
+        assert trader.status == "stopping"
+        assert trader.stopped_at is None
+        assert result["status"] == "stopping"
+
+    def test_get_status_transitions_to_stopped_when_service_gone(
+        self,
+        mock_db: Session,
+        mock_user: User,
+        trader_service: TraderService,
+        mock_runtime,
+    ):
+        """When DB=stopping and swarm service is gone, transition to 'stopped'."""
+        trader_id = uuid.uuid4()
+
+        trader = Mock()
+        trader.id = str(trader_id)
+        trader.user_id = mock_user.id
+        trader.status = "stopping"
+        trader.runtime_name = "trader-12345678"
+        trader.wallet_address = "0x" + "a" * 40
+        trader.stopped_at = None
+
+        mock_db.query.return_value.filter.return_value.first.return_value = trader
+        mock_runtime.service_exists.return_value = False
+        mock_runtime.get_status.return_value = {
+            "state": "not_found",
+            "running": False,
+        }
+
+        result = trader_service.get_trader_status(trader_id, mock_user.id)
+
+        assert trader.status == "stopped"
+        assert trader.stopped_at is not None
+        assert result["status"] == "stopped"
+
+
+class TestStartRestartGuards:
+    """Tests that start/restart reject 'stopping' state."""
+
+    def test_start_trader_rejects_stopping(
+        self,
+        mock_db: Session,
+        mock_user: User,
+        trader_service: TraderService,
+    ):
+        trader_id = uuid.uuid4()
+        trader = Mock()
+        trader.id = str(trader_id)
+        trader.user_id = mock_user.id
+        trader.status = "stopping"
+        trader.runtime_name = "trader-12345678"
+
+        mock_db.query.return_value.filter.return_value.first.return_value = trader
+
+        with pytest.raises(ValueError, match="still stopping"):
+            trader_service.start_trader(trader_id, mock_user.id)
+
+    def test_restart_trader_rejects_stopping(
+        self,
+        mock_db: Session,
+        mock_user: User,
+        trader_service: TraderService,
+    ):
+        trader_id = uuid.uuid4()
+        trader = Mock()
+        trader.id = str(trader_id)
+        trader.user_id = mock_user.id
+        trader.status = "stopping"
+        trader.runtime_name = "trader-12345678"
+
+        mock_db.query.return_value.filter.return_value.first.return_value = trader
+
+        with pytest.raises(ValueError, match="still stopping"):
+            trader_service.restart_trader(trader_id, mock_user.id)

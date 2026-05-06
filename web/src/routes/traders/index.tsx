@@ -145,10 +145,18 @@ function RowActions(props: { trader: Trader }) {
           loading={stopMut.isPending}
         />
       </Show>
+      <Show when={t.status === "stopping"}>
+        <IconButton
+          icon={Square}
+          tooltip="Stopping…"
+          disabled
+          loading
+        />
+      </Show>
       <AlertDialog open={deleteOpen()} onOpenChange={setDeleteOpen}>
         <AlertDialogTrigger
           as={(p: Record<string, unknown>) => (
-            <IconButton {...p} icon={Trash2} tooltip="Delete" variant="danger" disabled={busy()} />
+            <IconButton {...p} icon={Trash2} tooltip="Delete" variant="danger" disabled={busy() || t.status === "stopping"} />
           )}
         />
         <AlertDialogContent>
@@ -280,8 +288,8 @@ const TradersPage: Component = () => {
     queryKey: traderKeys.lists(),
     queryFn: () => api.listTraders(),
     refetchInterval: (q) =>
-      Array.isArray(q.state.data) && q.state.data.some((t) => t.status === "starting")
-        ? 2000
+      Array.isArray(q.state.data) && q.state.data.some((t) => t.status === "starting" || t.status === "stopping")
+        ? 1000
         : false,
   }));
 

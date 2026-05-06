@@ -49,7 +49,7 @@ export interface Trader {
   user_id: string;
   wallet_address: string;
   runtime_name: string;
-  status: "configured" | "starting" | "running" | "stopped" | "failed";
+  status: "configured" | "starting" | "running" | "stopping" | "stopped" | "failed";
   image_tag: string;
   created_at: string;
   updated_at: string;

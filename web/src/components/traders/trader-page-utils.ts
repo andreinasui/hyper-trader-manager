@@ -47,12 +47,18 @@ export function canStop(t: Trader): boolean {
   return ["running", "starting"].includes(t.status);
 }
 
+/** Whether trader is currently stopping (swarm teardown in progress) */
+export function isStopping(t: Trader): boolean {
+  return t.status === "stopping";
+}
+
 /** Status border-left color class */
 export function statusBorderClass(status: Trader["status"]): string {
   switch (status) {
     case "running": return "border-l-success";
     case "failed": return "border-l-error";
-    case "starting": return "border-l-warning";
+    case "starting":
+    case "stopping": return "border-l-warning";
     default: return "border-l-border-default";
   }
 }
@@ -62,7 +68,8 @@ export function statusTintClass(status: Trader["status"]): string {
   switch (status) {
     case "running": return "bg-success/[0.03]";
     case "failed": return "bg-error/[0.05]";
-    case "starting": return "bg-warning/[0.04]";
+    case "starting":
+    case "stopping": return "bg-warning/[0.04]";
     default: return "";
   }
 }
