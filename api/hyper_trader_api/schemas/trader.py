@@ -253,16 +253,23 @@ class TraderLogsResponse(BaseModel):
 
     trader_id: uuid.UUID
     wallet_address: str
-    logs: str
+    logs: list[str]
     tail_lines: int
+    since: datetime | None = None
+    until: datetime | None = None
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "trader_id": "550e8400-e29b-41d4-a716-446655440000",
                 "wallet_address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a",
-                "logs": "2024-01-15 10:30:00 INFO Starting trader...\n2024-01-15 10:30:01 INFO Connected to exchange",
+                "logs": [
+                    "2024-01-15T10:30:00Z {\"level\":\"info\",\"message\":\"Starting trader...\"}",
+                    "2024-01-15T10:30:01Z {\"level\":\"info\",\"message\":\"Connected to exchange\"}",
+                ],
                 "tail_lines": 100,
+                "since": None,
+                "until": None,
             }
         }
     )

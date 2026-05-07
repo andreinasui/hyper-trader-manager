@@ -37,8 +37,14 @@ def client(mock_db):
 
     app.dependency_overrides[get_db] = override_get_db
 
-    # Mock the engine for health checks
-    with patch("hyper_trader_api.main.engine") as mock_engine:
+    # Mock the engine for health checks and bootstrap to avoid alembic running
+    # with a mock engine (alembic needs a real URL to parse)
+    with (
+        patch("hyper_trader_api.main.engine") as mock_engine,
+        # Bootstrap is patched here intentionally; tests that need to verify migration
+        # behaviour should call bootstrap_database() directly (see test_alembic_bootstrap.py).
+        patch("hyper_trader_api.main.bootstrap_database", autospec=True),
+    ):
         mock_engine.connect.return_value.__enter__.return_value.execute.return_value = None
         with TestClient(app) as c:
             yield c

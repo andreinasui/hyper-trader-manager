@@ -41,6 +41,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "7"
 
   # ============================================
   # API service (FastAPI + uvicorn)
@@ -70,6 +75,8 @@ services:
       - update-state:/var/lib/update-state
       # Stack directory (read-only) for update system
       - ${COMPOSE_PROJECT_DIR}:${COMPOSE_PROJECT_DIR}:ro
+      # Log archives
+      - hypertrader-logs:/app/data/logs
     networks:
       - hypertrader
     depends_on:
@@ -81,6 +88,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "7"
 
   # ============================================
   # Web service
@@ -107,6 +119,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "7"
     depends_on:
       api:
         condition: service_healthy
@@ -119,3 +136,5 @@ volumes:
   hypertrader-data:
   traefik-acme:
   update-state:
+  hypertrader-logs:
+    name: hypertrader-logs

@@ -1,33 +1,61 @@
+"""Database bootstrap utilities — runs Alembic migrations on startup.
+
+Handles three cases:
+1. Fresh DB (no tables): run `alembic upgrade head` to create everything.
+2. Legacy DB (core tables present, no `alembic_version`): stamp at baseline,
+   then upgrade to head.
+3. Already-migrated DB: just upgrade to head (no-op if already at head).
 """
-Database bootstrap utilities.
 
-Creates all tables in SQLite on application startup.
-"""
+from __future__ import annotations
 
-from sqlalchemy import Engine
+import logging
+from pathlib import Path
 
-from hyper_trader_api.database import Base
+from alembic.config import Config
+from sqlalchemy import Engine, inspect
+
+from alembic import command
+
+logger = logging.getLogger(__name__)
+
+BASELINE_REVISION = "0001_baseline"
+# Lowest migration revision; this value must NEVER change as we add new migrations.
+# It's used to stamp legacy DBs that pre-date alembic at the schema produced by 0001.
+
+
+def _alembic_config(engine: Engine) -> Config:
+    api_root = Path(__file__).resolve().parents[2]
+    cfg = Config(str(api_root / "alembic.ini"))
+    cfg.set_main_option("script_location", str(api_root / "alembic"))
+    cfg.set_main_option("sqlalchemy.url", str(engine.url))
+    # Prevent alembic from reconfiguring the root logger via fileConfig —
+    # doing so would reset log levels and break caplog in tests.
+    cfg.attributes["configure_logger"] = False
+    return cfg
+
+
+def _is_legacy_db(engine: Engine) -> bool:
+    """A legacy DB has core tables but no alembic_version."""
+    insp = inspect(engine)
+    tables = set(insp.get_table_names())
+    return "users" in tables and "alembic_version" not in tables
 
 
 def bootstrap_database(engine: Engine) -> None:
-    """
-    Create all database tables.
+    """Run Alembic migrations, stamping legacy DBs at baseline first."""
+    cfg = _alembic_config(engine)
 
-    This is used for SQLite deployments where we don't have
-    separate migration tools. In production, this should be run once
-    during initial setup.
+    with engine.connect() as conn:
+        # Share one connection across stamp + upgrade so SQLite :memory: DBs see the
+        # same schema (each connection sees its own :memory: database). Both alembic
+        # commands manage their own transactions on this connection.
+        # Inject the connection so env.py reuses it (critical for in-memory SQLite).
+        cfg.attributes["connection"] = conn
 
-    Args:
-        engine: SQLAlchemy engine to use for table creation.
-    """
-    # Import all models to ensure they're registered with Base.metadata
-    from hyper_trader_api.models import (  # noqa: F401
-        Trader,
-        TraderConfig,
-        User,
-    )
-    from hyper_trader_api.models.session_token import SessionToken  # noqa: F401
-    from hyper_trader_api.models.ssl_config import SSLConfig  # noqa: F401
+        if _is_legacy_db(engine):
+            logger.info("Detected legacy DB without alembic_version — stamping at baseline")
+            command.stamp(cfg, BASELINE_REVISION)
 
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
+        logger.info("Running alembic upgrade head")
+        command.upgrade(cfg, "head")

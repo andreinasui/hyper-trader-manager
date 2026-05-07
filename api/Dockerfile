@@ -36,6 +36,10 @@ RUN uv sync --frozen --no-dev --no-install-project
 # Copy application code
 COPY hyper_trader_api /app/hyper_trader_api
 
+# Copy Alembic migrations and config
+COPY alembic /app/alembic
+COPY alembic.ini /app/alembic.ini
+
 # Install the project itself
 RUN uv sync --frozen --no-dev
 
@@ -57,6 +61,10 @@ COPY --from=builder /app/.venv /app/.venv
 
 # Copy application code
 COPY --from=builder /app/hyper_trader_api /app/hyper_trader_api
+
+# Copy Alembic migrations and config
+COPY --from=builder /app/alembic /app/alembic
+COPY --from=builder /app/alembic.ini /app/alembic.ini
 
 # Create data directory for SQLite and app files
 RUN mkdir -p /app/data

@@ -6,8 +6,10 @@ Handles trader CRUD operations and management.
 
 import logging
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -29,6 +31,8 @@ from hyper_trader_api.schemas.trader import (
     TraderStatusResponse,
     TraderUpdate,
 )
+from hyper_trader_api.schemas.trader_log_archive import TraderLogArchiveResponse
+from hyper_trader_api.services.log_archive_service import LogArchiveService
 from hyper_trader_api.services.trader_service import (
     TraderNotFoundError,
     TraderOwnershipError,
@@ -53,6 +57,11 @@ class UpdateImageRequest(BaseModel):
 def get_trader_service(db: Session = Depends(get_db)) -> TraderService:
     """Dependency to get TraderService instance."""
     return TraderService(db)
+
+
+def get_log_archive_service(db: Session = Depends(get_db)) -> LogArchiveService:
+    """Dependency to get LogArchiveService instance."""
+    return LogArchiveService(db=db)
 
 
 def _trader_to_response(trader: Trader) -> TraderResponse:
@@ -497,6 +506,62 @@ async def get_trader_status(
 
 
 @router.get(
+    "/{trader_id}/logs/download",
+    summary="Download trader logs",
+    description="Download logs from a trader's Docker container as a plain text file.",
+    response_class=PlainTextResponse,
+)
+async def download_trader_logs(
+    trader_id: uuid.UUID,
+    since: datetime | None = Query(
+        default=None,
+        description="Start of time range (ISO 8601 with timezone, e.g. 2026-05-03T09:00:00Z)",
+    ),
+    until: datetime | None = Query(
+        default=None,
+        description="End of time range (ISO 8601 with timezone)",
+    ),
+    user: User = Depends(get_current_user),
+    service: TraderService = Depends(get_trader_service),
+) -> PlainTextResponse:
+    """
+    Download logs from a trader's Docker container as a plain text file.
+
+    - **since**: Start of time range. Defaults to 24h ago if not provided.
+    - **until**: End of time range. Defaults to now if not provided.
+    """
+    effective_since = since if since is not None else datetime.now(UTC) - timedelta(hours=24)
+    effective_until = until if until is not None else datetime.now(UTC)
+
+    try:
+        trader = service.get_trader(trader_id, user.id)
+        logs = service.download_trader_logs(
+            trader_id,
+            user.id,
+            effective_since,
+            effective_until,
+        )
+
+        filename = f"trader-{trader.wallet_address[:8]}-{effective_since.strftime('%Y%m%dT%H%M%S')}.log"
+
+        return PlainTextResponse(
+            content=logs,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    except TraderNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trader not found: {trader_id}",
+        ) from e
+    except TraderOwnershipError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this trader",
+        ) from e
+
+
+@router.get(
     "/{trader_id}/logs",
     response_model=TraderLogsResponse,
     summary="Get trader logs",
@@ -507,23 +572,43 @@ async def get_trader_logs(
     tail_lines: int = Query(
         default=100, ge=1, le=10000, description="Number of log lines to return"
     ),
+    since: datetime | None = Query(
+        default=None,
+        description="Start of time range (ISO 8601 with timezone, e.g. 2026-05-03T09:00:00Z)",
+    ),
+    until: datetime | None = Query(
+        default=None,
+        description="End of time range (ISO 8601 with timezone)",
+    ),
     user: User = Depends(get_current_user),
     service: TraderService = Depends(get_trader_service),
 ) -> TraderLogsResponse:
     """
     Get logs from a trader's Docker container.
 
-    - **tail_lines**: Number of log lines to return (1-10000, default: 100)
+    - **tail_lines**: Number of log lines to return when no time range given (1-10000, default: 100)
+    - **since**: Start of time range. When provided, tail_lines is ignored.
+    - **until**: End of time range. Defaults to now when since is provided.
     """
+    effective_until = (datetime.now(UTC) if since is not None else None) if until is None else until
+
     try:
         trader = service.get_trader(trader_id, user.id)
-        logs = service.get_trader_logs(trader_id, user.id, tail_lines)
+        logs = service.get_trader_logs(
+            trader_id,
+            user.id,
+            tail_lines,
+            since=since,
+            until=effective_until,
+        )
 
         return TraderLogsResponse(
             trader_id=trader_id,
             wallet_address=trader.wallet_address,
             logs=logs,
             tail_lines=tail_lines,
+            since=since,
+            until=effective_until,
         )
 
     except TraderNotFoundError as e:
@@ -564,3 +649,52 @@ async def update_trader_image(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied") from e
     except TraderServiceError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)) from e
+
+
+@router.get(
+    "/{trader_id}/archives",
+    response_model=list[TraderLogArchiveResponse],
+    summary="List trader log archives",
+    description="List all log archives for a trader (most recent first).",
+)
+def list_trader_archives(
+    trader_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    service: TraderService = Depends(get_trader_service),
+    archive_service: LogArchiveService = Depends(get_log_archive_service),
+) -> list[TraderLogArchiveResponse]:
+    """List all log archives for a trader (most recent first)."""
+    trader = service.get_trader(trader_id, current_user.id)  # validates ownership
+    archives = archive_service.list_archives(trader.id)
+    return [TraderLogArchiveResponse.model_validate(a) for a in archives]
+
+
+@router.get(
+    "/{trader_id}/archives/{archive_id}/download",
+    summary="Download a trader log archive",
+    description="Download a gzipped log archive for a specific trader run.",
+)
+def download_trader_archive(
+    trader_id: uuid.UUID,
+    archive_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    service: TraderService = Depends(get_trader_service),
+    archive_service: LogArchiveService = Depends(get_log_archive_service),
+) -> FileResponse:
+    """Download a gzipped log archive."""
+    trader = service.get_trader(trader_id, current_user.id)
+    archive = archive_service.get_archive(str(archive_id))
+    if archive is None or archive.trader_id != trader.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Archive not found")
+
+    path = archive_service.archive_path(archive)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Archive file missing on disk")
+
+    timestamp = archive.run_started_at.strftime("%Y%m%dT%H%M%SZ")
+    filename = f"{trader.runtime_name}-{timestamp}.tar.gz"
+    return FileResponse(
+        path=str(path),
+        media_type="application/gzip",
+        filename=filename,
+    )

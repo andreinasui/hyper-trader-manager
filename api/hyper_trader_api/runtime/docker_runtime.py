@@ -6,6 +6,7 @@ Manages trader services using Docker Swarm with native secret management.
 
 import logging
 import re
+from datetime import datetime
 from typing import Any
 
 import docker
@@ -20,6 +21,31 @@ from docker.types import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_log_line_timestamp(line: str) -> datetime | None:
+    """
+    Parse the Docker timestamp prefix from a timestamped log line.
+
+    Docker prefixes lines with RFC3339Nano timestamps when timestamps=True,
+    e.g. "2026-05-03T12:34:56.789123456Z actual log content".
+    Python's datetime only handles 6-digit microseconds, so we truncate/pad.
+    """
+    parts = line.split(" ", 1)
+    if not parts:
+        return None
+    ts = parts[0]
+    if "." in ts:
+        base, rest = ts.rsplit(".", 1)
+        # Find where numeric fraction ends and timezone begins
+        tz_start = next((i for i, c in enumerate(rest) if not c.isdigit()), len(rest))
+        frac = rest[:tz_start][:6].ljust(6, "0")  # truncate nanos to micros
+        tz = rest[tz_start:]
+        ts = f"{base}.{frac}{tz}"
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 class DockerRuntime:
@@ -218,6 +244,8 @@ class DockerRuntime:
                 "LOG_FORMAT=json",
                 "LOG_LEVEL=debug",
             ],
+            log_driver="json-file",
+            log_driver_options={"max-size": "100m", "max-file": "7"},
         )
 
     def remove_service(
@@ -391,24 +419,62 @@ class DockerRuntime:
                 "running": False,
             }
 
-    def get_logs(self, runtime_name: str, tail_lines: int) -> str:
+    def get_logs(
+        self,
+        runtime_name: str,
+        tail_lines: int = 100,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        all_lines: bool = False,
+    ) -> str:
         """
-        Get recent logs from a trader service.
+        Get logs from a trader service.
 
         Args:
             runtime_name: Service name
-            tail_lines: Number of recent lines to retrieve
+            tail_lines: Lines to return when no time range is given (default 100)
+            since: Return logs after this timestamp (enables time range mode)
+            until: Return logs up to this timestamp (client-side filtered; Docker
+                   service logs API does not support --until)
+            all_lines: When True and since is set, retrieve all matching lines
+                       instead of capping at 1000 (used for downloads)
 
         Returns:
             Log output as string, empty if service not found
         """
+        if until is not None and since is None:
+            logger.warning(
+                "get_logs called with 'until' but no 'since' — 'until' will be ignored"
+            )
         try:
             service = self.client.services.get(runtime_name)
-            # Service logs returns a generator
-            logs_gen = service.logs(stdout=True, stderr=True, tail=tail_lines)
-            # Collect and decode logs
+
+            if since is not None:
+                tail: int | str = "all" if all_lines else 1000
+                logs_gen = service.logs(
+                    stdout=True,
+                    stderr=True,
+                    since=since,
+                    timestamps=True,
+                    tail=tail,
+                )
+            else:
+                logs_gen = service.logs(stdout=True, stderr=True, tail=tail_lines)
+
             logs_bytes = b"".join(logs_gen)
-            return logs_bytes.decode("utf-8")
+            raw = logs_bytes.decode("utf-8")
+
+            # Filter lines beyond 'until' when a time range is active
+            if since is not None and until is not None:
+                filtered = [
+                    line
+                    for line in raw.splitlines(keepends=True)
+                    if (ts := _parse_log_line_timestamp(line)) is None or ts <= until
+                ]
+                return "".join(filtered)
+
+            return raw
+
         except NotFound:
             return ""
 

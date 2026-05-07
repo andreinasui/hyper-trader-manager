@@ -287,3 +287,111 @@ class TestDockerRuntimeUpdateServiceImage:
 
         with pytest.raises(NotFound):
             runtime.update_service_image("trader-missing", "0.4.4")
+
+
+class TestDockerRuntimeLogConfig:
+    """Tests that trader services are created with log driver config."""
+
+    @patch("hyper_trader_api.runtime.docker_runtime.docker")
+    def test_create_service_sets_log_driver(self, mock_docker):
+        """create_service should pass json-file log driver options to services.create."""
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.swarm.attrs = {"ID": "swarm-id"}
+        mock_client.secrets.get.return_value = MagicMock(id="secret-id")
+        mock_client.networks.get.return_value = MagicMock()
+        mock_client.configs.get.return_value = MagicMock(id="config-id")
+        # create_config calls configs.list then configs.create
+        mock_client.configs.list.return_value = []
+        mock_docker.from_env.return_value = mock_client
+
+        from hyper_trader_api.runtime.docker_runtime import DockerRuntime
+
+        runtime = DockerRuntime(mock_client)
+
+        trader = MagicMock()
+        trader.id = "test-trader-id"
+        trader.runtime_name = "trader-ab12cd34"
+        trader.image_tag = "0.4.4"
+        trader.wallet_address = "0xab12cd34ef56gh78"
+
+        runtime.create_service(trader, "config: yaml")
+
+        call_kwargs = mock_client.services.create.call_args.kwargs
+        assert call_kwargs.get("log_driver") == "json-file"
+        assert call_kwargs.get("log_driver_options") == {"max-size": "100m", "max-file": "7"}
+
+
+class TestDockerRuntimeGetLogsTimeRange:
+    """Tests for get_logs with time range filtering."""
+
+    def _make_runtime(self):
+        """Create a DockerRuntime with a mocked Docker client."""
+        mock_client = MagicMock()
+        mock_client.swarm.attrs = {"ID": "swarm-id"}
+        from hyper_trader_api.runtime.docker_runtime import DockerRuntime
+        return DockerRuntime(mock_client), mock_client
+
+    def test_get_logs_uses_tail_when_no_since(self):
+        """Without since, get_logs uses tail=tail_lines and no timestamps."""
+        runtime, mock_client = self._make_runtime()
+        mock_service = MagicMock()
+        mock_client.services.get.return_value = mock_service
+        mock_service.logs.return_value = iter([b"line1\nline2\n"])
+
+        runtime.get_logs("trader-abc", tail_lines=50)
+
+        mock_service.logs.assert_called_once_with(stdout=True, stderr=True, tail=50)
+
+    def test_get_logs_uses_since_and_timestamps_when_since_given(self):
+        """With since, get_logs uses since=dt, timestamps=True, tail=1000."""
+        from datetime import datetime, timezone
+        runtime, mock_client = self._make_runtime()
+        mock_service = MagicMock()
+        mock_client.services.get.return_value = mock_service
+        mock_service.logs.return_value = iter([b""])
+
+        since = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
+        runtime.get_logs("trader-abc", since=since)
+
+        mock_service.logs.assert_called_once_with(
+            stdout=True, stderr=True, since=since, timestamps=True, tail=1000
+        )
+
+    def test_get_logs_uses_tail_all_when_all_lines_true(self):
+        """With all_lines=True, get_logs uses tail='all'."""
+        from datetime import datetime, timezone
+        runtime, mock_client = self._make_runtime()
+        mock_service = MagicMock()
+        mock_client.services.get.return_value = mock_service
+        mock_service.logs.return_value = iter([b""])
+
+        since = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
+        runtime.get_logs("trader-abc", since=since, all_lines=True)
+
+        mock_service.logs.assert_called_once_with(
+            stdout=True, stderr=True, since=since, timestamps=True, tail="all"
+        )
+
+    def test_get_logs_filters_lines_beyond_until(self):
+        """Lines with timestamps after 'until' are excluded from the result."""
+        from datetime import datetime, timezone
+        runtime, mock_client = self._make_runtime()
+        mock_service = MagicMock()
+        mock_client.services.get.return_value = mock_service
+
+        # Two lines: one within range, one after 'until'
+        log_bytes = (
+            b"2026-05-03T10:00:00.000000000Z within range\n"
+            b"2026-05-03T12:00:00.000000000Z after until\n"
+        )
+        mock_service.logs.return_value = iter([log_bytes])
+
+        since = datetime(2026, 5, 3, 9, 0, 0, tzinfo=timezone.utc)
+        until = datetime(2026, 5, 3, 11, 0, 0, tzinfo=timezone.utc)
+
+        result = runtime.get_logs("trader-abc", since=since, until=until)
+
+        assert "within range" in result
+        assert "after until" not in result

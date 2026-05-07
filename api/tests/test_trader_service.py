@@ -41,8 +41,13 @@ def mock_runtime():
 @pytest.fixture
 def trader_service(mock_db: Session, mock_runtime):
     """Create TraderService with mocked dependencies."""
-    with patch("hyper_trader_api.services.trader_service.get_runtime", return_value=mock_runtime):
-        with patch("hyper_trader_api.services.trader_service.get_settings") as mock_settings:
+    with patch(
+        "hyper_trader_api.services.trader_service.get_runtime",
+        return_value=mock_runtime,
+    ):
+        with patch(
+            "hyper_trader_api.services.trader_service.get_settings"
+        ) as mock_settings:
             settings = MagicMock()
             settings.image_tag = "latest"
             mock_settings.return_value = settings
@@ -76,7 +81,9 @@ def valid_config():
 class TestConfigValidation:
     """Tests for _validate_config method."""
 
-    def test_copy_account_cannot_equal_self_account(self, trader_service: TraderService):
+    def test_copy_account_cannot_equal_self_account(
+        self, trader_service: TraderService
+    ):
         """Test that copy account cannot be the same as self account."""
         wallet_address = "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
         config = {
@@ -86,28 +93,42 @@ class TestConfigValidation:
             },
         }
 
-        with pytest.raises(ValueError, match="Copy account cannot be the same as self account"):
+        with pytest.raises(
+            ValueError, match="Copy account cannot be the same as self account"
+        ):
             trader_service._validate_config(config, wallet_address)
 
-    def test_copy_account_case_insensitive_comparison(self, trader_service: TraderService):
+    def test_copy_account_case_insensitive_comparison(
+        self, trader_service: TraderService
+    ):
         """Test that address comparison is case-insensitive."""
         wallet_address = "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
         config = {
             "provider_settings": {
                 "self_account": {"address": wallet_address.lower()},
-                "copy_account": {"address": wallet_address.upper()},  # Different case but same
+                "copy_account": {
+                    "address": wallet_address.upper()
+                },  # Different case but same
             },
         }
 
-        with pytest.raises(ValueError, match="Copy account cannot be the same as self account"):
+        with pytest.raises(
+            ValueError, match="Copy account cannot be the same as self account"
+        ):
             trader_service._validate_config(config, wallet_address)
 
-    def test_allowed_and_blocked_assets_cannot_overlap(self, trader_service: TraderService):
+    def test_allowed_and_blocked_assets_cannot_overlap(
+        self, trader_service: TraderService
+    ):
         """Test that allowed and blocked asset lists cannot overlap."""
         config = {
             "provider_settings": {
-                "self_account": {"address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"},
-                "copy_account": {"address": "0x1234567890abcdef1234567890abcdef12345678"},
+                "self_account": {
+                    "address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
+                },
+                "copy_account": {
+                    "address": "0x1234567890abcdef1234567890abcdef12345678"
+                },
             },
             "trader_settings": {
                 "trading_strategy": {
@@ -119,15 +140,25 @@ class TestConfigValidation:
             },
         }
 
-        with pytest.raises(ValueError, match="Assets cannot be both allowed and blocked"):
-            trader_service._validate_config(config, "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a")
+        with pytest.raises(
+            ValueError, match="Assets cannot be both allowed and blocked"
+        ):
+            trader_service._validate_config(
+                config, "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
+            )
 
-    def test_bucket_config_cannot_have_both_manual_and_auto(self, trader_service: TraderService):
+    def test_bucket_config_cannot_have_both_manual_and_auto(
+        self, trader_service: TraderService
+    ):
         """Test that bucket config cannot have both manual and auto."""
         config = {
             "provider_settings": {
-                "self_account": {"address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"},
-                "copy_account": {"address": "0x1234567890abcdef1234567890abcdef12345678"},
+                "self_account": {
+                    "address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
+                },
+                "copy_account": {
+                    "address": "0x1234567890abcdef1234567890abcdef12345678"
+                },
             },
             "trader_settings": {
                 "trading_strategy": {
@@ -139,15 +170,21 @@ class TestConfigValidation:
             },
         }
 
-        with pytest.raises(ValueError, match="Bucket config must use either manual or auto"):
-            trader_service._validate_config(config, "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a")
+        with pytest.raises(
+            ValueError, match="Bucket config must use either manual or auto"
+        ):
+            trader_service._validate_config(
+                config, "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
+            )
 
     def test_valid_config_passes_validation(
         self, trader_service: TraderService, valid_config: dict
     ):
         """Test that valid config passes all validation rules."""
         # Should not raise any exceptions
-        trader_service._validate_config(valid_config, "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a")
+        trader_service._validate_config(
+            valid_config, "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
+        )
 
 
 class TestCreateTrader:
@@ -166,7 +203,9 @@ class TestCreateTrader:
         # Mock existing trader with same wallet
         existing_trader = Mock()
         existing_trader.wallet_address = wallet_address.lower()
-        mock_db.query.return_value.filter.return_value.first.return_value = existing_trader
+        mock_db.query.return_value.filter.return_value.first.return_value = (
+            existing_trader
+        )
 
         trader_data = TraderCreate(
             wallet_address=wallet_address,
@@ -216,7 +255,9 @@ class TestCreateTrader:
             name="My Trader",
         )
 
-        with pytest.raises(ValueError, match="A trader with name 'My Trader' already exists"):
+        with pytest.raises(
+            ValueError, match="A trader with name 'My Trader' already exists"
+        ):
             trader_service.create_trader(mock_user, trader_data)
 
 
@@ -241,7 +282,9 @@ class TestStartTrader:
 
         mock_db.query.return_value.filter.return_value.first.return_value = trader
 
-        with pytest.raises(ValueError, match="Trader cannot be started from status 'running'"):
+        with pytest.raises(
+            ValueError, match="Trader cannot be started from status 'running'"
+        ):
             trader_service.start_trader(trader_id, mock_user.id)
 
     def test_start_trader_accepts_configured_state(
@@ -266,7 +309,9 @@ class TestStartTrader:
         mock_db.query.return_value.filter.return_value.first.return_value = trader
 
         # Mock _get_config_data to return YAML string without DB lookup
-        with patch.object(trader_service, "_get_config_data", return_value="provider_settings: {}"):
+        with patch.object(
+            trader_service, "_get_config_data", return_value="provider_settings: {}"
+        ):
             result = trader_service.start_trader(trader_id, mock_user.id)
 
         # Verify trader status was updated to "running"
@@ -299,7 +344,9 @@ class TestStartTrader:
         mock_runtime.create_service.side_effect = Exception("Docker error")
 
         # Mock _get_config_data to return YAML string without DB lookup
-        with patch.object(trader_service, "_get_config_data", return_value="provider_settings: {}"):
+        with patch.object(
+            trader_service, "_get_config_data", return_value="provider_settings: {}"
+        ):
             with patch("time.sleep"):  # Skip sleep delays in tests
                 with pytest.raises(
                     TraderServiceError, match="Failed to start trader after 3 attempts"
@@ -310,6 +357,37 @@ class TestStartTrader:
         assert trader.status == "failed"
         assert trader.last_error == "Docker error"
         assert trader.start_attempts == 3
+
+    def test_start_trader_sets_last_started_at(
+        self,
+        mock_db: Session,
+        mock_user: User,
+        trader_service: TraderService,
+        mock_runtime,
+    ):
+        """Test that start_trader stamps last_started_at and clears last_error on success."""
+        trader_id = uuid.uuid4()
+
+        trader = Mock()
+        trader.id = str(trader_id)
+        trader.user_id = mock_user.id
+        trader.status = "configured"
+        trader.runtime_name = "trader-12345678"
+        trader.start_attempts = 0
+        trader.last_error = "previous error"
+        trader.last_started_at = None
+
+        mock_db.query.return_value.filter.return_value.first.return_value = trader
+
+        with patch.object(
+            trader_service, "_get_config_data", return_value="provider_settings: {}"
+        ):
+            result = trader_service.start_trader(trader_id, mock_user.id)
+
+        assert result == trader
+        assert trader.status == "running"
+        assert trader.last_started_at is not None
+        assert trader.last_error is None
 
 
 class TestStopTrader:
@@ -333,7 +411,9 @@ class TestStopTrader:
 
         mock_db.query.return_value.filter.return_value.first.return_value = trader
 
-        with pytest.raises(ValueError, match="Trader cannot be stopped from status 'configured'"):
+        with pytest.raises(
+            ValueError, match="Trader cannot be stopped from status 'configured'"
+        ):
             trader_service.stop_trader(trader_id, mock_user.id)
 
     def test_stop_trader_sets_stopping_and_returns_immediately(
@@ -380,8 +460,99 @@ class TestStopTrader:
 
         mock_db.query.return_value.filter.return_value.first.return_value = trader
 
-        with pytest.raises(ValueError, match="Trader cannot be stopped from status 'stopping'"):
+        with pytest.raises(
+            ValueError, match="Trader cannot be stopped from status 'stopping'"
+        ):
             trader_service.stop_trader(trader_id, mock_user.id)
+
+    def test_stop_trader_archives_logs_before_remove(
+        self,
+        mock_db: Session,
+        mock_user: User,
+        trader_service: TraderService,
+        mock_runtime,
+    ):
+        """stop_trader archives logs before removing the service."""
+        trader_id = uuid.uuid4()
+
+        trader = Mock()
+        trader.id = str(trader_id)
+        trader.user_id = mock_user.id
+        trader.status = "running"
+        trader.runtime_name = "trader-12345678"
+        trader.stopped_at = None
+
+        mock_db.query.return_value.filter.return_value.first.return_value = trader
+        mock_runtime.service_exists.return_value = True
+
+        mock_archive = MagicMock()
+        trader_service.archive_service = mock_archive
+
+        trader_service.stop_trader(trader_id, mock_user.id)
+
+        mock_archive.archive_run.assert_called_once_with(trader)
+        # archive must happen before remove
+        mock_archive.archive_run.assert_called_once()
+        mock_runtime.remove_service.assert_called_once_with(trader.runtime_name)
+
+    def test_stop_trader_succeeds_when_archiving_fails(
+        self,
+        mock_db: Session,
+        mock_user: User,
+        trader_service: TraderService,
+        mock_runtime,
+    ):
+        """stop_trader still removes service even if archiving raises."""
+        trader_id = uuid.uuid4()
+
+        trader = Mock()
+        trader.id = str(trader_id)
+        trader.user_id = mock_user.id
+        trader.status = "running"
+        trader.runtime_name = "trader-12345678"
+        trader.stopped_at = None
+
+        mock_db.query.return_value.filter.return_value.first.return_value = trader
+        mock_runtime.service_exists.return_value = True
+
+        mock_archive = MagicMock()
+        mock_archive.archive_run.side_effect = Exception("disk full")
+        trader_service.archive_service = mock_archive
+
+        # Should not raise — archive failure is best-effort
+        result = trader_service.stop_trader(trader_id, mock_user.id)
+
+        assert result == trader
+        mock_runtime.remove_service.assert_called_once_with(trader.runtime_name)
+
+
+class TestDeleteTrader:
+    """Tests for delete_trader."""
+
+    def test_delete_trader_purges_archive_directory(
+        self,
+        mock_db: Session,
+        mock_user: User,
+        trader_service: TraderService,
+        mock_runtime,
+    ):
+        """delete_trader calls purge_trader after DB delete."""
+        trader_id = uuid.uuid4()
+
+        trader = Mock()
+        trader.id = str(trader_id)
+        trader.user_id = mock_user.id
+        trader.status = "stopped"
+        trader.runtime_name = "trader-12345678"
+
+        mock_db.query.return_value.filter.return_value.first.return_value = trader
+
+        mock_archive = MagicMock()
+        trader_service.archive_service = mock_archive
+
+        trader_service.delete_trader(trader_id, mock_user.id)
+
+        mock_archive.purge_trader.assert_called_once_with(str(trader_id))
 
 
 class TestUpdateTraderInfo:
@@ -427,7 +598,9 @@ class TestUpdateTraderInfo:
 
         update_data = TraderInfoUpdate(name="New Name")
 
-        with pytest.raises(ValueError, match="A trader with name 'New Name' already exists"):
+        with pytest.raises(
+            ValueError, match="A trader with name 'New Name' already exists"
+        ):
             trader_service.update_trader_info(trader_id, mock_user.id, update_data)
 
     def test_update_description_only(
@@ -524,7 +697,9 @@ class TestRestartTrader:
         # First call (restart check): True, second call (start_trader check): False
         mock_runtime.service_exists.side_effect = [True, False]
 
-        with patch.object(trader_service, "_get_config_data", return_value="provider_settings: {}"):
+        with patch.object(
+            trader_service, "_get_config_data", return_value="provider_settings: {}"
+        ):
             result = trader_service.restart_trader(trader_id, mock_user.id)
 
         # Verify service was removed during stop phase
@@ -556,7 +731,9 @@ class TestRestartTrader:
         mock_db.query.return_value.filter.return_value.first.return_value = trader
         mock_runtime.service_exists.return_value = False
 
-        with patch.object(trader_service, "_get_config_data", return_value="provider_settings: {}"):
+        with patch.object(
+            trader_service, "_get_config_data", return_value="provider_settings: {}"
+        ):
             trader_service.restart_trader(trader_id, mock_user.id)
 
         # Service was not running, so remove_service should NOT be called
@@ -610,7 +787,9 @@ class TestRestartTrader:
         mock_runtime.service_exists.return_value = True
         mock_runtime.create_service.side_effect = Exception("Docker create error")
 
-        with patch.object(trader_service, "_get_config_data", return_value="provider_settings: {}"):
+        with patch.object(
+            trader_service, "_get_config_data", return_value="provider_settings: {}"
+        ):
             with patch("time.sleep"):
                 with pytest.raises(TraderServiceError, match="Failed to start trader"):
                     trader_service.restart_trader(trader_id, mock_user.id)
@@ -647,7 +826,9 @@ class TestUpdateImage:
         # Verify pull was called
         mock_runtime.pull_image.assert_called_once_with("0.4.4")
         # Verify service update was called for running trader
-        mock_runtime.update_service_image.assert_called_once_with("trader-12345678", "0.4.4")
+        mock_runtime.update_service_image.assert_called_once_with(
+            "trader-12345678", "0.4.4"
+        )
         # Verify DB was updated
         assert trader.image_tag == "0.4.4"
         mock_db.commit.assert_called()
@@ -805,7 +986,9 @@ class TestUpdateImage:
         mock_db.query.return_value.filter.return_value.first.return_value = trader
 
         # Mock pull to succeed but service update to fail
-        mock_runtime.update_service_image.side_effect = Exception("Service update failed")
+        mock_runtime.update_service_image.side_effect = Exception(
+            "Service update failed"
+        )
 
         with pytest.raises(TraderServiceError, match="Failed to update service image"):
             trader_service.update_image(trader_id, mock_user.id, "0.4.4")
@@ -813,7 +996,9 @@ class TestUpdateImage:
         # Verify pull was called
         mock_runtime.pull_image.assert_called_once_with("0.4.4")
         # Verify service update was attempted
-        mock_runtime.update_service_image.assert_called_once_with("trader-12345678", "0.4.4")
+        mock_runtime.update_service_image.assert_called_once_with(
+            "trader-12345678", "0.4.4"
+        )
         # Verify DB was NOT updated (due to exception)
         mock_db.commit.assert_not_called()
 
@@ -959,3 +1144,94 @@ class TestStartRestartGuards:
 
         with pytest.raises(ValueError, match="still stopping"):
             trader_service.restart_trader(trader_id, mock_user.id)
+
+
+class TestGetTraderLogs:
+    """Tests for get_trader_logs."""
+
+    def test_get_trader_logs_returns_list_of_lines(self, trader_service: TraderService):
+        """get_trader_logs should return log output split into a list of lines."""
+        trader_service.runtime.get_logs.return_value = "line1\nline2\nline3"
+
+        mock_trader = MagicMock()
+        mock_trader.id = str(uuid.uuid4())
+        mock_trader.user_id = "user-1"
+        mock_trader.runtime_name = "trader-ab12cd34"
+
+        trader_service.db.query.return_value.filter.return_value.first.return_value = (
+            mock_trader
+        )
+
+        result = trader_service.get_trader_logs(mock_trader.id, mock_trader.user_id)
+
+        assert isinstance(result, list)
+        assert result == ["line1", "line2", "line3"]
+
+    def test_get_trader_logs_empty_returns_empty_list(
+        self, trader_service: TraderService
+    ):
+        """get_trader_logs should return an empty list when there are no logs."""
+        trader_service.runtime.get_logs.return_value = ""
+
+        mock_trader = MagicMock()
+        mock_trader.id = str(uuid.uuid4())
+        mock_trader.user_id = "user-1"
+        mock_trader.runtime_name = "trader-ab12cd34"
+
+        trader_service.db.query.return_value.filter.return_value.first.return_value = (
+            mock_trader
+        )
+
+        result = trader_service.get_trader_logs(mock_trader.id, mock_trader.user_id)
+
+        assert result == []
+
+    def test_get_trader_logs_passes_since_until_to_runtime(self, trader_service: TraderService):
+        """get_trader_logs should pass since/until to the runtime."""
+        from datetime import datetime, timezone
+
+        trader_service.runtime.get_logs.return_value = "2026-05-03T10:00:00Z line1"
+
+        mock_trader = MagicMock()
+        mock_trader.id = str(uuid.uuid4())
+        mock_trader.user_id = "user-1"
+        mock_trader.runtime_name = "trader-ab12cd34"
+        trader_service.db.query.return_value.filter.return_value.first.return_value = mock_trader
+
+        since = datetime(2026, 5, 3, 9, 0, tzinfo=timezone.utc)
+        until = datetime(2026, 5, 3, 11, 0, tzinfo=timezone.utc)
+
+        trader_service.get_trader_logs(mock_trader.id, mock_trader.user_id, since=since, until=until)
+
+        trader_service.runtime.get_logs.assert_called_once_with(
+            mock_trader.runtime_name,
+            100,
+            since=since,
+            until=until,
+        )
+
+    def test_download_trader_logs_returns_raw_string(self, trader_service: TraderService):
+        """download_trader_logs should return the full log string for the time range."""
+        from datetime import datetime, timezone
+
+        raw_log = "2026-05-03T10:00:00Z line1\n2026-05-03T10:01:00Z line2"
+        trader_service.runtime.get_logs.return_value = raw_log
+
+        mock_trader = MagicMock()
+        mock_trader.id = str(uuid.uuid4())
+        mock_trader.user_id = "user-1"
+        mock_trader.runtime_name = "trader-ab12cd34"
+        trader_service.db.query.return_value.filter.return_value.first.return_value = mock_trader
+
+        since = datetime(2026, 5, 3, 9, 0, tzinfo=timezone.utc)
+        until = datetime(2026, 5, 3, 11, 0, tzinfo=timezone.utc)
+
+        result = trader_service.download_trader_logs(mock_trader.id, mock_trader.user_id, since, until)
+
+        assert result == raw_log
+        trader_service.runtime.get_logs.assert_called_once_with(
+            mock_trader.runtime_name,
+            since=since,
+            until=until,
+            all_lines=True,
+        )

@@ -6,8 +6,8 @@ Handles trader CRUD operations using Docker runtime.
 
 import logging
 import uuid
-from datetime import UTC
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from sqlalchemy.orm import Session
@@ -17,6 +17,9 @@ from hyper_trader_api.models import Trader, TraderConfig, User
 from hyper_trader_api.runtime.factory import get_runtime
 from hyper_trader_api.schemas.trader import TraderCreate, TraderInfoUpdate, TraderUpdate
 from hyper_trader_api.services.image_service import ImageService
+
+if TYPE_CHECKING:
+    from hyper_trader_api.services.log_archive_service import LogArchiveService
 
 logger = logging.getLogger(__name__)
 
@@ -47,16 +50,22 @@ class TraderService:
     while maintaining state in the database.
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, archive_service: "LogArchiveService | None" = None):
         """
         Initialize trader service.
 
         Args:
             db: Database session
+            archive_service: Optional log archive service (defaults to new LogArchiveService)
         """
+        from hyper_trader_api.services.log_archive_service import LogArchiveService
+
         self.db = db
         self.settings = get_settings()
         self.runtime = get_runtime()
+        self.archive_service: LogArchiveService = archive_service or LogArchiveService(
+            db=db, runtime=self.runtime
+        )
 
     def _validate_config(self, config: dict, wallet_address: str) -> None:
         """Validate config business rules."""
@@ -111,6 +120,13 @@ class TraderService:
             raise TraderServiceError(f"No config found for trader {trader_id}")
 
         return yaml.safe_dump(trader_config.config_json, default_flow_style=False)
+
+    def _safe_archive(self, trader: Trader) -> None:
+        """Archive trader logs; silently logs WARNING on failure, never re-raises."""
+        try:
+            self.archive_service.archive_run(trader)
+        except Exception as e:
+            logger.warning("Failed to archive logs for trader %s: %s", trader.id, e)
 
     def create_trader(self, user: User, trader_data: TraderCreate) -> Trader:
         """
@@ -245,6 +261,7 @@ class TraderService:
         # Check if service already exists (shouldn't happen, but be safe)
         if self.runtime.service_exists(trader.runtime_name):
             logger.warning(f"Service {trader.runtime_name} already exists, removing first")
+            self._safe_archive(trader)
             self.runtime.remove_service(trader.runtime_name)
 
         # Update status to starting
@@ -264,6 +281,7 @@ class TraderService:
             try:
                 self.runtime.create_service(trader, config_data)
                 trader.status = "running"
+                trader.last_started_at = datetime.now(UTC)
                 trader.last_error = None
                 self.db.commit()
                 self.db.refresh(trader)
@@ -327,6 +345,7 @@ class TraderService:
 
         try:
             if self.runtime.service_exists(trader.runtime_name):
+                self._safe_archive(trader)
                 self.runtime.remove_service(trader.runtime_name)
             logger.info(f"Trader stop initiated: {trader.runtime_name}")
             return trader
@@ -497,6 +516,7 @@ class TraderService:
             TraderServiceError: If deletion fails
         """
         trader = self.get_trader(trader_id, user_id)
+        trader_id_str = trader.id
 
         # Remove from Docker runtime (service + secret + config)
         try:
@@ -508,6 +528,12 @@ class TraderService:
         # Delete from DB (cascade will delete configs)
         self.db.delete(trader)
         self.db.commit()
+
+        # Best-effort purge of log archive directory
+        try:
+            self.archive_service.purge_trader(trader_id_str)
+        except Exception as e:
+            logger.warning("Failed to purge archive for trader %s: %s", trader_id_str, e)
 
         logger.info(f"Trader deleted: {trader.runtime_name}")
 
@@ -538,6 +564,7 @@ class TraderService:
         # Stop the running service (keep secret + DB records)
         try:
             if self.runtime.service_exists(trader.runtime_name):
+                self._safe_archive(trader)
                 self.runtime.remove_service(trader.runtime_name)
                 logger.info(f"Stopped trader service for restart: {trader.runtime_name}")
         except Exception as e:
@@ -631,6 +658,7 @@ class TraderService:
 
         try:
             if self.runtime.service_exists(trader.runtime_name):
+                self._safe_archive(trader)
                 self.runtime.remove_service(trader.runtime_name)
 
             trader.status = "failed"
@@ -642,17 +670,26 @@ class TraderService:
         except Exception as e:
             logger.error(f"Failed to auto-stop trader {trader.runtime_name}: {e}")
 
-    def get_trader_logs(self, trader_id: uuid.UUID, user_id: str, tail_lines: int = 100) -> str:
+    def get_trader_logs(
+        self,
+        trader_id: uuid.UUID,
+        user_id: str,
+        tail_lines: int = 100,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> list[str]:
         """
         Get logs for a trader.
 
         Args:
             trader_id: Trader's UUID
             user_id: Owner's user ID
-            tail_lines: Number of log lines to return
+            tail_lines: Lines to return when no time range given
+            since: Start of time window
+            until: End of time window
 
         Returns:
-            Log output as string
+            Log lines as a list of strings
 
         Raises:
             TraderNotFoundError: If trader doesn't exist
@@ -661,10 +698,46 @@ class TraderService:
         trader = self.get_trader(trader_id, user_id)
 
         try:
-            logs = self.runtime.get_logs(trader.runtime_name, tail_lines)
-            return logs if logs else "No logs available"
+            logs = self.runtime.get_logs(trader.runtime_name, tail_lines, since=since, until=until)
+            return logs.splitlines() if logs else []
         except Exception as e:
             logger.warning(f"Failed to get logs for {trader.runtime_name}: {e}")
+            return [f"Error retrieving logs: {e}"]
+
+    def download_trader_logs(
+        self,
+        trader_id: uuid.UUID,
+        user_id: str,
+        since: datetime,
+        until: datetime,
+    ) -> str:
+        """
+        Get all logs for a trader within a time range for file download.
+
+        Args:
+            trader_id: Trader's UUID
+            user_id: Owner's user ID
+            since: Start of time window
+            until: End of time window
+
+        Returns:
+            Full log output as a raw string (newline-separated)
+
+        Raises:
+            TraderNotFoundError: If trader doesn't exist
+            TraderOwnershipError: If user doesn't own trader
+        """
+        trader = self.get_trader(trader_id, user_id)
+
+        try:
+            return self.runtime.get_logs(
+                trader.runtime_name,
+                since=since,
+                until=until,
+                all_lines=True,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to get download logs for {trader.runtime_name}: {e}")
             return f"Error retrieving logs: {e}"
 
     def update_image(self, trader_id: uuid.UUID, user_id: str, new_tag: str) -> Trader:

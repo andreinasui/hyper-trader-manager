@@ -2,8 +2,10 @@ export const traderKeys = {
   all: ["traders"] as const,
   lists: () => [...traderKeys.all, "list"] as const,
   detail: (id: string) => [...traderKeys.all, "detail", id] as const,
-  logs: (id: string) => [...traderKeys.detail(id), "logs"] as const,
+  logs: (id: string, since?: string, until?: string) =>
+    [...traderKeys.detail(id), "logs", since ?? null, until ?? null] as const,
   status: (id: string) => [...traderKeys.detail(id), "status"] as const,
+  archives: (id: string) => [...traderKeys.detail(id), "archives"] as const,
 };
 
 export const userKeys = {

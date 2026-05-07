@@ -23,6 +23,7 @@ import {
 } from "~/components/ui/alert-dialog";
 import { StatusDot } from "~/components/ui/status-badge";
 import { LogViewer } from "~/components/traders/LogViewer";
+import { LogArchives } from "~/components/traders/LogArchives";
 import { TraderConfigForm } from "~/components/traders/TraderConfigForm";
 import { canStart, canStop } from "~/components/traders/trader-page-utils";
 import { api } from "~/lib/api";
@@ -134,6 +135,7 @@ const TraderDetailPage: Component = () => {
       queryClient.invalidateQueries({ queryKey: traderKeys.status(params.id) });
       // Invalidate all trader queries so list view updates when navigating back
       queryClient.invalidateQueries({ queryKey: traderKeys.all });
+      queryClient.invalidateQueries({ queryKey: traderKeys.archives(params.id) });
     },
   }));
 
@@ -141,6 +143,7 @@ const TraderDetailPage: Component = () => {
     mutationFn: () => api.deleteTrader(params.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: traderKeys.all });
+      queryClient.removeQueries({ queryKey: traderKeys.archives(params.id) });
       navigate("/traders");
     },
   }));
@@ -166,6 +169,7 @@ const TraderDetailPage: Component = () => {
       );
       queryClient.invalidateQueries({ queryKey: traderKeys.detail(params.id) });
       queryClient.invalidateQueries({ queryKey: traderKeys.all });
+      queryClient.invalidateQueries({ queryKey: traderKeys.archives(params.id) });
     },
   }));
 
@@ -417,11 +421,14 @@ const TraderDetailPage: Component = () => {
                       </TabsContent>
 
                       {/* Logs Tab */}
-                      <TabsContent value="logs">
-                        <Panel>
-                          <LogViewer traderId={params.id} />
-                        </Panel>
-                      </TabsContent>
+                       <TabsContent value="logs">
+                         <Panel>
+                           <LogViewer traderId={params.id} />
+                         </Panel>
+                         <Panel class="mt-4">
+                           <LogArchives traderId={params.id} />
+                         </Panel>
+                       </TabsContent>
 
                       {/* Configuration Tab */}
                       <TabsContent value="configuration">

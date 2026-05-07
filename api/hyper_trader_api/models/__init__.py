@@ -3,7 +3,7 @@ SQLAlchemy models for HyperTrader API.
 
 This package exports all database models for easy importing:
 
-    from hyper_trader_api.models import User, Trader, TraderConfig, SSLConfig
+    from hyper_trader_api.models import User, Trader, TraderConfig, SSLConfig, TraderLogArchive
 """
 
 from hyper_trader_api.models.session_token import SessionToken
@@ -12,6 +12,7 @@ from hyper_trader_api.models.trader import (
     Trader,
     TraderConfig,
 )
+from hyper_trader_api.models.trader_log_archive import TraderLogArchive
 from hyper_trader_api.models.user import User
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "TraderConfig",
     "SessionToken",
     "SSLConfig",
+    "TraderLogArchive",
 ]

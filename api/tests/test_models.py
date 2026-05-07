@@ -396,3 +396,66 @@ class TestSSLConfigModel:
         from hyper_trader_api.models import SSLConfig as ImportedSSLConfig
 
         assert ImportedSSLConfig is SSLConfig
+
+
+class TestTraderLastStartedAt:
+    """Test last_started_at column on Trader model."""
+
+    def test_trader_has_last_started_at(self, sqlite_session):
+        """Trader model should have a nullable last_started_at column."""
+        user = User(username="lsa_user", password_hash="hash", is_admin=False)
+        sqlite_session.add(user)
+        sqlite_session.commit()
+
+        now = datetime.now(UTC)
+        trader = Trader(
+            user_id=user.id,
+            wallet_address="0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            runtime_name="trader-lsa-test",
+            last_started_at=now,
+        )
+        sqlite_session.add(trader)
+        sqlite_session.commit()
+
+        retrieved = sqlite_session.get(Trader, trader.id)
+        assert retrieved.last_started_at is not None
+
+    def test_trader_last_started_at_defaults_null(self, sqlite_session):
+        """last_started_at should default to None when not provided."""
+        user = User(username="lsa_null_user", password_hash="hash", is_admin=False)
+        sqlite_session.add(user)
+        sqlite_session.commit()
+
+        trader = Trader(
+            user_id=user.id,
+            wallet_address="0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            runtime_name="trader-lsa-null-test",
+        )
+        sqlite_session.add(trader)
+        sqlite_session.commit()
+
+        retrieved = sqlite_session.get(Trader, trader.id)
+        assert retrieved.last_started_at is None
+
+
+def test_trader_log_archive_model_exists() -> None:
+    from hyper_trader_api.models import TraderLogArchive
+
+    expected = {
+        "id",
+        "trader_id",
+        "run_started_at",
+        "run_ended_at",
+        "file_path",
+        "file_size_bytes",
+        "created_at",
+    }
+    assert expected <= set(TraderLogArchive.__table__.c.keys())
+
+
+def test_trader_has_log_archives_relationship() -> None:
+    from hyper_trader_api.models import Trader
+
+    assert "log_archives" in Trader.__mapper__.relationships
+    rel = Trader.__mapper__.relationships["log_archives"]
+    assert rel.cascade.delete_orphan is True

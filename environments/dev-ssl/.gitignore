@@ -1,3 +1,4 @@
 .env
 api.env
 api-pebble.env
+data/logs/

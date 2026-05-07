@@ -17,6 +17,7 @@ from sqlalchemy.types import JSON
 from hyper_trader_api.database import Base
 
 if TYPE_CHECKING:
+    from hyper_trader_api.models.trader_log_archive import TraderLogArchive
     from hyper_trader_api.models.user import User
 
 
@@ -36,6 +37,7 @@ class Trader(Base):
         start_attempts: Number of start attempts (for retry logic, max 3)
         last_error: Error message when status is failed
         stopped_at: Timestamp when user stopped the trader
+        last_started_at: Timestamp when the trader was last started
         image_tag: Docker image tag for deployment
         name: Optional user-friendly display name (unique per user, max 50 chars)
         description: Optional notes about the trader (max 255 chars)
@@ -104,6 +106,12 @@ class Trader(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+    # Placed last so migration 0002's batch_alter_table.add_column
+    # appends correctly and matches Base.metadata.create_all output.
+    last_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     __table_args__ = (UniqueConstraint("user_id", "name", name="uq_trader_user_name"),)
 
@@ -117,6 +125,12 @@ class Trader(Base):
         back_populates="trader",
         cascade="all, delete-orphan",
         order_by="TraderConfig.version.desc()",
+    )
+    log_archives: Mapped[list["TraderLogArchive"]] = relationship(
+        "TraderLogArchive",
+        back_populates="trader",
+        cascade="all, delete-orphan",
+        order_by="TraderLogArchive.run_started_at.desc()",
     )
 
     @property

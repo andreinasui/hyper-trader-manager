@@ -151,3 +151,12 @@ export interface ImageVersionInfo {
   latest_remote: string | null;
   all_remote: string[];
 }
+
+export interface TraderLogArchive {
+  id: string;
+  trader_id: string;
+  run_started_at: string;
+  run_ended_at: string;
+  file_size_bytes: number;
+  created_at: string;
+}

@@ -678,3 +678,178 @@ class TestUpdateTraderImage:
         response = client.post(f"/api/v1/traders/{trader_id}/update-image", json=update_payload)
 
         assert response.status_code == 401
+
+
+class TestGetTraderLogsEndpoint:
+    """Tests for GET /{trader_id}/logs endpoint."""
+
+    def test_get_logs_default(self, auth_client, mock_trader_full):
+        """Default call with no params returns logs."""
+        from unittest.mock import patch
+        with patch("hyper_trader_api.routers.traders.TraderService") as mock_svc_cls:
+            mock_svc = mock_svc_cls.return_value
+            mock_svc.get_trader.return_value = mock_trader_full
+            mock_svc.get_trader_logs.return_value = ["line1", "line2"]
+
+            resp = auth_client.get(f"/api/v1/traders/{mock_trader_full.id}/logs")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["logs"] == ["line1", "line2"]
+        mock_svc.get_trader_logs.assert_called_once()
+        call_kwargs = mock_svc.get_trader_logs.call_args
+        assert call_kwargs.kwargs.get("since") is None
+        assert call_kwargs.kwargs.get("until") is None
+
+    def test_get_logs_with_since_until(self, auth_client, mock_trader_full):
+        """since/until query params are parsed and passed to service."""
+        from unittest.mock import patch
+        from datetime import datetime, timezone
+        with patch("hyper_trader_api.routers.traders.TraderService") as mock_svc_cls:
+            mock_svc = mock_svc_cls.return_value
+            mock_svc.get_trader.return_value = mock_trader_full
+            mock_svc.get_trader_logs.return_value = ["filtered line"]
+
+            resp = auth_client.get(
+                f"/api/v1/traders/{mock_trader_full.id}/logs",
+                params={"since": "2026-05-03T09:00:00Z", "until": "2026-05-03T11:00:00Z"},
+            )
+
+        assert resp.status_code == 200
+        call_kwargs = mock_svc.get_trader_logs.call_args
+        since_arg = call_kwargs.kwargs.get("since")
+        until_arg = call_kwargs.kwargs.get("until")
+        assert since_arg is not None
+        assert until_arg is not None
+        # Verify they're datetime objects with UTC timezone
+        assert since_arg.tzinfo is not None
+        assert until_arg.tzinfo is not None
+
+    def test_get_logs_since_without_until(self, auth_client, mock_trader_full):
+        """since without until: until defaults to now (not None)."""
+        from unittest.mock import patch
+        with patch("hyper_trader_api.routers.traders.TraderService") as mock_svc_cls:
+            mock_svc = mock_svc_cls.return_value
+            mock_svc.get_trader.return_value = mock_trader_full
+            mock_svc.get_trader_logs.return_value = []
+
+            resp = auth_client.get(
+                f"/api/v1/traders/{mock_trader_full.id}/logs",
+                params={"since": "2026-05-03T09:00:00Z"},
+            )
+
+        assert resp.status_code == 200
+        call_kwargs = mock_svc.get_trader_logs.call_args
+        until_arg = call_kwargs.kwargs.get("until")
+        # When since is provided without until, until should be set (not None)
+        assert until_arg is not None
+
+    def test_get_logs_trader_not_found(self, auth_client):
+        """404 when trader not found."""
+        from unittest.mock import patch
+        trader_id = uuid.uuid4()
+        with patch("hyper_trader_api.routers.traders.TraderService") as mock_svc_cls:
+            mock_svc = mock_svc_cls.return_value
+            mock_svc.get_trader.side_effect = TraderNotFoundError("not found")
+            mock_svc.get_trader_logs.side_effect = TraderNotFoundError("not found")
+
+            resp = auth_client.get(f"/api/v1/traders/{trader_id}/logs")
+
+        assert resp.status_code == 404
+
+
+class TestDownloadTraderLogsEndpoint:
+    """Tests for GET /{trader_id}/logs/download endpoint."""
+
+    def test_download_logs_returns_plain_text(self, auth_client, mock_trader_full):
+        """Download returns plain text content."""
+        from unittest.mock import patch
+        with patch("hyper_trader_api.routers.traders.TraderService") as mock_svc_cls:
+            mock_svc = mock_svc_cls.return_value
+            mock_svc.get_trader.return_value = mock_trader_full
+            mock_svc.download_trader_logs.return_value = "line1\nline2\n"
+
+            resp = auth_client.get(
+                f"/api/v1/traders/{mock_trader_full.id}/logs/download",
+            )
+
+        assert resp.status_code == 200
+        assert "text/plain" in resp.headers["content-type"]
+        assert resp.text == "line1\nline2\n"
+
+    def test_download_logs_content_disposition(self, auth_client, mock_trader_full):
+        """Download response has content-disposition attachment header."""
+        from unittest.mock import patch
+        with patch("hyper_trader_api.routers.traders.TraderService") as mock_svc_cls:
+            mock_svc = mock_svc_cls.return_value
+            mock_svc.get_trader.return_value = mock_trader_full
+            mock_svc.download_trader_logs.return_value = "logs here"
+
+            resp = auth_client.get(
+                f"/api/v1/traders/{mock_trader_full.id}/logs/download",
+            )
+
+        assert resp.status_code == 200
+        cd = resp.headers.get("content-disposition", "")
+        assert "attachment" in cd
+        assert ".log" in cd
+
+    def test_download_logs_passes_since_until(self, auth_client, mock_trader_full):
+        """since/until query params are forwarded to service."""
+        from unittest.mock import patch
+        with patch("hyper_trader_api.routers.traders.TraderService") as mock_svc_cls:
+            mock_svc = mock_svc_cls.return_value
+            mock_svc.get_trader.return_value = mock_trader_full
+            mock_svc.download_trader_logs.return_value = "log output"
+
+            resp = auth_client.get(
+                f"/api/v1/traders/{mock_trader_full.id}/logs/download",
+                params={"since": "2026-05-03T09:00:00Z", "until": "2026-05-03T11:00:00Z"},
+            )
+
+        assert resp.status_code == 200
+        call_kwargs = mock_svc.download_trader_logs.call_args
+        # since and until were passed; verify they're timezone-aware datetimes
+        args = list(call_kwargs.args) + list(call_kwargs.kwargs.values())
+        dt_args = [a for a in args if hasattr(a, 'tzinfo')]
+        assert len(dt_args) >= 2
+
+    def test_download_logs_default_24h_range(self, auth_client, mock_trader_full):
+        """When no since given, defaults to last 24h."""
+        from unittest.mock import patch
+        from datetime import datetime, timezone, timedelta
+        with patch("hyper_trader_api.routers.traders.TraderService") as mock_svc_cls:
+            mock_svc = mock_svc_cls.return_value
+            mock_svc.get_trader.return_value = mock_trader_full
+            mock_svc.download_trader_logs.return_value = "log output"
+
+            before = datetime.now(timezone.utc)
+            resp = auth_client.get(
+                f"/api/v1/traders/{mock_trader_full.id}/logs/download",
+            )
+            after = datetime.now(timezone.utc)
+
+        assert resp.status_code == 200
+        call_kwargs = mock_svc.download_trader_logs.call_args
+        # Extract positional or keyword since arg (3rd positional arg or kwarg "since")
+        since_arg = None
+        if call_kwargs.args and len(call_kwargs.args) >= 3:
+            since_arg = call_kwargs.args[2]
+        if since_arg is None:
+            since_arg = call_kwargs.kwargs.get("since")
+        assert since_arg is not None
+        expected_since_approx = before - timedelta(hours=24)
+        assert abs((since_arg - expected_since_approx).total_seconds()) < 5
+
+    def test_download_logs_trader_not_found(self, auth_client):
+        """404 when trader not found."""
+        from unittest.mock import patch
+        trader_id = uuid.uuid4()
+        with patch("hyper_trader_api.routers.traders.TraderService") as mock_svc_cls:
+            mock_svc = mock_svc_cls.return_value
+            mock_svc.get_trader.side_effect = TraderNotFoundError("not found")
+            mock_svc.download_trader_logs.side_effect = TraderNotFoundError("not found")
+
+            resp = auth_client.get(f"/api/v1/traders/{trader_id}/logs/download")
+
+        assert resp.status_code == 404

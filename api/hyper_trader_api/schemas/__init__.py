@@ -30,10 +30,13 @@ from hyper_trader_api.schemas.trader_config import (
     TraderSettings,
     TradingStrategy,
 )
+from hyper_trader_api.schemas.trader_log_archive import TraderLogArchiveResponse
 
 __all__ = [
     # Auth schemas
     "UserResponse",
+    # Trader log archive schemas
+    "TraderLogArchiveResponse",
     # SSL setup schemas
     "SSLStatusResponse",
     "SSLSetupRequest",
