@@ -1,7 +1,7 @@
 # helper/Dockerfile
 FROM docker:27-cli
 
-RUN apk add --no-cache bash jq
+RUN apk add --no-cache bash jq curl
 
 COPY update-helper.sh /update-helper.sh
 RUN chmod +x /update-helper.sh
