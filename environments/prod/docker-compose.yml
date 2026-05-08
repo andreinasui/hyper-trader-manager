@@ -11,10 +11,11 @@ services:
   init:
     image: busybox
     network_mode: none
-    command: sh -c "touch /letsencrypt/acme.json && chmod 600 /letsencrypt/acme.json && chown -R 1000:1000 /var/lib/update-state"
+    command: sh -c "touch /letsencrypt/acme.json && chmod 600 /letsencrypt/acme.json && chown -R 1000:1000 /var/lib/update-state && chown -R 1000:1000 /app/data/logs"
     volumes:
       - traefik-acme:/letsencrypt
       - update-state:/var/lib/update-state
+      - logs:/app/data/logs
 
   # ============================================
   # Traefik reverse proxy
@@ -66,7 +67,7 @@ services:
       - UPDATE_INTERVAL_SECONDS=${UPDATE_INTERVAL_SECONDS:-3600}
     volumes:
       # Persistent data: SQLite database and trader configs
-      - hypertrader-data:/app/data
+      - data:/app/data
       # Docker socket access for managing trader containers
       - ${DOCKER_SOCK}:/var/run/docker.sock
       # Bind mount for Traefik config (wizard writes here)
@@ -76,7 +77,7 @@ services:
       # Stack directory (read-only) for update system
       - ${COMPOSE_PROJECT_DIR}:${COMPOSE_PROJECT_DIR}:ro
       # Log archives
-      - hypertrader-logs:/app/data/logs
+      - logs:/app/data/logs
     networks:
       - hypertrader
     depends_on:
@@ -133,8 +134,7 @@ networks:
     driver: bridge
 
 volumes:
-  hypertrader-data:
+  data:
   traefik-acme:
   update-state:
-  hypertrader-logs:
-    name: hypertrader-logs
+  logs:
