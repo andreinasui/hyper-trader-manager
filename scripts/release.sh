@@ -222,17 +222,12 @@ if [[ "$DRY_RUN" == true ]]; then
   echo "Would execute:"
   echo "  sed: update version in api/pyproject.toml            →  ${VERSION}"
   echo "  sed: update version in web/package.json              →  ${VERSION}"
-  echo "  sed: stamp PINNED_VERSION in scripts/install.sh      →  ${TAG}"
   echo "  scripts/generate-manifest.sh ${VERSION}  →  environments/prod/manifest.json"
   echo "  git add api/pyproject.toml web/package.json scripts/install.sh environments/prod/manifest.json"
   echo "  git commit -m \"chore: bump version to ${VERSION}\""
   echo "  git push origin main"
   echo "  git tag -a ${TAG} -m \"<tag message above>\""
   echo "  git push origin ${TAG}"
-  echo "  sed: reset PINNED_VERSION in scripts/install.sh      →  (empty)"
-  echo "  git add scripts/install.sh"
-  echo "  git commit -m \"chore: reset install.sh after ${TAG} release\""
-  echo "  git push origin main"
   echo "  [CI] docker build/push ghcr.io/andreinasui/hyper-trader-manager-api:${VERSION}"
   echo "  [CI] docker build/push ghcr.io/andreinasui/hyper-trader-manager-web:${VERSION}"
   echo "  [CI] docker build/push ghcr.io/andreinasui/hyper-trader-manager-update-helper:${VERSION}"
@@ -261,15 +256,6 @@ if [[ ! -f "$PACKAGE_JSON" ]]; then
 fi
 sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" "$PACKAGE_JSON"
 echo -e "${GREEN}✓ web/package.json → ${VERSION}${NC}"
-
-# scripts/install.sh — stamp PINNED_VERSION with the release tag
-INSTALL_SH="${GIT_ROOT}/scripts/install.sh"
-if [[ ! -f "$INSTALL_SH" ]]; then
-  echo -e "${RED}Error: scripts/install.sh not found at ${INSTALL_SH}${NC}" >&2
-  exit 1
-fi
-sed -i "s/^PINNED_VERSION=\".*\"/PINNED_VERSION=\"${TAG}\"/" "$INSTALL_SH"
-echo -e "${GREEN}✓ scripts/install.sh → PINNED_VERSION=\"${TAG}\"${NC}"
 
 # environments/prod/manifest.json — regenerate for the new version
 echo ""
@@ -318,19 +304,6 @@ else
 fi
 echo -e "${GREEN}✓ Tag pushed${NC}"
 
-# ─── Reset install.sh PINNED_VERSION on main ─────────────────────────────────
-echo ""
-echo -e "${BLUE}Resetting PINNED_VERSION in scripts/install.sh on main...${NC}"
-sed -i 's/^PINNED_VERSION="[^"]*"/PINNED_VERSION=""/' "$INSTALL_SH"
-git add scripts/install.sh
-if git diff --cached --quiet; then
-  echo -e "${YELLOW}No reset needed (PINNED_VERSION already empty)${NC}"
-else
-  git commit -m "chore: reset install.sh after ${TAG} release"
-  git push origin main
-  echo -e "${GREEN}✓ PINNED_VERSION reset and pushed${NC}"
-fi
-
 # ─── Summary ─────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BLUE}========================================${NC}"
@@ -343,7 +316,6 @@ echo ""
 echo "What was done:"
 echo "  ✓ Updated api/pyproject.toml to ${VERSION}"
 echo "  ✓ Updated web/package.json to ${VERSION}"
-echo "  ✓ Stamped scripts/install.sh with PINNED_VERSION=${TAG}"
 echo "  ✓ Committed and pushed version bump"
 echo "  ✓ Created and pushed tag ${TAG}"
 echo "  ✓ Reset scripts/install.sh PINNED_VERSION on main"
