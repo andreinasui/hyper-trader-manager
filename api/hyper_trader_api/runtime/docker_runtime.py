@@ -241,7 +241,7 @@ class DockerRuntime:
                 f"WALLET_ADDRESS={trader.wallet_address}",
                 "CONFIG_PATH=/app/config.yaml",
                 "PRIVATE_KEY_FILE=/run/secrets/private_key",
-                "LOG_FORMAT=json",
+                "LOG_FORMAT=hyper_trader=json",
                 "LOG_LEVEL=debug",
             ],
             log_driver="json-file",
@@ -314,8 +314,12 @@ class DockerRuntime:
             replicated = mode.get("Replicated", {})
             desired_replicas = replicated.get("Replicas", 1)
 
-            running_tasks = [t for t in tasks if t.get("Status", {}).get("State") == "running"]
-            failed_tasks = [t for t in tasks if t.get("Status", {}).get("State") == "failed"]
+            running_tasks = [
+                t for t in tasks if t.get("Status", {}).get("State") == "running"
+            ]
+            failed_tasks = [
+                t for t in tasks if t.get("Status", {}).get("State") == "failed"
+            ]
 
             # Log all task states for debugging (exclude shutdown/complete noise)
             if tasks_sorted:
@@ -352,7 +356,9 @@ class DockerRuntime:
                     )
                 else:
                     state = "running"
-                    logger.debug(f"Service {runtime_name}: running ({len(running_tasks)} tasks)")
+                    logger.debug(
+                        f"Service {runtime_name}: running ({len(running_tasks)} tasks)"
+                    )
             elif tasks_sorted:
                 # Check the most recent task's state
                 most_recent_task = tasks_sorted[0]
@@ -361,7 +367,9 @@ class DockerRuntime:
 
                 # Log full task status for debugging failed states
                 if task_state in ("failed", "rejected", "shutdown"):
-                    logger.debug(f"Service {runtime_name} most recent task status: {task_status}")
+                    logger.debug(
+                        f"Service {runtime_name} most recent task status: {task_status}"
+                    )
 
                 # Map Docker Swarm task states to app states
                 # Swarm states: new, pending, assigned, accepted, preparing, ready,
@@ -375,7 +383,9 @@ class DockerRuntime:
                         or task_status.get("Error")
                         or f"Task {task_state}"
                     )
-                    logger.warning(f"Service {runtime_name}: task {task_state} - {error_message}")
+                    logger.warning(
+                        f"Service {runtime_name}: task {task_state} - {error_message}"
+                    )
                 elif task_state in ("shutdown", "complete"):
                     state = "stopped"
                     logger.info(f"Service {runtime_name}: task {task_state}")
