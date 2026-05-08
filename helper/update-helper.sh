@@ -13,7 +13,8 @@ write_state() {
   # write_state KEY VAL [KEY VAL...]
   local jq_args=() filter=""
   while [ $# -gt 0 ]; do
-    local k="$1" v="$2"; shift 2
+    local k="$1" v="$2"
+    shift 2
     if [ -z "$filter" ]; then filter=".$k = \$$k"; else filter="$filter | .$k = \$$k"; fi
     if [ "$v" = "null" ]; then
       jq_args+=(--argjson "$k" null)
@@ -21,53 +22,61 @@ write_state() {
       jq_args+=(--arg "$k" "$v")
     fi
   done
-  [ -f "$STATE_FILE" ] || echo '{}' > "$STATE_FILE"
-  local tmp; tmp="$(mktemp "$(dirname "$STATE_FILE")/.state.XXXXXX")"
-  jq "${jq_args[@]}" "$filter" "$STATE_FILE" > "$tmp"
+  [ -f "$STATE_FILE" ] || echo '{}' >"$STATE_FILE"
+  local tmp
+  tmp="$(mktemp "$(dirname "$STATE_FILE")/.state.XXXXXX")"
+  jq "${jq_args[@]}" "$filter" "$STATE_FILE" >"$tmp"
   mv "$tmp" "$STATE_FILE"
+  chmod 644 "$STATE_FILE" 2>/dev/null || true
 }
 
 rewrite_env() {
   local new_api="$1" new_web="$2"
-  local tmp; tmp="$(mktemp)"
+  local tmp
+  tmp="$(mktemp)"
   local saw_api=0 saw_web=0
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
-      HYPERTRADER_API_IMAGE=*)
-        echo "HYPERTRADER_API_IMAGE=$new_api" >> "$tmp"; saw_api=1 ;;
-      HYPERTRADER_WEB_IMAGE=*)
-        echo "HYPERTRADER_WEB_IMAGE=$new_web" >> "$tmp"; saw_web=1 ;;
-      *)
-        echo "$line" >> "$tmp" ;;
+    HYPERTRADER_API_IMAGE=*)
+      echo "HYPERTRADER_API_IMAGE=$new_api" >>"$tmp"
+      saw_api=1
+      ;;
+    HYPERTRADER_WEB_IMAGE=*)
+      echo "HYPERTRADER_WEB_IMAGE=$new_web" >>"$tmp"
+      saw_web=1
+      ;;
+    *)
+      echo "$line" >>"$tmp"
+      ;;
     esac
-  done < "$ENV_FILE"
-  [ "$saw_api" = 1 ] || echo "HYPERTRADER_API_IMAGE=$new_api" >> "$tmp"
-  [ "$saw_web" = 1 ] || echo "HYPERTRADER_WEB_IMAGE=$new_web" >> "$tmp"
+  done <"$ENV_FILE"
+  [ "$saw_api" = 1 ] || echo "HYPERTRADER_API_IMAGE=$new_api" >>"$tmp"
+  [ "$saw_web" = 1 ] || echo "HYPERTRADER_WEB_IMAGE=$new_web" >>"$tmp"
   mv "$tmp" "$ENV_FILE"
 }
 
 wait_for_healthy() {
   local name="$1" timeout_secs="$2"
-  local deadline=$(( $(date +%s) + timeout_secs ))
+  local deadline=$(($(date +%s) + timeout_secs))
   local running_since=0
   while [ "$(date +%s)" -lt "$deadline" ]; do
     local health
     health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$name" 2>/dev/null || echo "missing")
     case "$health" in
-      healthy) return 0 ;;
-      none)
-        local state
-        state=$(docker inspect --format='{{.State.Status}}' "$name" 2>/dev/null || echo "missing")
-        if [ "$state" = "running" ]; then
-          if [ "$running_since" = 0 ]; then running_since=$(date +%s); fi
-          if [ $(( $(date +%s) - running_since )) -ge 10 ]; then return 0; fi
-        else
-          running_since=0
-        fi
-        ;;
-      *)
+    healthy) return 0 ;;
+    none)
+      local state
+      state=$(docker inspect --format='{{.State.Status}}' "$name" 2>/dev/null || echo "missing")
+      if [ "$state" = "running" ]; then
+        if [ "$running_since" = 0 ]; then running_since=$(date +%s); fi
+        if [ $(($(date +%s) - running_since)) -ge 10 ]; then return 0; fi
+      else
         running_since=0
-        ;;
+      fi
+      ;;
+    *)
+      running_since=0
+      ;;
     esac
     sleep 2
   done
@@ -82,8 +91,8 @@ wait_for_healthy() {
 fetch_manifest() {
   local url="$1" dest="$2"
   curl -fsSL "$url" -o "$dest" || return 1
-  jq -e '.version and (.files|type=="array") and (.env_schemas|type=="array")' "$dest" >/dev/null \
-    || return 1
+  jq -e '.version and (.files|type=="array") and (.env_schemas|type=="array")' "$dest" >/dev/null ||
+    return 1
 }
 
 # manifest_files MANIFEST  → emits each file entry as:
@@ -104,7 +113,10 @@ manifest_version() { jq -r '.version' "$1"; }
 # file_sha256 PATH
 # Returns sha256 of file, or empty string if file missing.
 file_sha256() {
-  [[ -f "$1" ]] || { echo ""; return 0; }
+  [[ -f "$1" ]] || {
+    echo ""
+    return 0
+  }
   sha256sum "$1" | awk '{print $1}'
 }
 
@@ -117,7 +129,10 @@ file_sha256() {
 # Lines that aren't KEY=VAL or comments are skipped.
 merge_env_file() {
   local current="$1" example="$2"
-  [[ -f "$current" ]] || { cp "$example" "$current"; return 0; }
+  [[ -f "$current" ]] || {
+    cp "$example" "$current"
+    return 0
+  }
 
   local pending_comments="" line key
   local appended=0
@@ -135,16 +150,16 @@ merge_env_file() {
       # Append, preceded by any pending comments. Add a leading blank line
       # to separate from existing content, but only on the first append.
       if [[ "$appended" -eq 0 ]]; then
-        printf '\n' >> "$current"
+        printf '\n' >>"$current"
         appended=1
       fi
-      [[ -n "$pending_comments" ]] && printf '%s' "$pending_comments" >> "$current"
-      printf '%s\n' "$line" >> "$current"
+      [[ -n "$pending_comments" ]] && printf '%s' "$pending_comments" >>"$current"
+      printf '%s\n' "$line" >>"$current"
       pending_comments=""
     else
       pending_comments=""
     fi
-  done < "$example"
+  done <"$example"
 }
 
 # env_missing_keys CURRENT NEW_EXAMPLE → list of keys in example missing in current
@@ -157,7 +172,7 @@ env_missing_keys() {
     if ! grep -q "^${key}=" "$current" 2>/dev/null; then
       echo "$key"
     fi
-  done < "$example"
+  done <"$example"
 }
 
 # ─── Snapshot ─────────────────────────────────────────────────────────────────
@@ -171,7 +186,7 @@ env_missing_keys() {
 # Echoes the backup directory on success.
 snapshot_create() {
   local pd="$1" old="$2" cur_manifest="$3"
-  [[ -n "$old" ]] || return 1  # guard: empty version would rm -rf the entire .backup/ dir
+  [[ -n "$old" ]] || return 1 # guard: empty version would rm -rf the entire .backup/ dir
   local backup="${pd}/.backup/${old}"
   rm -rf "$backup"
   mkdir -p "$backup"
@@ -222,12 +237,12 @@ snapshot_prune() {
   # List dirs sorted by mtime descending, skip first KEEP_N, rm -rf the rest.
   local i=0
   while IFS= read -r -d '' dir; do
-    i=$((i+1))
-    if (( i > keep )); then
+    i=$((i + 1))
+    if ((i > keep)); then
       rm -rf "$dir"
     fi
-  done < <(find "$d" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\0' \
-            | sort -zrn | sed -z 's/^[^ ]* //')
+  done < <(find "$d" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\0' |
+    sort -zrn | sed -z 's/^[^ ]* //')
 }
 
 # ─── File replace ─────────────────────────────────────────────────────────────
@@ -238,16 +253,16 @@ snapshot_prune() {
 resolve_owner() {
   local tag="$1" pd="$2"
   case "$tag" in
-    uid:*)
-      local n="${tag#uid:}"
-      echo "${n}:${n}"
-      ;;
-    user)
-      stat -c '%u:%g' "$pd"
-      ;;
-    *)
-      stat -c '%u:%g' "$pd"
-      ;;
+  uid:*)
+    local n="${tag#uid:}"
+    echo "${n}:${n}"
+    ;;
+  user)
+    stat -c '%u:%g' "$pd"
+    ;;
+  *)
+    stat -c '%u:%g' "$pd"
+    ;;
   esac
 }
 
@@ -257,10 +272,15 @@ resolve_owner() {
 apply_managed_file() {
   local pd="$1" raw="$2" src="$3" dest="$4" expected="$5" mode="$6" owner_tag="$7"
   local target="${pd}/${dest}"
-  local tmp; tmp="$(mktemp "${pd}/.tmp.XXXXXX")"
+  local tmp
+  tmp="$(mktemp "${pd}/.tmp.XXXXXX")"
 
-  curl -fsSL "${raw}/${src}" -o "$tmp" || { rm -f "$tmp"; return 1; }
-  local got; got="$(sha256sum "$tmp" | awk '{print $1}')"
+  curl -fsSL "${raw}/${src}" -o "$tmp" || {
+    rm -f "$tmp"
+    return 1
+  }
+  local got
+  got="$(sha256sum "$tmp" | awk '{print $1}')"
   if [[ "$got" != "$expected" ]]; then
     rm -f "$tmp"
     echo "[helper] checksum mismatch: ${dest} (expected ${expected}, got ${got})" >&2
@@ -269,10 +289,11 @@ apply_managed_file() {
 
   mkdir -p "$(dirname "$target")"
   chmod "$mode" "$tmp"
-  local owner; owner="$(resolve_owner "$owner_tag" "$pd")"
+  local owner
+  owner="$(resolve_owner "$owner_tag" "$pd")"
   chown "$owner" "$tmp" 2>/dev/null || true
   mv -f "$tmp" "$target"
- }
+}
 
 # ─── Legacy-layout migration ──────────────────────────────────────────────────
 
@@ -286,12 +307,15 @@ migrate_legacy_layout() {
   local target="${pd}/bin/hyper-trader-manager"
   local link="/usr/local/bin/hyper-trader-manager"
 
-  [[ -f "$target" ]] && return 0  # already migrated
+  [[ -f "$target" ]] && return 0 # already migrated
 
   mkdir -p "${pd}/bin"
 
   if [[ -f "$link" && ! -L "$link" ]]; then
-    cp -a "$link" "$target" || { echo "[helper] WARN: could not migrate manager script: cp failed" >&2; return 0; }
+    cp -a "$link" "$target" || {
+      echo "[helper] WARN: could not migrate manager script: cp failed" >&2
+      return 0
+    }
     chmod 0755 "$target"
     rm -f "$link"
     if ! ln -sf "$target" "$link" 2>/dev/null; then
@@ -367,7 +391,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       rm -f "$tmp_ex"
     done < <(manifest_env_schemas "$NEW_MANIFEST")
 
-    if (( ${#CHANGED_FILES[@]} > 0 || ${#NEW_ENV_KEYS[@]} > 0 )); then
+    if ((${#CHANGED_FILES[@]} > 0 || ${#NEW_ENV_KEYS[@]} > 0)); then
       HOST_PHASE_RAN=1
       write_state sub_phase host_files
 
@@ -384,7 +408,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       # Apply file changes
       changed_paths_csv=""
       for row in "${CHANGED_FILES[@]}"; do
-        IFS='|' read -r path src expected mode owner <<< "$row"
+        IFS='|' read -r path src expected mode owner <<<"$row"
         if ! apply_managed_file "$COMPOSE_PROJECT_DIR" "$RAW_BASE" "$src" "$path" "$expected" "$mode" "$owner"; then
           echo "[helper] file apply failed: $path — restoring snapshot" >&2
           snapshot_restore "$COMPOSE_PROJECT_DIR" "$BACKUP_DIR" || true
@@ -413,9 +437,12 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       cp -a "$NEW_MANIFEST" "$CUR_MANIFEST"
 
       # Record state
-      local_edits_csv="$(IFS=,; echo "${LOCAL_EDITS[*]:-}")"
+      local_edits_csv="$(
+        IFS=,
+        echo "${LOCAL_EDITS[*]:-}"
+      )"
       write_state host_files_changed "$changed_paths_csv" \
-                  local_edits_overwritten "$local_edits_csv"
+        local_edits_overwritten "$local_edits_csv"
 
       snapshot_prune "$COMPOSE_PROJECT_DIR" 3
     fi
@@ -427,8 +454,8 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   docker compose down --timeout 30
   docker compose up -d
 
-  if wait_for_healthy "$API_CONTAINER" "$HEALTH_TIMEOUT_SECONDS" \
-     && wait_for_healthy "$WEB_CONTAINER" "$HEALTH_TIMEOUT_SECONDS"; then
+  if wait_for_healthy "$API_CONTAINER" "$HEALTH_TIMEOUT_SECONDS" &&
+    wait_for_healthy "$WEB_CONTAINER" "$HEALTH_TIMEOUT_SECONDS"; then
     write_state status idle sub_phase null finished_at "$(now)" error_message null
     echo "[helper] update succeeded"
     exit 0
@@ -437,15 +464,15 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   # ── Phase D: rollback ───────────────────────────────────────────────────────
   echo "[helper] new version unhealthy — rolling back"
   write_state error_message "health check timeout"
-  if (( HOST_PHASE_RAN == 1 )) && [[ -n "$BACKUP_DIR" ]]; then
+  if ((HOST_PHASE_RAN == 1)) && [[ -n "$BACKUP_DIR" ]]; then
     snapshot_restore "$COMPOSE_PROJECT_DIR" "$BACKUP_DIR" || true
   fi
   rewrite_env "$OLD_API_IMAGE" "$OLD_WEB_IMAGE"
   docker compose down --timeout 30
   docker compose up -d
 
-  if wait_for_healthy "$API_CONTAINER" "$HEALTH_TIMEOUT_SECONDS" \
-     && wait_for_healthy "$WEB_CONTAINER" "$HEALTH_TIMEOUT_SECONDS"; then
+  if wait_for_healthy "$API_CONTAINER" "$HEALTH_TIMEOUT_SECONDS" &&
+    wait_for_healthy "$WEB_CONTAINER" "$HEALTH_TIMEOUT_SECONDS"; then
     write_state status rolled_back sub_phase null finished_at "$(now)" error_message "new version failed health check"
     echo "[helper] rolled back successfully"
     exit 0
