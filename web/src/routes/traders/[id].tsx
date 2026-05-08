@@ -350,7 +350,7 @@ const TraderDetailPage: Component = () => {
                                 label: "Update Image",
                                 icon: RefreshCw,
                                 onClick: () => updateImageMutation.mutate(imageQuery.data!.latest_remote!),
-                                priority: "secondary" as const,
+                                priority: "primary" as const,
                                 disabled: busy(),
                                 loading: updateImageMutation.isPending,
                               }]
@@ -359,7 +359,7 @@ const TraderDetailPage: Component = () => {
                             label: "Delete",
                             icon: Trash2,
                             onClick: () => setDeleteOpen(true),
-                            priority: "secondary" as const,
+                            priority: "primary" as const,
                             variant: "danger" as const,
                             disabled: busy() || trader().status === "stopping",
                           },

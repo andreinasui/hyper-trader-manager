@@ -1,4 +1,4 @@
-import { type Component, Show, For, Suspense, createSignal } from "solid-js";
+import { type Component, Show, For, Suspense, createSignal, onMount } from "solid-js";
 import { createQuery, createMutation, useQueryClient } from "@tanstack/solid-query";
 import { A } from "@solidjs/router";
 import { Play, Square, Trash2, RefreshCw, AlertCircle, Inbox } from "lucide-solid";
@@ -25,7 +25,7 @@ import {
   AlertDialogTrigger,
 } from "~/components/ui/alert-dialog";
 import { api } from "~/lib/api";
-import { traderKeys, imageKeys } from "~/lib/query-keys";
+import { traderKeys, imageKeys, updateKeys } from "~/lib/query-keys";
 import type { Trader } from "~/lib/types";
 import { ImageVersionBanner } from "~/components/traders/ImageVersionBanner";
 import {
@@ -283,7 +283,27 @@ function LoadingSkeleton() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+// Module-level guard: don't refetch update status more than once per minute
+// across mounts of /traders (e.g. rapid navigation).
+let lastUpdateCheckAt = 0;
+const UPDATE_CHECK_DEBOUNCE_MS = 60_000;
+
 const TradersPage: Component = () => {
+  const queryClient = useQueryClient();
+
+  onMount(() => {
+    const now = Date.now();
+    // Always invalidate image versions so the banner reflects fresh data on each visit.
+    queryClient.invalidateQueries({ queryKey: imageKeys.versions() });
+    if (now - lastUpdateCheckAt < UPDATE_CHECK_DEBOUNCE_MS) return;
+    lastUpdateCheckAt = now;
+    // Force a backend GitHub release check; ignore failures (e.g. dev mode).
+    api.updates
+      .check()
+      .then(() => queryClient.invalidateQueries({ queryKey: updateKeys.status() }))
+      .catch(() => {});
+  });
+
   const tradersQuery = createQuery(() => ({
     queryKey: traderKeys.lists(),
     queryFn: () => api.listTraders(),
