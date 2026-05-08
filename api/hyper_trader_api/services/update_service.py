@@ -140,6 +140,10 @@ class UpdateService:
         old_web_image: str,
         new_api_image: str,
         new_web_image: str,
+        old_version: str = "unknown",
+        new_version: str = "",
+        manifest_url: str = "",
+        raw_base: str = "",
     ) -> None:
         if not self.compose_project_dir:
             raise RuntimeError("update system not configured")
@@ -171,6 +175,10 @@ class UpdateService:
                 "OLD_WEB_IMAGE": old_web_image,
                 "NEW_API_IMAGE": new_api_image,
                 "NEW_WEB_IMAGE": new_web_image,
+                "OLD_VERSION": old_version,
+                "NEW_VERSION": new_version,
+                "MANIFEST_URL": manifest_url,
+                "RAW_BASE": raw_base,
             },
             volumes={
                 "/var/run/docker.sock": {"bind": "/var/run/docker.sock", "mode": "rw"},

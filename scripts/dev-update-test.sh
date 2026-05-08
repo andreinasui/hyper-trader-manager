@@ -143,6 +143,58 @@ cmd_updating() {
   hint
 }
 
+cmd_host_files_updating() {
+  check_container
+  check_update_configured
+  info "Setting state → updating (sub_phase=host_files)"
+  write_state '{
+  "status": "updating",
+  "sub_phase": "host_files",
+  "current_version": "0.0.1",
+  "latest_version": "v99.0.0",
+  "last_checked": null,
+  "update_started_at": null,
+  "old_api_image": null,
+  "old_web_image": null,
+  "new_api_image": null,
+  "new_web_image": null,
+  "error_message": null,
+  "finished_at": null,
+  "host_files_changed": ["docker-compose.yml", "traefik/traefik.yml"],
+  "local_edits_overwritten": [],
+  "backup_path": "/opt/hyper-trader/.backup/0.0.1"
+}'
+  success "Overlay shows: \"Updating configuration files…\""
+  hint
+}
+
+cmd_host_files_overwritten() {
+  check_container
+  check_update_configured
+  local now
+  now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  info "Setting state → idle + local edits overwritten notice"
+  write_state "{
+  \"status\": \"idle\",
+  \"sub_phase\": null,
+  \"current_version\": \"99.0.0\",
+  \"latest_version\": \"v99.0.0\",
+  \"last_checked\": null,
+  \"update_started_at\": null,
+  \"old_api_image\": null,
+  \"old_web_image\": null,
+  \"new_api_image\": null,
+  \"new_web_image\": null,
+  \"error_message\": null,
+  \"finished_at\": \"$now\",
+  \"host_files_changed\": [\"traefik/traefik.yml\"],
+  \"local_edits_overwritten\": [\"traefik/traefik.yml\"],
+  \"backup_path\": \"/opt/hyper-trader/.backup/0.0.1\"
+}"
+  success "Overlay: \"Update complete!\" + amber notice about overwritten edits"
+  hint
+}
+
 cmd_done() {
   check_container
   check_update_configured
@@ -236,6 +288,8 @@ ${BOLD}Commands:${NC}
   ${CYAN}done${NC}              Idle + recent finished_at       → "Update complete!" → redirect
   ${CYAN}failed${NC}            Failed update                   → "Update failed" overlay
   ${CYAN}rolled-back${NC}       Rolled-back update              → "Update rolled back" overlay
+  ${CYAN}host-files-updating${NC}     sub_phase=host_files          → "Updating configuration files…"
+  ${CYAN}host-files-overwritten${NC}  local edits notice            → amber overlay banner
   ${CYAN}reset${NC}             Remove state file (clean slate)
 
 ${BOLD}Typical test flow:${NC}
@@ -263,6 +317,8 @@ case "${1:-}" in
   done)             cmd_done ;;
   failed)           cmd_failed ;;
   rolled-back)      cmd_rolled_back ;;
+  host-files-updating)    cmd_host_files_updating ;;
+  host-files-overwritten) cmd_host_files_overwritten ;;
   reset)            cmd_reset ;;
   -h|--help|help)   usage; exit 0 ;;
   "")               usage; exit 0 ;;

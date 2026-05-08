@@ -1,0 +1,13 @@
+{
+  "version": "0.0.0-test",
+  "files": [
+    {"path":"docker-compose.yml","source":"environments/prod/docker-compose.yml","sha256":"d4ad31086066c480eb3b6394b4cf6a90c442ea227d88d41959bd8c2f4cc4fd4d","mode":"0644","owner":"user"},
+    {"path":"traefik/traefik.yml","source":"environments/prod/traefik/traefik.template.yml","sha256":"254a5d85afb0d46a6632fe75d80501870328d7302b9ee53f040e16655753c259","mode":"0644","owner":"uid:1000"},
+    {"path":"traefik/dynamic/00-bootstrap.yml","source":"environments/prod/traefik/dynamic/00-bootstrap.yml","sha256":"55b6d0087673ebd129ac2ce7ab96b6f717472d51c7ad3baa761f125f0a848dd7","mode":"0644","owner":"uid:1000"},
+    {"path":"bin/hyper-trader-manager","source":"scripts/hyper-trader-manager.sh","sha256":"3531788936dd7bb8ed9a4ba52fb2fdf568228cb9df995aee6dab56899985401f","mode":"0755","owner":"user"}
+  ],
+  "env_schemas": [
+    {"path":".env","source":"environments/prod/.env.example"},
+    {"path":"api.env","source":"environments/prod/api.env.example"}
+  ]
+}

@@ -2,9 +2,10 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 UpdateStatus = Literal["idle", "updating", "rolled_back", "failed"]
+SubPhase = Literal["host_files", "image_swap"]
 
 
 class UpdateStateFile(BaseModel):
@@ -23,6 +24,21 @@ class UpdateStateFile(BaseModel):
     new_web_image: str | None = None
     error_message: str | None = None
     finished_at: datetime | None = None
+
+    # Host-file update fields (added in 0.2.7)
+    sub_phase: SubPhase | None = None
+    host_files_changed: list[str] = []
+    local_edits_overwritten: list[str] = []
+    backup_path: str | None = None
+
+    @field_validator("host_files_changed", "local_edits_overwritten", mode="before")
+    @classmethod
+    def _split_csv(cls, v: object) -> object:
+        # The bash helper writes these as comma-separated strings via jq --arg.
+        # Accept both string and list forms.
+        if isinstance(v, str):
+            return [s for s in v.split(",") if s]
+        return v
 
 
 class ServiceStatusEntry(BaseModel):
@@ -46,6 +62,12 @@ class UpdateStatusResponse(BaseModel):
     finished_at: datetime | None
     configured: bool
     service_status: ServiceStatus | None = None
+
+    # Host-file update fields
+    sub_phase: SubPhase | None = None
+    host_files_changed: list[str] = []
+    local_edits_overwritten: list[str] = []
+    backup_path: str | None = None
 
 
 class ApplyUpdateResponse(BaseModel):

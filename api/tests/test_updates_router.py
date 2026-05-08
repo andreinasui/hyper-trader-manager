@@ -179,3 +179,73 @@ def test_check_triggers_version_fetch(tmp_path):
         r = client.post("/api/updates/check")
     assert r.status_code == 200
     assert svc.read_state().latest_version == "v0.2.0"
+
+
+# ---- New host-file fields (Task 8) ----
+
+
+def test_status_includes_new_host_fields():
+    """UpdateStateFile accepts and round-trips the four new host-file fields."""
+    from hyper_trader_api.schemas.update import UpdateStateFile
+
+    state = UpdateStateFile(
+        status="updating",
+        sub_phase="host_files",
+        host_files_changed=["docker-compose.yml", "traefik/traefik.yml"],
+        local_edits_overwritten=["traefik/traefik.yml"],
+        backup_path="/opt/hyper-trader/.backup/0.2.6",
+    )
+    dumped = state.model_dump()
+    assert dumped["sub_phase"] == "host_files"
+    assert dumped["host_files_changed"] == ["docker-compose.yml", "traefik/traefik.yml"]
+    assert dumped["local_edits_overwritten"] == ["traefik/traefik.yml"]
+    assert dumped["backup_path"] == "/opt/hyper-trader/.backup/0.2.6"
+
+
+def test_host_fields_csv_coercion():
+    """CSV strings from bash helper are split into lists."""
+    from hyper_trader_api.schemas.update import UpdateStateFile
+
+    state = UpdateStateFile(
+        status="updating",
+        host_files_changed="docker-compose.yml,traefik/traefik.yml",
+        local_edits_overwritten="traefik/traefik.yml",
+    )
+    assert state.host_files_changed == ["docker-compose.yml", "traefik/traefik.yml"]
+    assert state.local_edits_overwritten == ["traefik/traefik.yml"]
+
+
+def test_host_fields_empty_csv_coercion():
+    """Empty CSV string produces empty list."""
+    from hyper_trader_api.schemas.update import UpdateStateFile
+
+    state = UpdateStateFile(status="idle", host_files_changed="", local_edits_overwritten="")
+    assert state.host_files_changed == []
+    assert state.local_edits_overwritten == []
+
+
+# ---- Task 9: router surfaces host-file fields ----
+
+
+def test_status_endpoint_returns_host_fields(tmp_path):
+    """GET /api/updates/status surfaces sub_phase, host_files_changed, backup_path from state."""
+    from hyper_trader_api.schemas.update import UpdateStateFile
+
+    app, svc = make_app(tmp_path)
+    state = UpdateStateFile(
+        status="updating",
+        sub_phase="host_files",
+        host_files_changed=["docker-compose.yml"],
+        local_edits_overwritten=[],
+        backup_path="/opt/hyper-trader/.backup/0.2.6",
+    )
+    svc.write_state(state)
+
+    client = TestClient(app)
+    r = client.get("/api/updates/status")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["sub_phase"] == "host_files"
+    assert body["host_files_changed"] == ["docker-compose.yml"]
+    assert body["local_edits_overwritten"] == []
+    assert body["backup_path"] == "/opt/hyper-trader/.backup/0.2.6"

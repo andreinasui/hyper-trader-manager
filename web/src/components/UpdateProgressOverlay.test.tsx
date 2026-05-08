@@ -173,6 +173,31 @@ describe("UpdateProgressOverlay", () => {
     expect(screen.getByRole("link", { name: /go home/i })).toHaveAttribute("href", "/");
   });
 
+  it("shows 'Updating configuration files…' when sub_phase is host_files", async () => {
+    const { api } = await import("~/lib/api");
+
+    vi.mocked(api.updates.getStatus).mockResolvedValue({
+      status: "updating",
+      sub_phase: "host_files",
+      current_version: "0.2.6",
+      latest_version: "v0.2.7",
+      update_available: false,
+      last_checked: null,
+      error_message: null,
+      finished_at: null,
+      configured: true,
+      service_status: null,
+      host_files_changed: ["docker-compose.yml"],
+      local_edits_overwritten: [],
+      backup_path: "/opt/hyper-trader/.backup/0.2.6",
+    });
+
+    render(() => <UpdateProgressOverlay />);
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(screen.getByText(/Updating configuration files/i)).toBeInTheDocument();
+  });
+
   it("shows reconnecting overlay after 3 consecutive failures", async () => {
     const { api } = await import("~/lib/api");
 

@@ -233,3 +233,44 @@ def test_collect_service_status_handles_missing_container(tmp_path):
     out = svc.collect_service_status(client=docker_client)
     assert out.api.image is None and out.api.running is False
     assert out.web.image is None and out.web.running is False
+
+
+# ---- Task 10: spawn_helper passes manifest URL ----
+
+
+def test_spawn_helper_passes_manifest_inputs(tmp_path):
+    """spawn_helper passes OLD_VERSION/NEW_VERSION/MANIFEST_URL/RAW_BASE env vars
+    and mounts COMPOSE_PROJECT_DIR rw."""
+    from unittest import mock
+
+    svc = UpdateService(
+        state_dir=tmp_path,
+        compose_project_dir=tmp_path / "stack",
+    )
+    fake_client = mock.MagicMock()
+    fake_client.containers.get.return_value.attrs = {
+        "Mounts": [{"Type": "volume", "Destination": str(tmp_path), "Name": "test_state"}]
+    }
+
+    svc.spawn_helper(
+        client=fake_client,
+        helper_image="ghcr.io/h:1",
+        old_api_image="api:0.1.0",
+        old_web_image="web:0.1.0",
+        new_api_image="api:0.2.0",
+        new_web_image="web:0.2.0",
+        old_version="0.1.0",
+        new_version="0.2.0",
+        manifest_url="https://example.com/manifest.json",
+        raw_base="https://example.com/v0.2.0",
+    )
+
+    kwargs = fake_client.containers.run.call_args.kwargs
+    env = kwargs["environment"]
+    assert env["OLD_VERSION"] == "0.1.0"
+    assert env["NEW_VERSION"] == "0.2.0"
+    assert env["MANIFEST_URL"] == "https://example.com/manifest.json"
+    assert env["RAW_BASE"] == "https://example.com/v0.2.0"
+
+    project_mount = kwargs["volumes"][str(tmp_path / "stack")]
+    assert project_mount["mode"] == "rw"

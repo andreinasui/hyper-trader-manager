@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     update_check_interval_hours: int = 24
     update_health_check_timeout_seconds: int = 60
     helper_image: str = "ghcr.io/andreinasui/hyper-trader-manager-update-helper:latest"
+    github_raw_base: str = "https://raw.githubusercontent.com"
 
     @computed_field  # type: ignore[prop-decorator]
     @property

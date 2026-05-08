@@ -20,7 +20,16 @@
 # =============================================================================
 set -euo pipefail
 
-INSTALL_DIR="/opt/hyper-trader"
+# Resolve INSTALL_DIR from this script's real path, so it works whether invoked
+# directly (/opt/hyper-trader/bin/hyper-trader-manager) or via the symlink in
+# /usr/local/bin/. Falls back to the well-known path for legacy installs.
+SELF="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+SELF_DIR="$(cd "$(dirname "$SELF")" && pwd)"
+if [[ "$(basename "$SELF_DIR")" == "bin" ]]; then
+  INSTALL_DIR="$(dirname "$SELF_DIR")"
+else
+  INSTALL_DIR="/opt/hyper-trader"
+fi
 COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
 
 # ── Colours ───────────────────────────────────────────────────────────────────
@@ -79,6 +88,24 @@ cmd_update() {
     echo -e "${GREEN}Update complete.${RESET}"
 }
 
+cmd_restore_backup() {
+    local version="${1:-}"
+    [[ -n "$version" ]] || die "Usage: hyper-trader-manager restore-backup <version>"
+
+    local backup="${INSTALL_DIR}/.backup/${version}"
+    [[ -d "$backup" ]] || die "Backup not found: ${backup}\nAvailable: $(ls "${INSTALL_DIR}/.backup" 2>/dev/null || echo none)"
+
+    echo -e "${YELLOW}Restoring from backup ${version}...${RESET}"
+    echo -e "${BLUE}This will stop the stack, copy ${backup} over ${INSTALL_DIR}, and restart.${RESET}"
+    read -r -p "Continue? [y/N] " confirm
+    [[ "$confirm" =~ ^[yY]$ ]] || { echo "Aborted."; exit 1; }
+
+    compose -f "${COMPOSE_FILE}" down --timeout 30 || true
+    cp -a "${backup}/." "${INSTALL_DIR}/"
+    compose -f "${COMPOSE_FILE}" up -d
+    echo -e "${GREEN}Restored.${RESET}"
+}
+
 usage() {
     echo -e "${BOLD}Usage:${RESET} hyper-trader-manager <command> [args]"
     echo ""
@@ -89,6 +116,7 @@ usage() {
     echo "  status   Show running container status"
     echo "  logs     Follow logs [service]"
     echo "  update   Pull new images and restart"
+    echo "  restore-backup <version>  Restore host files from .backup/<version>/"
 }
 
 case "${1:-}" in
@@ -98,5 +126,6 @@ case "${1:-}" in
     status)  cmd_status ;;
     logs)    shift; cmd_logs "$@" ;;
     update)  cmd_update ;;
+    restore-backup) shift; cmd_restore_backup "$@" ;;
     *)       usage; exit 1 ;;
 esac

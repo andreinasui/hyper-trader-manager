@@ -114,6 +114,7 @@ header "Creating install directory"
 
 mkdir -p "${INSTALL_DIR}/traefik/dynamic"
 # acme.json is managed by the traefik-acme-init Docker volume init container
+mkdir -p "${INSTALL_DIR}/bin"
 
 success "Created ${INSTALL_DIR}"
 
@@ -136,7 +137,10 @@ download "${RAW_BASE}/environments/prod/.env.example" "${INSTALL_DIR}/.env.examp
 download "${RAW_BASE}/environments/prod/api.env.example" "${INSTALL_DIR}/api.env.example"
 download "${RAW_BASE}/environments/prod/traefik/traefik.template.yml" "${INSTALL_DIR}/traefik/traefik.yml"
 download "${RAW_BASE}/environments/prod/traefik/dynamic/00-bootstrap.yml" "${INSTALL_DIR}/traefik/dynamic/00-bootstrap.yml"
-download "${RAW_BASE}/scripts/hyper-trader-manager.sh" "${MANAGER_BIN}"
+download "${RAW_BASE}/scripts/hyper-trader-manager.sh" "${INSTALL_DIR}/bin/hyper-trader-manager"
+chmod +x "${INSTALL_DIR}/bin/hyper-trader-manager"
+ln -sf "${INSTALL_DIR}/bin/hyper-trader-manager" "${MANAGER_BIN}"
+download "${RAW_BASE}/environments/prod/manifest.json" "${INSTALL_DIR}/manifest.json"
 
 success "Files downloaded."
 
@@ -189,11 +193,10 @@ success "Ownership set to ${REAL_USER}:${REAL_GROUP}"
 chown -R 1000:1000 "${INSTALL_DIR}/traefik"
 success "Traefik config directory ownership set to 1000:1000 (API container user)"
 
-# ── Phase 7: Install management script ───────────────────────────────────────
-header "Installing management script"
-
-chmod +x "${MANAGER_BIN}"
-success "Installed: ${MANAGER_BIN}"
+# ── Phase 7: Management script (already installed in Phase 4) ────────────────
+header "Management script"
+success "Installed: ${INSTALL_DIR}/bin/hyper-trader-manager"
+success "Symlinked: ${MANAGER_BIN}"
 
 # ── Phase 8: Summary ──────────────────────────────────────────────────────────
 echo ""

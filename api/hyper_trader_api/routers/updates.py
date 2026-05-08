@@ -81,6 +81,10 @@ async def get_status(
         finished_at=state.finished_at,
         configured=svc.configured,
         service_status=service_status,
+        sub_phase=state.sub_phase,
+        host_files_changed=state.host_files_changed,
+        local_edits_overwritten=state.local_edits_overwritten,
+        backup_path=state.backup_path,
     )
 
 
@@ -117,6 +121,11 @@ async def apply_update(
     state.error_message = None
     svc.write_state(state)
 
+    raw_base = (
+        f"{settings.github_raw_base.rstrip('/')}/{settings.github_repo}/refs/tags/{latest}"
+    )
+    manifest_url = f"{raw_base}/environments/prod/manifest.json"
+
     svc.spawn_helper(
         client=docker_client,
         helper_image=settings.helper_image or "",
@@ -124,6 +133,10 @@ async def apply_update(
         old_web_image=state.old_web_image or "",
         new_api_image=state.new_api_image,
         new_web_image=state.new_web_image,
+        old_version=(current or "unknown"),
+        new_version=latest.lstrip("v"),
+        manifest_url=manifest_url,
+        raw_base=raw_base,
     )
 
     return ApplyUpdateResponse(status="updating", message="Update started")
@@ -185,4 +198,8 @@ async def check_now(
         finished_at=state.finished_at,
         configured=svc.configured,
         service_status=service_status,
+        sub_phase=state.sub_phase,
+        host_files_changed=state.host_files_changed,
+        local_edits_overwritten=state.local_edits_overwritten,
+        backup_path=state.backup_path,
     )

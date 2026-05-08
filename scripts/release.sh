@@ -223,7 +223,8 @@ if [[ "$DRY_RUN" == true ]]; then
   echo "  sed: update version in api/pyproject.toml            →  ${VERSION}"
   echo "  sed: update version in web/package.json              →  ${VERSION}"
   echo "  sed: stamp PINNED_VERSION in scripts/install.sh      →  ${TAG}"
-  echo "  git add api/pyproject.toml web/package.json scripts/install.sh"
+  echo "  scripts/generate-manifest.sh ${VERSION}  →  environments/prod/manifest.json"
+  echo "  git add api/pyproject.toml web/package.json scripts/install.sh environments/prod/manifest.json"
   echo "  git commit -m \"chore: bump version to ${VERSION}\""
   echo "  git push origin main"
   echo "  git tag -a ${TAG} -m \"<tag message above>\""
@@ -270,13 +271,19 @@ fi
 sed -i "s/^PINNED_VERSION=\".*\"/PINNED_VERSION=\"${TAG}\"/" "$INSTALL_SH"
 echo -e "${GREEN}✓ scripts/install.sh → PINNED_VERSION=\"${TAG}\"${NC}"
 
+# environments/prod/manifest.json — regenerate for the new version
+echo ""
+echo -e "${BLUE}Regenerating environments/prod/manifest.json...${NC}"
+"${GIT_ROOT}/scripts/generate-manifest.sh" "${VERSION}"
+echo -e "${GREEN}✓ manifest.json regenerated${NC}"
+
 # ─── Commit ──────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BLUE}Committing version bump...${NC}"
 
 cd "$GIT_ROOT"
 
-git add api/pyproject.toml web/package.json scripts/install.sh
+git add api/pyproject.toml web/package.json scripts/install.sh environments/prod/manifest.json
 
 if git diff --cached --quiet; then
   echo -e "${YELLOW}No changes to commit (version may already be set to ${VERSION})${NC}"

@@ -21,6 +21,10 @@ export interface UpdateStatusResponse {
   finished_at: string | null;
   configured: boolean;
   service_status: ServiceStatus | null;
+  sub_phase?: "host_files" | "image_swap" | null;
+  host_files_changed?: string[];
+  local_edits_overwritten?: string[];
+  backup_path?: string | null;
 }
 
 export interface ApplyUpdateResponse {

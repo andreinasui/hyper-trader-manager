@@ -28,6 +28,8 @@ export const UpdateProgressOverlay: Component = () => {
   const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
   const [consecutiveFailures, setConsecutiveFailures] = createSignal(0);
   const [seenUpdating, setSeenUpdating] = createSignal(false);
+  const [subPhase, setSubPhase] = createSignal<"host_files" | "image_swap" | null>(null);
+  const [localEditsOverwritten, setLocalEditsOverwritten] = createSignal<string[]>([]);
 
   let intervalId: ReturnType<typeof setInterval> | undefined;
   const startTime = Date.now();
@@ -48,6 +50,7 @@ export const UpdateProgressOverlay: Component = () => {
 
         if (status.status === "updating") {
           setSeenUpdating(true);
+          setSubPhase(status.sub_phase ?? null);
         } else if (status.status === "idle") {
           // Two paths to "DONE":
           //  1) We previously observed an "updating" poll on this overlay.
@@ -75,6 +78,10 @@ export const UpdateProgressOverlay: Component = () => {
         } else if (status.status === "rolled_back") {
           clearInterval(intervalId);
           setPhase("ROLLED_BACK");
+        }
+
+        if (status.local_edits_overwritten?.length) {
+          setLocalEditsOverwritten(status.local_edits_overwritten);
         }
       } catch {
         setConsecutiveFailures((f) => f + 1);
@@ -136,14 +143,24 @@ export const UpdateProgressOverlay: Component = () => {
                 </div>
 
                 {/* Progress steps */}
-                <div class="mt-4 space-y-2">
-                  {STEPS.map((step) => (
-                    <div class="flex items-center gap-3 text-sm text-text-subtle">
-                      <Loader2 class="h-4 w-4 animate-spin text-primary flex-shrink-0" />
-                      <span>{step.label}</span>
+                <Show
+                  when={subPhase() === "host_files"}
+                  fallback={
+                    <div class="mt-4 space-y-2">
+                      {STEPS.map((step) => (
+                        <div class="flex items-center gap-3 text-sm text-text-subtle">
+                          <Loader2 class="h-4 w-4 animate-spin text-primary flex-shrink-0" />
+                          <span>{step.label}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  }
+                >
+                  <div class="mt-4 flex items-center gap-3 text-sm text-text-subtle">
+                    <Loader2 class="h-4 w-4 animate-spin text-primary flex-shrink-0" />
+                    <span>Updating configuration files…</span>
+                  </div>
+                </Show>
               </div>
             </Match>
 
@@ -166,6 +183,13 @@ export const UpdateProgressOverlay: Component = () => {
                     </div>
                   ))}
                 </div>
+
+                <Show when={localEditsOverwritten().length > 0}>
+                  <div class="mt-3 w-full p-3 bg-amber-950 border border-amber-800 rounded-md text-xs text-amber-200">
+                    Local edits to {localEditsOverwritten().join(", ")} were overwritten.
+                    A backup is preserved on the server.
+                  </div>
+                </Show>
               </div>
             </Match>
 

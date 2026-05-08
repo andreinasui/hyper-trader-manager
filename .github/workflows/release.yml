@@ -59,9 +59,36 @@ jobs:
         working-directory: web
         run: pnpm test
 
+  verify-manifest:
+    name: Verify manifest.json matches host files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "VERSION=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Regenerate manifest into temp file and diff
+        run: |
+          # The committed manifest must already reflect the tagged commit
+          # (release.sh regenerates and commits it). This check guards
+          # against tags created without using release.sh.
+          chmod +x scripts/generate-manifest.sh
+          mv environments/prod/manifest.json /tmp/committed.json
+          scripts/generate-manifest.sh "${{ steps.version.outputs.VERSION }}"
+          if ! diff -q /tmp/committed.json environments/prod/manifest.json; then
+            echo "::error::Committed manifest.json does not match generated manifest. Re-run scripts/release.sh."
+            diff /tmp/committed.json environments/prod/manifest.json || true
+            exit 1
+          fi
+
   build-push-api:
     name: Build and Push API Docker Image
-    needs: test-api
+    needs: [test-api, verify-manifest]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -138,7 +165,7 @@ jobs:
 
   build-push-web:
     name: Build and Push Web Docker Image
-    needs: test-web
+    needs: [test-web, verify-manifest]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -215,6 +242,7 @@ jobs:
 
   build-push-helper:
     name: Build and Push Helper Docker Image
+    needs: verify-manifest
     runs-on: ubuntu-latest
     permissions:
       contents: read
