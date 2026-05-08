@@ -14,7 +14,7 @@ from functools import lru_cache
 from importlib.metadata import version as get_package_version
 from typing import Literal
 
-from pydantic import computed_field, field_validator
+from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -76,14 +76,6 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return ["http://localhost"]
-
-    @field_validator("cors_origins", mode="after")
-    @classmethod
-    def parse_cors_origins_to_list(cls, v: str) -> list[str]:
-        """Parse comma-separated string to list."""
-        if not v.strip():
-            return []
-        return [origin.strip() for origin in v.split(",") if origin.strip()]
 
     # ==================== API Metadata ====================
     @computed_field  # type: ignore[prop-decorator]

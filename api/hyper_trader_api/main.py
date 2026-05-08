@@ -10,7 +10,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -223,14 +223,22 @@ app.include_router(updates_router)
     summary="Health check",
     description="Check if the API is running and database is connected.",
 )
-async def health_check() -> dict[str, Any]:
+async def health_check(response: Response) -> dict[str, Any]:
     """
     Health check endpoint.
 
     Returns OK if:
     - API is running
     - Database is connected
+
+    Access-Control-Allow-Origin is set to * so the SSL-setup polling flow can
+    reach this endpoint cross-origin (browser is on http://domain, health check
+    is on https://domain — different scheme = different origin).
     """
+    # Allow cross-origin access — this endpoint is public and carries no
+    # sensitive data. Required during SSL setup when the frontend at
+    # http://<domain> polls https://<domain>/health to detect HTTPS readiness.
+    response.headers["Access-Control-Allow-Origin"] = "*"
     # Check database connection
     try:
         with engine.connect() as conn:
