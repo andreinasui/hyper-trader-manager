@@ -1,5 +1,5 @@
 {
-  "version": "0.2.7",
+  "version": "0.2.8",
   "files": [
     {"path":"docker-compose.yml","source":"environments/prod/docker-compose.yml","sha256":"d4ad31086066c480eb3b6394b4cf6a90c442ea227d88d41959bd8c2f4cc4fd4d","mode":"0644","owner":"user"},
     {"path":"traefik/traefik.yml","source":"environments/prod/traefik/traefik.template.yml","sha256":"254a5d85afb0d46a6632fe75d80501870328d7302b9ee53f040e16655753c259","mode":"0644","owner":"uid:1000"},
