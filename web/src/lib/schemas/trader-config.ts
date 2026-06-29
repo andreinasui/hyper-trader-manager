@@ -23,6 +23,11 @@ export const providerSettingsSchema = z.object({
   self_account: selfAccountSchema,
   copy_account: copyAccountSchema,
   slippage_bps: z.number().int().min(0).max(1000).default(200),
+  risk_parameters: z.object({
+    allowed_assets: z.union([z.literal("*"), z.array(z.string()).min(1)]),
+    blocked_assets: z.array(z.string()).default([]),
+    max_leverage: z.number().int().min(1).max(50).nullable().optional(),
+  }),
 });
 
 // For form validation, uses relaxed self_account validation
@@ -32,45 +37,46 @@ export const providerSettingsFormSchema = z.object({
   self_account: selfAccountFormSchema,
   copy_account: copyAccountSchema,
   slippage_bps: z.number().int().min(0).max(1000).default(200),
+  risk_parameters: z.object({
+    allowed_assets: z.union([z.literal("*"), z.array(z.string()).min(1)]),
+    blocked_assets: z.array(z.string()).default([]),
+    max_leverage: z.number().int().min(1).max(50).nullable().optional(),
+  }),
 });
 
 export const openOnLowPnlSchema = z.object({
-  enabled: z.boolean().default(true),
-  max_pnl: z.number().min(-1).max(1).default(0.05),
+  enabled: z.boolean().default(false),
+  max_pnl: z.number().min(0).max(1).default(0),
 });
 
 export const riskParametersSchema = z.object({
-  allowed_assets: z.array(z.string()).nullable().optional(),
-  blocked_assets: z.array(z.string()).default([]),
-  max_leverage: z.number().int().min(1).max(50).nullable().optional(),
   self_proportionality_multiplier: z.number().min(0.01).max(10).default(1.0),
   open_on_low_pnl: openOnLowPnlSchema.default({}),
 });
 
 export const manualBucketSchema = z.object({
-  width_percent: z.number().gt(0).lte(1),
+  type: z.literal("manual"),
+  width_percent: z.number().min(0).max(1),
+  pricing_strategy: z.enum(["vwap", "aggressive"]).default("vwap"),
 });
 
 export const autoBucketSchema = z.object({
-  ratio_threshold: z.number().gt(0).default(1000),
-  wide_bucket_percent: z.number().gt(0).lte(1).default(0.01),
-  narrow_bucket_percent: z.number().gt(0).lte(1).default(0.0001),
+  type: z.literal("auto"),
+  ratio_threshold: z.number().min(0).default(1000),
+  wide_bucket_percent: z.number().gt(0).max(0.01).default(0.01),
+  narrow_bucket_percent: z.number().min(0).max(0.01).default(0.0001),
+  pricing_strategy: z.enum(["vwap", "aggressive"]).default("vwap"),
 });
 
-export const bucketConfigSchema = z
-  .object({
-    manual: manualBucketSchema.nullable().optional(),
-    auto: autoBucketSchema.nullable().optional(),
-    pricing_strategy: z.enum(["vwap", "aggressive"]).default("vwap"),
-  })
-  .refine((data) => !(data.manual && data.auto), {
-    message: "Cannot use both manual and auto bucket config",
-  });
+export const bucketConfigSchema = z.discriminatedUnion("type", [
+  autoBucketSchema,
+  manualBucketSchema,
+]);
 
 export const tradingStrategySchema = z.object({
-  type: z.enum(["order_based", "position_based"]).default("order_based"),
+  type: z.literal("order_based").default("order_based"),
   risk_parameters: riskParametersSchema.default({}),
-  bucket_config: bucketConfigSchema.default({ pricing_strategy: "vwap" }),
+  bucket_config: bucketConfigSchema.default({ type: "auto", pricing_strategy: "vwap" }),
 });
 
 export const traderSettingsSchema = z.object({

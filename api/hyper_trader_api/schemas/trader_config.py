@@ -1,301 +1,181 @@
 """
 Trader configuration schema for HyperTrader API.
 
-Pydantic v2 models matching the HyperTrader YAML config schema.
+Pydantic v2 models matching the HyperTrader JSON config schema.
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class SelfAccount(BaseModel):
     """Self trading account configuration."""
 
-    address: str = Field(
-        ...,
-        pattern=r"^0x[a-fA-F0-9]{40}$",
-        description="Ethereum address (0x...)",
-    )
-    is_sub: bool = Field(
-        default=False,
-        description="Whether account is a vault sub-account",
-    )
+    model_config = ConfigDict(extra="forbid")
+
+    address: str = Field(..., pattern=r"^0x[a-fA-F0-9]{40}$")
+    is_sub: bool = False
 
 
 class CopyAccount(BaseModel):
     """Account to copy trades from."""
 
-    address: str = Field(
+    model_config = ConfigDict(extra="forbid")
+
+    address: str = Field(..., pattern=r"^0x[a-fA-F0-9]{40}$")
+
+
+class ProviderRiskParameters(BaseModel):
+    """Provider-level risk management parameters."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    allowed_assets: Literal["*"] | list[str] = Field(
         ...,
-        pattern=r"^0x[a-fA-F0-9]{40}$",
-        description="Ethereum address (0x...)",
+        description="'*' for all assets, or a non-empty list of asset names",
     )
+    blocked_assets: list[str] = Field(default_factory=list)
+    max_leverage: int | None = Field(default=None, ge=1, le=50)
+
+    @field_validator("allowed_assets")
+    @classmethod
+    def _non_empty_list(cls, v: "Literal['*'] | list[str]") -> "Literal['*'] | list[str]":
+        if isinstance(v, list) and len(v) == 0:
+            raise ValueError("allowed_assets must be '*' or a non-empty list")
+        return v
 
 
 class ProviderSettings(BaseModel):
     """Exchange and account configuration."""
 
-    exchange: Literal["hyperliquid"] = Field(
-        default="hyperliquid",
-        description="Exchange identifier",
-    )
-    network: Literal["mainnet", "testnet"] = Field(
-        ...,
-        description="Network environment",
-    )
-    self_account: SelfAccount = Field(
-        ...,
-        description="Your trading account",
-    )
-    copy_account: CopyAccount = Field(
-        ...,
-        description="Account to copy trades from",
-    )
-    slippage_bps: int = Field(
-        default=200,
-        ge=0,
-        le=1000,
-        description="Slippage tolerance in basis points (1bp = 0.01%)",
-    )
+    model_config = ConfigDict(extra="forbid")
+
+    exchange: Literal["hyperliquid"] = "hyperliquid"
+    network: Literal["mainnet", "testnet"]
+    self_account: SelfAccount
+    copy_account: CopyAccount
+    slippage_bps: int = Field(default=200, ge=0, le=1000)
+    risk_parameters: ProviderRiskParameters
 
 
 class OpenOnLowPnl(BaseModel):
-    """Configuration for opening positions on low PnL."""
+    """Configuration for opening positions when portfolio PnL is low."""
 
-    enabled: bool = Field(default=True)
-    max_pnl: float = Field(
-        default=0.05,
-        ge=-1.0,
-        le=1.0,
-        description="Max PnL threshold (-1.0 to 1.0)",
-    )
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    max_pnl: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
-class RiskParameters(BaseModel):
-    """Risk management parameters."""
+class OrderBasedRiskParameters(BaseModel):
+    """Risk parameters for order-based trading strategy."""
 
-    allowed_assets: list[str] | None = Field(
-        default=None,
-        description="Whitelist of assets (null = all allowed)",
-    )
-    blocked_assets: list[str] = Field(
-        default_factory=list,
-        description="Blacklist of assets",
-    )
-    max_leverage: int | None = Field(
-        default=None,
-        ge=1,
-        le=50,
-        description="Maximum leverage allowed for positions",
-    )
-    self_proportionality_multiplier: float = Field(
-        default=1.0,
-        ge=0.01,
-        le=10.0,
-        description="Multiplier for self order sizing",
-    )
-    open_on_low_pnl: OpenOnLowPnl = Field(
-        default_factory=OpenOnLowPnl,
-    )
+    model_config = ConfigDict(extra="forbid")
+
+    self_proportionality_multiplier: float = Field(default=1.0, gt=0.0)
+    open_on_low_pnl: OpenOnLowPnl = Field(default_factory=OpenOnLowPnl)
 
 
-class ManualBucket(BaseModel):
-    """Fixed bucket width configuration."""
-
-    width_percent: float = Field(
-        ...,
-        gt=0.0,
-        le=1.0,
-        description="Bucket width as percentage (0-1)",
-    )
-
-
-class AutoBucket(BaseModel):
+class AutoBucketConfig(BaseModel):
     """Auto-detection bucket configuration."""
 
-    ratio_threshold: float = Field(
-        default=1000.0,
-        gt=0.0,
-        description="Ratio threshold for auto-detection",
-    )
-    wide_bucket_percent: float = Field(
-        default=0.01,
-        gt=0.0,
-        le=1.0,
-        description="Wide bucket percentage",
-    )
-    narrow_bucket_percent: float = Field(
-        default=0.0001,
-        gt=0.0,
-        le=1.0,
-        description="Narrow bucket percentage",
-    )
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["auto"]
+    ratio_threshold: float = Field(default=1000.0, ge=0.0)
+    wide_bucket_percent: float = Field(default=0.01, gt=0.0, le=0.01)
+    narrow_bucket_percent: float = Field(default=0.0001, ge=0.0, le=0.01)
+    pricing_strategy: Literal["vwap", "aggressive"] = "vwap"
 
 
-class BucketConfig(BaseModel):
-    """Order bucketing configuration."""
+class ManualBucketConfig(BaseModel):
+    """Fixed-width bucket configuration."""
 
-    manual: ManualBucket | None = Field(
-        default=None,
-        description="Fixed bucket width",
-    )
-    auto: AutoBucket | None = Field(
-        default=None,
-        description="Auto-detection mode",
-    )
-    pricing_strategy: Literal["vwap", "aggressive"] = Field(
-        default="vwap",
-        description="Bucket price calculation strategy",
-    )
+    model_config = ConfigDict(extra="forbid")
 
-    model_config = ConfigDict(
-        json_schema_extra={"description": "Either manual or auto must be set, not both"}
-    )
+    type: Literal["manual"]
+    width_percent: float = Field(..., ge=0.0, le=1.0)
+    pricing_strategy: Literal["vwap", "aggressive"] = "vwap"
 
 
-class TradingStrategy(BaseModel):
-    """Trading strategy configuration."""
+BucketConfig = Annotated[
+    AutoBucketConfig | ManualBucketConfig,
+    Field(discriminator="type"),
+]
 
-    type: Literal["order_based", "position_based"] = Field(
-        default="order_based",
-        description="Trading strategy type",
-    )
-    risk_parameters: RiskParameters = Field(
-        default_factory=RiskParameters,
-    )
-    bucket_config: BucketConfig = Field(
-        default_factory=BucketConfig,
-        description="Order bucketing configuration",
-    )
+
+class PositionBasedStrategy(BaseModel):
+    """Position-based trading strategy (no bucket config required)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["position_based"]
+
+
+class OrderBasedStrategy(BaseModel):
+    """Order-based trading strategy with required bucket config."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["order_based"]
+    risk_parameters: OrderBasedRiskParameters = Field(default_factory=OrderBasedRiskParameters)
+    bucket_config: BucketConfig
+
+
+TradingStrategy = Annotated[
+    PositionBasedStrategy | OrderBasedStrategy,
+    Field(discriminator="type"),
+]
 
 
 class TraderSettings(BaseModel):
-    """Trading strategy and risk parameters."""
+    """Trading strategy container."""
 
-    trading_strategy: TradingStrategy = Field(
-        ...,
-        description="Trading strategy configuration",
-    )
+    model_config = ConfigDict(extra="forbid")
+
+    trading_strategy: TradingStrategy
 
 
 class TraderConfigSchema(BaseModel):
     """Complete trader configuration schema."""
 
-    provider_settings: ProviderSettings = Field(
-        ...,
-        description="Exchange and account configuration",
-    )
-    trader_settings: TraderSettings = Field(
-        ...,
-        description="Trading strategy and risk parameters",
-    )
+    model_config = ConfigDict(extra="forbid")
 
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "provider_settings": {
-                    "exchange": "hyperliquid",
-                    "network": "mainnet",
-                    "self_account": {
-                        "address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a",
-                        "is_sub": False,
-                    },
-                    "copy_account": {
-                        "address": "0x1234567890abcdef1234567890abcdef12345678",
-                    },
-                },
-                "trader_settings": {
-                    "trading_strategy": {
-                        "type": "order_based",
-                        "risk_parameters": {
-                            "max_leverage": 10,
-                        },
-                    },
-                },
-            }
-        }
-    )
+    provider_settings: ProviderSettings
+    trader_settings: TraderSettings
 
 
 # Update-specific schemas where self_account.address is optional
-# (will be auto-filled from trader's wallet_address in the service layer)
+# (auto-filled from trader's wallet_address in the service layer)
 
 
 class SelfAccountUpdate(BaseModel):
-    """Self account for updates - address is optional (auto-filled from trader)."""
+    """Self account for updates - address is optional."""
 
-    address: str | None = Field(
-        default=None,
-        pattern=r"^0x[a-fA-F0-9]{40}$",
-        description="Ethereum address (0x...) - auto-filled if not provided",
-    )
-    is_sub: bool = Field(
-        default=False,
-        description="Whether account is a vault sub-account",
-    )
+    model_config = ConfigDict(extra="forbid")
+
+    address: str | None = Field(default=None, pattern=r"^0x[a-fA-F0-9]{40}$")
+    is_sub: bool = False
 
 
 class ProviderSettingsUpdate(BaseModel):
     """Exchange and account configuration for updates."""
 
-    exchange: Literal["hyperliquid"] = Field(
-        default="hyperliquid",
-        description="Exchange identifier",
-    )
-    network: Literal["mainnet", "testnet"] = Field(
-        ...,
-        description="Network environment",
-    )
-    self_account: SelfAccountUpdate = Field(
-        default_factory=SelfAccountUpdate,
-        description="Your trading account (address auto-filled)",
-    )
-    copy_account: CopyAccount = Field(
-        ...,
-        description="Account to copy trades from",
-    )
-    slippage_bps: int = Field(
-        default=200,
-        ge=0,
-        le=1000,
-        description="Slippage tolerance in basis points (1bp = 0.01%)",
-    )
+    model_config = ConfigDict(extra="forbid")
+
+    exchange: Literal["hyperliquid"] = "hyperliquid"
+    network: Literal["mainnet", "testnet"]
+    self_account: SelfAccountUpdate = Field(default_factory=SelfAccountUpdate)
+    copy_account: CopyAccount
+    slippage_bps: int = Field(default=200, ge=0, le=1000)
+    risk_parameters: ProviderRiskParameters
 
 
 class TraderConfigUpdateSchema(BaseModel):
     """Trader configuration for updates - self_account.address is optional."""
 
-    provider_settings: ProviderSettingsUpdate = Field(
-        ...,
-        description="Exchange and account configuration",
-    )
-    trader_settings: TraderSettings = Field(
-        ...,
-        description="Trading strategy and risk parameters",
-    )
+    model_config = ConfigDict(extra="forbid")
 
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "provider_settings": {
-                    "exchange": "hyperliquid",
-                    "network": "mainnet",
-                    "self_account": {
-                        "is_sub": False,
-                    },
-                    "copy_account": {
-                        "address": "0x1234567890abcdef1234567890abcdef12345678",
-                    },
-                },
-                "trader_settings": {
-                    "trading_strategy": {
-                        "type": "order_based",
-                        "risk_parameters": {
-                            "max_leverage": 10,
-                        },
-                    },
-                },
-            }
-        }
-    )
+    provider_settings: ProviderSettingsUpdate
+    trader_settings: TraderSettings

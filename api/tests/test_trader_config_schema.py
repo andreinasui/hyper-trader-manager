@@ -4,9 +4,10 @@ Tests for trader configuration Pydantic schemas.
 Covers:
 - TraderConfigSchema: main configuration schema
 - ProviderSettings: exchange, network, and account settings
-- TradingStrategy: strategy type validation
-- RiskParameters: risk management validation
-- BucketConfig: order bucketing validation
+- ProviderRiskParameters: provider-level risk validation
+- TradingStrategy: position_based and order_based validation
+- OrderBasedRiskParameters: order-based risk parameters
+- AutoBucketConfig / ManualBucketConfig: bucket config validation
 - TraderConfigUpdateSchema: update-specific schema with optional self_account.address
 """
 
@@ -14,53 +15,61 @@ import pytest
 from pydantic import ValidationError
 
 from hyper_trader_api.schemas.trader_config import (
-    AutoBucket,
-    BucketConfig,
+    AutoBucketConfig,
     CopyAccount,
-    ManualBucket,
+    ManualBucketConfig,
+    OrderBasedRiskParameters,
+    OrderBasedStrategy,
+    PositionBasedStrategy,
+    ProviderRiskParameters,
     ProviderSettings,
-    RiskParameters,
     SelfAccount,
     TraderConfigSchema,
     TraderConfigUpdateSchema,
-    TradingStrategy,
+    TraderSettings,
 )
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+SELF_ADDR = "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
+COPY_ADDR = "0x1234567890abcdef1234567890abcdef12345678"
+
+MINIMAL_PROVIDER = {
+    "network": "mainnet",
+    "self_account": {"address": SELF_ADDR},
+    "copy_account": {"address": COPY_ADDR},
+    "risk_parameters": {"allowed_assets": "*"},
+}
 
 
 class TestTraderConfigSchema:
     """Tests for TraderConfigSchema - main configuration model."""
 
-    def test_valid_minimal_config(self):
-        """TraderConfigSchema accepts minimal valid configuration."""
-        config_data = {
-            "provider_settings": {
-                "network": "mainnet",
-                "self_account": {
-                    "address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a",
-                },
-                "copy_account": {
-                    "address": "0x1234567890abcdef1234567890abcdef12345678",
-                },
-            },
-            "trader_settings": {
-                "trading_strategy": {
-                    "type": "order_based",
-                },
-            },
-        }
-
-        config = TraderConfigSchema(**config_data)
-
+    def test_valid_minimal_position_based(self):
+        """TraderConfigSchema accepts minimal position_based configuration."""
+        config = TraderConfigSchema(
+            provider_settings=MINIMAL_PROVIDER,
+            trader_settings={"trading_strategy": {"type": "position_based"}},
+        )
         assert config.provider_settings.network == "mainnet"
         assert config.provider_settings.exchange == "hyperliquid"
-        assert (
-            config.provider_settings.self_account.address
-            == "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
-        )
+        assert config.provider_settings.self_account.address == SELF_ADDR
         assert config.provider_settings.self_account.is_sub is False
-        assert (
-            config.provider_settings.copy_account.address
-            == "0x1234567890abcdef1234567890abcdef12345678"
+        assert config.provider_settings.copy_account.address == COPY_ADDR
+        assert config.trader_settings.trading_strategy.type == "position_based"
+
+    def test_valid_minimal_order_based(self):
+        """TraderConfigSchema accepts minimal order_based with auto bucket."""
+        config = TraderConfigSchema(
+            provider_settings=MINIMAL_PROVIDER,
+            trader_settings={
+                "trading_strategy": {
+                    "type": "order_based",
+                    "bucket_config": {"type": "auto"},
+                }
+            },
         )
         assert config.trader_settings.trading_strategy.type == "order_based"
 
@@ -70,28 +79,25 @@ class TestTraderConfigSchema:
             "provider_settings": {
                 "exchange": "hyperliquid",
                 "network": "testnet",
-                "self_account": {
-                    "address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a",
-                    "is_sub": True,
-                },
-                "copy_account": {
-                    "address": "0x1234567890abcdef1234567890abcdef12345678",
-                },
+                "self_account": {"address": SELF_ADDR, "is_sub": True},
+                "copy_account": {"address": COPY_ADDR},
                 "slippage_bps": 50,
+                "risk_parameters": {
+                    "allowed_assets": ["BTC", "ETH"],
+                    "blocked_assets": ["DOGE"],
+                    "max_leverage": 20,
+                },
             },
             "trader_settings": {
                 "trading_strategy": {
                     "type": "order_based",
                     "risk_parameters": {
-                        "allowed_assets": ["BTC", "ETH"],
-                        "blocked_assets": ["DOGE"],
-                        "max_leverage": 20,
                         "self_proportionality_multiplier": 2.5,
+                        "open_on_low_pnl": {"enabled": True, "max_pnl": 0.1},
                     },
                     "bucket_config": {
-                        "manual": {
-                            "width_percent": 0.05,
-                        },
+                        "type": "manual",
+                        "width_percent": 0.05,
                         "pricing_strategy": "aggressive",
                     },
                 },
@@ -104,15 +110,23 @@ class TestTraderConfigSchema:
         assert config.provider_settings.network == "testnet"
         assert config.provider_settings.self_account.is_sub is True
         assert config.provider_settings.slippage_bps == 50
-        assert config.trader_settings.trading_strategy.type == "order_based"
-        assert config.trader_settings.trading_strategy.risk_parameters.max_leverage == 20
-        assert (
-            config.trader_settings.trading_strategy.risk_parameters.self_proportionality_multiplier
-            == 2.5
-        )
-        assert (
-            config.trader_settings.trading_strategy.bucket_config.pricing_strategy == "aggressive"
-        )
+        assert config.provider_settings.risk_parameters.allowed_assets == ["BTC", "ETH"]
+        assert config.provider_settings.risk_parameters.max_leverage == 20
+
+        strategy = config.trader_settings.trading_strategy
+        assert strategy.type == "order_based"
+        assert strategy.risk_parameters.self_proportionality_multiplier == 2.5
+        assert strategy.bucket_config.type == "manual"
+        assert strategy.bucket_config.pricing_strategy == "aggressive"
+
+    def test_extra_fields_rejected(self):
+        """TraderConfigSchema rejects unknown top-level fields."""
+        with pytest.raises(ValidationError):
+            TraderConfigSchema(
+                provider_settings=MINIMAL_PROVIDER,
+                trader_settings={"trading_strategy": {"type": "position_based"}},
+                unknown_field="bad",
+            )
 
 
 class TestProviderSettingsValidation:
@@ -120,30 +134,21 @@ class TestProviderSettingsValidation:
 
     def test_invalid_ethereum_address(self):
         """ProviderSettings rejects invalid Ethereum addresses."""
-        # Missing 0x prefix
         with pytest.raises(ValidationError) as exc_info:
             ProviderSettings(
                 network="mainnet",
                 self_account=SelfAccount(address="e221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"),
-                copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
+                copy_account=CopyAccount(address=COPY_ADDR),
+                risk_parameters=ProviderRiskParameters(allowed_assets="*"),
             )
         assert "address" in str(exc_info.value).lower()
 
-        # Too short
         with pytest.raises(ValidationError) as exc_info:
             ProviderSettings(
                 network="mainnet",
                 self_account=SelfAccount(address="0x1234"),
-                copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
-            )
-        assert "address" in str(exc_info.value).lower()
-
-        # Invalid characters
-        with pytest.raises(ValidationError) as exc_info:
-            ProviderSettings(
-                network="mainnet",
-                self_account=SelfAccount(address="0xGGGGef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"),
-                copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
+                copy_account=CopyAccount(address=COPY_ADDR),
+                risk_parameters=ProviderRiskParameters(allowed_assets="*"),
             )
         assert "address" in str(exc_info.value).lower()
 
@@ -151,9 +156,10 @@ class TestProviderSettingsValidation:
         """ProviderSettings rejects invalid network values."""
         with pytest.raises(ValidationError) as exc_info:
             ProviderSettings(
-                network="devnet",  # Invalid - only mainnet or testnet allowed
-                self_account=SelfAccount(address="0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"),
-                copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
+                network="devnet",
+                self_account=SelfAccount(address=SELF_ADDR),
+                copy_account=CopyAccount(address=COPY_ADDR),
+                risk_parameters=ProviderRiskParameters(allowed_assets="*"),
             )
         assert "network" in str(exc_info.value).lower()
 
@@ -161,177 +167,229 @@ class TestProviderSettingsValidation:
         """ProviderSettings slippage_bps defaults to 200 bps."""
         settings = ProviderSettings(
             network="mainnet",
-            self_account=SelfAccount(address="0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"),
-            copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
+            self_account=SelfAccount(address=SELF_ADDR),
+            copy_account=CopyAccount(address=COPY_ADDR),
+            risk_parameters=ProviderRiskParameters(allowed_assets="*"),
         )
         assert settings.slippage_bps == 200
 
     def test_slippage_bps_bounds(self):
         """ProviderSettings validates slippage_bps is between 0 and 1000."""
-        # Valid: 0
+        rp = ProviderRiskParameters(allowed_assets="*")
+
         settings = ProviderSettings(
             network="mainnet",
-            self_account=SelfAccount(address="0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"),
-            copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
+            self_account=SelfAccount(address=SELF_ADDR),
+            copy_account=CopyAccount(address=COPY_ADDR),
+            risk_parameters=rp,
             slippage_bps=0,
         )
         assert settings.slippage_bps == 0
 
-        # Valid: 1000
         settings = ProviderSettings(
             network="mainnet",
-            self_account=SelfAccount(address="0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"),
-            copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
+            self_account=SelfAccount(address=SELF_ADDR),
+            copy_account=CopyAccount(address=COPY_ADDR),
+            risk_parameters=rp,
             slippage_bps=1000,
         )
         assert settings.slippage_bps == 1000
 
-        # Invalid: negative
         with pytest.raises(ValidationError) as exc_info:
             ProviderSettings(
                 network="mainnet",
-                self_account=SelfAccount(address="0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"),
-                copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
+                self_account=SelfAccount(address=SELF_ADDR),
+                copy_account=CopyAccount(address=COPY_ADDR),
+                risk_parameters=rp,
                 slippage_bps=-1,
             )
         assert "slippage_bps" in str(exc_info.value).lower()
 
-        # Invalid: too high
         with pytest.raises(ValidationError) as exc_info:
             ProviderSettings(
                 network="mainnet",
-                self_account=SelfAccount(address="0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"),
-                copy_account=CopyAccount(address="0x1234567890abcdef1234567890abcdef12345678"),
+                self_account=SelfAccount(address=SELF_ADDR),
+                copy_account=CopyAccount(address=COPY_ADDR),
+                risk_parameters=rp,
                 slippage_bps=1001,
             )
         assert "slippage_bps" in str(exc_info.value).lower()
+
+    def test_risk_parameters_required(self):
+        """ProviderSettings requires risk_parameters."""
+        with pytest.raises(ValidationError):
+            ProviderSettings(
+                network="mainnet",
+                self_account=SelfAccount(address=SELF_ADDR),
+                copy_account=CopyAccount(address=COPY_ADDR),
+            )
+
+
+class TestProviderRiskParametersValidation:
+    """Tests for ProviderRiskParameters validation rules."""
+
+    def test_allowed_assets_star(self):
+        """ProviderRiskParameters accepts '*' for all assets."""
+        rp = ProviderRiskParameters(allowed_assets="*")
+        assert rp.allowed_assets == "*"
+
+    def test_allowed_assets_non_empty_list(self):
+        """ProviderRiskParameters accepts non-empty list of assets."""
+        rp = ProviderRiskParameters(allowed_assets=["BTC", "ETH"])
+        assert rp.allowed_assets == ["BTC", "ETH"]
+
+    def test_allowed_assets_empty_list_rejected(self):
+        """ProviderRiskParameters rejects empty list for allowed_assets."""
+        with pytest.raises(ValidationError):
+            ProviderRiskParameters(allowed_assets=[])
+
+    def test_blocked_assets_defaults_to_empty(self):
+        """ProviderRiskParameters blocked_assets defaults to empty list."""
+        rp = ProviderRiskParameters(allowed_assets="*")
+        assert rp.blocked_assets == []
+
+    def test_max_leverage_bounds(self):
+        """ProviderRiskParameters validates max_leverage is between 1 and 50 or null."""
+        assert ProviderRiskParameters(allowed_assets="*", max_leverage=1).max_leverage == 1
+        assert ProviderRiskParameters(allowed_assets="*", max_leverage=50).max_leverage == 50
+        assert ProviderRiskParameters(allowed_assets="*", max_leverage=None).max_leverage is None
+
+        with pytest.raises(ValidationError) as exc_info:
+            ProviderRiskParameters(allowed_assets="*", max_leverage=0)
+        assert "max_leverage" in str(exc_info.value).lower()
+
+        with pytest.raises(ValidationError) as exc_info:
+            ProviderRiskParameters(allowed_assets="*", max_leverage=51)
+        assert "max_leverage" in str(exc_info.value).lower()
 
 
 class TestTradingStrategyValidation:
     """Tests for TradingStrategy validation rules."""
 
     def test_invalid_strategy_type(self):
-        """TradingStrategy rejects invalid strategy types."""
-        with pytest.raises(ValidationError) as exc_info:
-            TradingStrategy(type="invalid_strategy")
-        assert "type" in str(exc_info.value).lower()
-
-    def test_valid_order_based(self):
-        """TradingStrategy accepts 'order_based' strategy type."""
-        strategy = TradingStrategy(type="order_based")
-        assert strategy.type == "order_based"
-        assert strategy.risk_parameters is not None
+        """TraderSettings rejects invalid strategy types."""
+        with pytest.raises(ValidationError):
+            TraderSettings(trading_strategy={"type": "invalid_strategy"})
 
     def test_valid_position_based(self):
-        """TradingStrategy accepts 'position_based' strategy type."""
-        strategy = TradingStrategy(type="position_based")
+        """position_based strategy has only type."""
+        strategy = PositionBasedStrategy(type="position_based")
         assert strategy.type == "position_based"
-        assert strategy.risk_parameters is not None
+
+    def test_position_based_rejects_extra_fields(self):
+        """position_based strategy rejects extra fields."""
+        with pytest.raises(ValidationError):
+            PositionBasedStrategy(type="position_based", bucket_config={"type": "auto"})
+
+    def test_valid_order_based_with_auto_bucket(self):
+        """order_based strategy requires bucket_config."""
+        strategy = OrderBasedStrategy(
+            type="order_based",
+            bucket_config={"type": "auto"},
+        )
+        assert strategy.type == "order_based"
+        assert strategy.bucket_config.type == "auto"
+
+    def test_order_based_requires_bucket_config(self):
+        """order_based strategy without bucket_config is invalid."""
+        with pytest.raises(ValidationError):
+            OrderBasedStrategy(type="order_based")
 
 
-class TestRiskParametersValidation:
-    """Tests for RiskParameters validation rules."""
+class TestOrderBasedRiskParametersValidation:
+    """Tests for OrderBasedRiskParameters validation rules."""
 
-    def test_max_leverage_bounds(self):
-        """RiskParameters validates max_leverage is between 1 and 50."""
-        # Valid: 1
-        params = RiskParameters(max_leverage=1)
-        assert params.max_leverage == 1
+    def test_defaults(self):
+        """OrderBasedRiskParameters has correct defaults."""
+        rp = OrderBasedRiskParameters()
+        assert rp.self_proportionality_multiplier == 1.0
+        assert rp.open_on_low_pnl.enabled is False
+        assert rp.open_on_low_pnl.max_pnl == 0.0
 
-        # Valid: 50
-        params = RiskParameters(max_leverage=50)
-        assert params.max_leverage == 50
+    def test_self_proportionality_multiplier_must_be_positive(self):
+        """self_proportionality_multiplier must be > 0."""
+        assert OrderBasedRiskParameters(self_proportionality_multiplier=0.001).self_proportionality_multiplier == 0.001
+        assert OrderBasedRiskParameters(self_proportionality_multiplier=100.0).self_proportionality_multiplier == 100.0
 
-        # Valid: None (disabled)
-        params = RiskParameters(max_leverage=None)
-        assert params.max_leverage is None
-
-        # Invalid: 0
         with pytest.raises(ValidationError) as exc_info:
-            RiskParameters(max_leverage=0)
-        assert "max_leverage" in str(exc_info.value).lower()
-
-        # Invalid: 51
-        with pytest.raises(ValidationError) as exc_info:
-            RiskParameters(max_leverage=51)
-        assert "max_leverage" in str(exc_info.value).lower()
-
-    def test_self_proportionality_multiplier_bounds(self):
-        """RiskParameters validates self_proportionality_multiplier is between 0.01 and 10.0."""
-        # Valid: 0.01 (minimum)
-        params = RiskParameters(self_proportionality_multiplier=0.01)
-        assert params.self_proportionality_multiplier == 0.01
-
-        # Valid: 10.0 (maximum)
-        params = RiskParameters(self_proportionality_multiplier=10.0)
-        assert params.self_proportionality_multiplier == 10.0
-
-        # Valid: default is 1.0
-        params = RiskParameters()
-        assert params.self_proportionality_multiplier == 1.0
-
-        # Invalid: 0.009 (too small)
-        with pytest.raises(ValidationError) as exc_info:
-            RiskParameters(self_proportionality_multiplier=0.009)
+            OrderBasedRiskParameters(self_proportionality_multiplier=0.0)
         assert "self_proportionality_multiplier" in str(exc_info.value).lower()
 
-        # Invalid: 10.1 (too large)
-        with pytest.raises(ValidationError) as exc_info:
-            RiskParameters(self_proportionality_multiplier=10.1)
-        assert "self_proportionality_multiplier" in str(exc_info.value).lower()
+    def test_open_on_low_pnl_max_pnl_bounds(self):
+        """open_on_low_pnl.max_pnl must be between 0 and 1."""
+        rp = OrderBasedRiskParameters(open_on_low_pnl={"enabled": True, "max_pnl": 1.0})
+        assert rp.open_on_low_pnl.max_pnl == 1.0
+
+        with pytest.raises(ValidationError):
+            OrderBasedRiskParameters(open_on_low_pnl={"max_pnl": -0.1})
+
+        with pytest.raises(ValidationError):
+            OrderBasedRiskParameters(open_on_low_pnl={"max_pnl": 1.1})
 
 
 class TestBucketConfigValidation:
-    """Tests for BucketConfig validation rules."""
-
-    def test_manual_bucket_width_bounds(self):
-        """BucketConfig validates manual bucket width_percent is between 0 and 1."""
-        # Valid: 0.001 (just above 0)
-        config = BucketConfig(manual=ManualBucket(width_percent=0.001))
-        assert config.manual.width_percent == 0.001
-
-        # Valid: 1.0 (maximum)
-        config = BucketConfig(manual=ManualBucket(width_percent=1.0))
-        assert config.manual.width_percent == 1.0
-
-        # Invalid: 0 (must be > 0)
-        with pytest.raises(ValidationError) as exc_info:
-            BucketConfig(manual=ManualBucket(width_percent=0.0))
-        assert "width_percent" in str(exc_info.value).lower()
-
-        # Invalid: 1.1 (too large)
-        with pytest.raises(ValidationError) as exc_info:
-            BucketConfig(manual=ManualBucket(width_percent=1.1))
-        assert "width_percent" in str(exc_info.value).lower()
+    """Tests for AutoBucketConfig and ManualBucketConfig validation rules."""
 
     def test_auto_bucket_defaults(self):
-        """BucketConfig auto bucket has correct default values."""
-        config = BucketConfig(auto=AutoBucket())
+        """AutoBucketConfig has correct default values."""
+        bucket = AutoBucketConfig(type="auto")
+        assert bucket.ratio_threshold == 1000.0
+        assert bucket.wide_bucket_percent == 0.01
+        assert bucket.narrow_bucket_percent == 0.0001
+        assert bucket.pricing_strategy == "vwap"
 
-        assert config.auto.ratio_threshold == 1000.0
-        assert config.auto.wide_bucket_percent == 0.01
-        assert config.auto.narrow_bucket_percent == 0.0001
+    def test_auto_bucket_wide_percent_bounds(self):
+        """wide_bucket_percent must be (0, 0.01]."""
+        assert AutoBucketConfig(type="auto", wide_bucket_percent=0.005).wide_bucket_percent == 0.005
+
+        with pytest.raises(ValidationError):
+            AutoBucketConfig(type="auto", wide_bucket_percent=0.0)
+
+        with pytest.raises(ValidationError):
+            AutoBucketConfig(type="auto", wide_bucket_percent=0.011)
+
+    def test_auto_bucket_narrow_percent_bounds(self):
+        """narrow_bucket_percent must be [0, 0.01]."""
+        assert AutoBucketConfig(type="auto", narrow_bucket_percent=0.0).narrow_bucket_percent == 0.0
+        assert AutoBucketConfig(type="auto", narrow_bucket_percent=0.01).narrow_bucket_percent == 0.01
+
+        with pytest.raises(ValidationError):
+            AutoBucketConfig(type="auto", narrow_bucket_percent=0.011)
+
+    def test_manual_bucket_width_bounds(self):
+        """ManualBucketConfig validates width_percent is in [0, 1]."""
+        assert ManualBucketConfig(type="manual", width_percent=0.0).width_percent == 0.0
+        assert ManualBucketConfig(type="manual", width_percent=1.0).width_percent == 1.0
+
+        with pytest.raises(ValidationError) as exc_info:
+            ManualBucketConfig(type="manual", width_percent=1.1)
+        assert "width_percent" in str(exc_info.value).lower()
 
     def test_pricing_strategy_values(self):
-        """BucketConfig pricing_strategy accepts valid values."""
-        # Valid: vwap (default)
-        config = BucketConfig(manual=ManualBucket(width_percent=0.01))
-        assert config.pricing_strategy == "vwap"
+        """Bucket configs accept valid pricing_strategy values."""
+        auto = AutoBucketConfig(type="auto", pricing_strategy="aggressive")
+        assert auto.pricing_strategy == "aggressive"
 
-        # Valid: aggressive
-        config = BucketConfig(
-            manual=ManualBucket(width_percent=0.01),
-            pricing_strategy="aggressive",
-        )
-        assert config.pricing_strategy == "aggressive"
+        manual = ManualBucketConfig(type="manual", width_percent=0.01, pricing_strategy="vwap")
+        assert manual.pricing_strategy == "vwap"
 
-        # Invalid: other values
         with pytest.raises(ValidationError) as exc_info:
-            BucketConfig(
-                manual=ManualBucket(width_percent=0.01),
-                pricing_strategy="invalid",
-            )
+            ManualBucketConfig(type="manual", width_percent=0.01, pricing_strategy="invalid")
         assert "pricing_strategy" in str(exc_info.value).lower()
+
+    def test_bucket_discriminator(self):
+        """BucketConfig discriminates by type field."""
+        strategy = OrderBasedStrategy(
+            type="order_based",
+            bucket_config={"type": "manual", "width_percent": 0.05},
+        )
+        assert isinstance(strategy.bucket_config, ManualBucketConfig)
+
+        strategy = OrderBasedStrategy(
+            type="order_based",
+            bucket_config={"type": "auto"},
+        )
+        assert isinstance(strategy.bucket_config, AutoBucketConfig)
 
 
 class TestTraderConfigUpdateSchema:
@@ -342,24 +400,16 @@ class TestTraderConfigUpdateSchema:
         config_data = {
             "provider_settings": {
                 "network": "mainnet",
-                "self_account": {
-                    "is_sub": False,
-                    # address is omitted - should be auto-filled by service layer
-                },
-                "copy_account": {
-                    "address": "0x1234567890abcdef1234567890abcdef12345678",
-                },
+                "self_account": {"is_sub": False},
+                "copy_account": {"address": COPY_ADDR},
+                "risk_parameters": {"allowed_assets": "*"},
             },
             "trader_settings": {
-                "trading_strategy": {
-                    "type": "order_based",
-                },
+                "trading_strategy": {"type": "position_based"},
             },
         }
 
         config = TraderConfigUpdateSchema(**config_data)
-
-        # self_account.address should be None when not provided
         assert config.provider_settings.self_account.address is None
         assert config.provider_settings.self_account.is_sub is False
 
@@ -368,27 +418,17 @@ class TestTraderConfigUpdateSchema:
         config_data = {
             "provider_settings": {
                 "network": "mainnet",
-                "self_account": {
-                    "address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a",
-                    "is_sub": True,
-                },
-                "copy_account": {
-                    "address": "0x1234567890abcdef1234567890abcdef12345678",
-                },
+                "self_account": {"address": SELF_ADDR, "is_sub": True},
+                "copy_account": {"address": COPY_ADDR},
+                "risk_parameters": {"allowed_assets": "*"},
             },
             "trader_settings": {
-                "trading_strategy": {
-                    "type": "order_based",
-                },
+                "trading_strategy": {"type": "position_based"},
             },
         }
 
         config = TraderConfigUpdateSchema(**config_data)
-
-        assert (
-            config.provider_settings.self_account.address
-            == "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
-        )
+        assert config.provider_settings.self_account.address == SELF_ADDR
         assert config.provider_settings.self_account.is_sub is True
 
     def test_self_account_defaults_to_empty_object(self):
@@ -396,20 +436,14 @@ class TestTraderConfigUpdateSchema:
         config_data = {
             "provider_settings": {
                 "network": "mainnet",
-                "copy_account": {
-                    "address": "0x1234567890abcdef1234567890abcdef12345678",
-                },
-                # self_account omitted entirely
+                "copy_account": {"address": COPY_ADDR},
+                "risk_parameters": {"allowed_assets": "*"},
             },
             "trader_settings": {
-                "trading_strategy": {
-                    "type": "order_based",
-                },
+                "trading_strategy": {"type": "position_based"},
             },
         }
 
         config = TraderConfigUpdateSchema(**config_data)
-
-        # self_account should use defaults
         assert config.provider_settings.self_account.address is None
         assert config.provider_settings.self_account.is_sub is False

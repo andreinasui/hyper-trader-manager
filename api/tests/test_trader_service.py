@@ -69,10 +69,13 @@ def valid_config():
             "copy_account": {
                 "address": "0x1234567890abcdef1234567890abcdef12345678",
             },
+            "risk_parameters": {
+                "allowed_assets": "*",
+            },
         },
         "trader_settings": {
             "trading_strategy": {
-                "type": "order_based",
+                "type": "position_based",
             },
         },
     }
@@ -129,14 +132,13 @@ class TestConfigValidation:
                 "copy_account": {
                     "address": "0x1234567890abcdef1234567890abcdef12345678"
                 },
+                "risk_parameters": {
+                    "allowed_assets": ["BTC", "ETH", "SOL"],
+                    "blocked_assets": ["ETH", "DOGE"],  # ETH overlaps
+                },
             },
             "trader_settings": {
-                "trading_strategy": {
-                    "risk_parameters": {
-                        "allowed_assets": ["BTC", "ETH", "SOL"],
-                        "blocked_assets": ["ETH", "DOGE"],  # ETH overlaps
-                    }
-                }
+                "trading_strategy": {"type": "position_based"}
             },
         }
 
@@ -147,10 +149,10 @@ class TestConfigValidation:
                 config, "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
             )
 
-    def test_bucket_config_cannot_have_both_manual_and_auto(
+    def test_allowed_assets_star_skips_overlap_check(
         self, trader_service: TraderService
     ):
-        """Test that bucket config cannot have both manual and auto."""
+        """Test that '*' allowed_assets skips overlap check with blocked_assets."""
         config = {
             "provider_settings": {
                 "self_account": {
@@ -159,23 +161,19 @@ class TestConfigValidation:
                 "copy_account": {
                     "address": "0x1234567890abcdef1234567890abcdef12345678"
                 },
+                "risk_parameters": {
+                    "allowed_assets": "*",
+                    "blocked_assets": ["ETH"],
+                },
             },
             "trader_settings": {
-                "trading_strategy": {
-                    "bucket_config": {
-                        "manual": [{"size": 100}],
-                        "auto": {"initial_size": 100},  # Both manual and auto
-                    }
-                }
+                "trading_strategy": {"type": "position_based"}
             },
         }
-
-        with pytest.raises(
-            ValueError, match="Bucket config must use either manual or auto"
-        ):
-            trader_service._validate_config(
-                config, "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
-            )
+        # Should not raise — '*' + blocked is a valid combo
+        trader_service._validate_config(
+            config, "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"
+        )
 
     def test_valid_config_passes_validation(
         self, trader_service: TraderService, valid_config: dict
@@ -310,7 +308,7 @@ class TestStartTrader:
 
         # Mock _get_config_data to return YAML string without DB lookup
         with patch.object(
-            trader_service, "_get_config_data", return_value="provider_settings: {}"
+            trader_service, "_get_config_data", return_value="{}"
         ):
             result = trader_service.start_trader(trader_id, mock_user.id)
 
@@ -345,7 +343,7 @@ class TestStartTrader:
 
         # Mock _get_config_data to return YAML string without DB lookup
         with patch.object(
-            trader_service, "_get_config_data", return_value="provider_settings: {}"
+            trader_service, "_get_config_data", return_value="{}"
         ):
             with patch("time.sleep"):  # Skip sleep delays in tests
                 with pytest.raises(
@@ -380,7 +378,7 @@ class TestStartTrader:
         mock_db.query.return_value.filter.return_value.first.return_value = trader
 
         with patch.object(
-            trader_service, "_get_config_data", return_value="provider_settings: {}"
+            trader_service, "_get_config_data", return_value="{}"
         ):
             result = trader_service.start_trader(trader_id, mock_user.id)
 
@@ -698,7 +696,7 @@ class TestRestartTrader:
         mock_runtime.service_exists.side_effect = [True, False]
 
         with patch.object(
-            trader_service, "_get_config_data", return_value="provider_settings: {}"
+            trader_service, "_get_config_data", return_value="{}"
         ):
             result = trader_service.restart_trader(trader_id, mock_user.id)
 
@@ -732,7 +730,7 @@ class TestRestartTrader:
         mock_runtime.service_exists.return_value = False
 
         with patch.object(
-            trader_service, "_get_config_data", return_value="provider_settings: {}"
+            trader_service, "_get_config_data", return_value="{}"
         ):
             trader_service.restart_trader(trader_id, mock_user.id)
 
@@ -788,7 +786,7 @@ class TestRestartTrader:
         mock_runtime.create_service.side_effect = Exception("Docker create error")
 
         with patch.object(
-            trader_service, "_get_config_data", return_value="provider_settings: {}"
+            trader_service, "_get_config_data", return_value="{}"
         ):
             with patch("time.sleep"):
                 with pytest.raises(TraderServiceError, match="Failed to start trader"):

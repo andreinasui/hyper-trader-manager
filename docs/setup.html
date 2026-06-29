@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Set up HyperTrader Manager on a VPS." />
+    <title>Setup | HyperTrader Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./site.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="./index.html"><span class="logo">HT</span><span>HyperTrader Manager</span></a>
+      <nav class="topnav" aria-label="Main navigation">
+        <a href="./index.html">Overview</a>
+        <a href="./setup.html" aria-current="page">Setup</a>
+        <a href="https://github.com/andreinasui/hyper-trader-manager">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar" aria-label="Documentation navigation">
+        <div class="nav-title">HyperTrader Manager</div>
+        <a class="nav-link" href="./index.html">Introduction</a>
+        <a class="nav-link active" href="./setup.html">Getting started</a>
+        <div class="nav-section">Guides</div>
+        <a class="nav-link" href="#requirements">Requirements</a>
+        <a class="nav-link" href="#install">Installation</a>
+        <a class="nav-link" href="#after-start">After start</a>
+        <div class="nav-section">Reference</div>
+        <a class="nav-link" href="#commands">Commands</a>
+      </aside>
+
+      <main class="article">
+        <p class="eyebrow">Getting started</p>
+        <h1 id="setup">Setup</h1>
+        <p class="lead">Install HyperTrader Manager on a VPS, configure HTTPS, then create the first admin account.</p>
+
+        <h2 id="requirements">Requirements</h2>
+        <ul>
+          <li>A Linux VPS with sudo access.</li>
+          <li>A real domain pointed at the VPS public IP.</li>
+          <li>Ports <code>80</code> and <code>443</code> reachable from the internet.</li>
+          <li>Docker support on the host.</li>
+        </ul>
+
+        <div class="admonition warning">
+          <p class="admonition-title">HTTPS required</p>
+          <p>Production admin bootstrap is blocked until HTTPS is configured, so admin credentials are not sent over plaintext HTTP.</p>
+        </div>
+
+        <h2 id="install">Installation</h2>
+        <p>Run the installer, edit the environment file, then start the stack.</p>
+        <pre><code>curl -sSL https://raw.githubusercontent.com/andreinasui/hyper-trader-manager/main/scripts/install.sh | sudo bash
+sudo nano /opt/hyper-trader/api.env
+hyper-trader-manager start</code></pre>
+
+        <h2 id="after-start">After start</h2>
+        <ol>
+          <li>Open your domain in a browser.</li>
+          <li>Complete the Let's Encrypt HTTPS setup.</li>
+          <li>Create the first admin account.</li>
+          <li>Create trader instances from the dashboard.</li>
+        </ol>
+
+        <h2 id="commands">Common commands</h2>
+        <pre><code>hyper-trader-manager status
+hyper-trader-manager logs api
+hyper-trader-manager update
+hyper-trader-manager restore-backup &lt;version&gt;</code></pre>
+
+        <h2 id="data">Data</h2>
+        <p>Production data lives in Docker volumes plus host Traefik configuration under <code>/opt/hyper-trader/traefik/</code>.</p>
+      </main>
+
+      <aside class="toc" aria-label="Table of contents">
+        <div class="toc-title">Table of contents</div>
+        <a href="#requirements">Requirements</a>
+        <a href="#install">Installation</a>
+        <a href="#after-start">After start</a>
+        <a href="#commands">Common commands</a>
+        <a href="#data">Data</a>
+      </aside>
+    </div>
+  </body>
+</html>

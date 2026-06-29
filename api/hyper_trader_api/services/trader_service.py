@@ -9,7 +9,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-import yaml
+import json
 from sqlalchemy.orm import Session
 
 from hyper_trader_api.config import get_settings
@@ -76,23 +76,13 @@ class TraderService:
         if copy_addr == wallet_address.lower():
             raise ValueError("Copy account cannot be the same as self account")
 
-        # Check allowed and blocked assets don't overlap
-        risk = (
-            config.get("trader_settings", {}).get("trading_strategy", {}).get("risk_parameters", {})
-        )
-        allowed = set(risk.get("allowed_assets") or [])
-        blocked = set(risk.get("blocked_assets") or [])
-        overlap = allowed & blocked
-        if overlap:
-            raise ValueError(f"Assets cannot be both allowed and blocked: {overlap}")
-
-        # Check bucket config - only manual OR auto, not both
-        bucket = config.get("trader_settings", {}).get("trading_strategy", {}).get("bucket_config")
-        if bucket:
-            has_manual = bucket.get("manual") is not None
-            has_auto = bucket.get("auto") is not None
-            if has_manual and has_auto:
-                raise ValueError("Bucket config must use either manual or auto, not both")
+        # Check allowed and blocked assets don't overlap (provider-level risk)
+        risk = config.get("provider_settings", {}).get("risk_parameters", {})
+        allowed_assets = risk.get("allowed_assets", [])
+        if isinstance(allowed_assets, list):
+            overlap = set(allowed_assets) & set(risk.get("blocked_assets") or [])
+            if overlap:
+                raise ValueError(f"Assets cannot be both allowed and blocked: {overlap}")
 
     def _get_runtime_name(self, wallet_address: str) -> str:
         """Generate runtime container name from wallet address."""
@@ -101,13 +91,13 @@ class TraderService:
 
     def _get_config_data(self, trader_id: str) -> str:
         """
-        Get trader's config from database as YAML string.
+        Get trader's config from database as JSON string.
 
         Args:
             trader_id: Trader's UUID as string
 
         Returns:
-            YAML config content as string
+            JSON config content as string
 
         Raises:
             TraderServiceError: If no config found in database
@@ -119,7 +109,7 @@ class TraderService:
         if not trader_config:
             raise TraderServiceError(f"No config found for trader {trader_id}")
 
-        return yaml.safe_dump(trader_config.config_json, default_flow_style=False)
+        return json.dumps(trader_config.config_json)
 
     def _safe_archive(self, trader: Trader) -> None:
         """Archive trader logs; silently logs WARNING on failure, never re-raises."""
@@ -270,7 +260,7 @@ class TraderService:
         trader.last_error = None
         self.db.commit()
 
-        # Get config data from database as YAML string
+        # Get config data from database as JSON string
         config_data = self._get_config_data(str(trader.id))
         last_error = None
 

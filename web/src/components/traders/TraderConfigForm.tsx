@@ -7,6 +7,7 @@ import {
   Wallet,
   SlidersHorizontal,
   RotateCcw,
+  Info,
 } from "lucide-solid";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -48,13 +49,15 @@ const DEFAULTS = {
   widthPercent: 0.01,
 } as const;
 
+const ASSET_SELECTOR_HELP = '"*" loads all markets. Examples: BTC = default:BTC, default:* loads default market, xyz:* loads xyz market. Block wins over allow.';
+
 export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
   const [error, setError] = createSignal<string | null>(null);
   const [showPrivateKey, setShowPrivateKey] = createSignal(false);
   const [bucketMode, setBucketMode] = createSignal<"manual" | "auto">("auto");
   const [advancedOpen, setAdvancedOpen] = createSignal(false);
   const [maxLeverageEnabled, setMaxLeverageEnabled] = createSignal(
-    (props.initialValues?.config?.trader_settings?.trading_strategy?.risk_parameters?.max_leverage ?? null) !== null
+    (props.initialValues?.config?.provider_settings?.risk_parameters?.max_leverage ?? null) !== null
   );
 
   // Use edit schema when editing (no wallet_address/private_key validation)
@@ -115,22 +118,25 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
         self_account: { address: "", is_sub: false },
         copy_account: { address: "" },
         slippage_bps: DEFAULTS.slippageBps,
+        risk_parameters: {
+          allowed_assets: "*",
+          blocked_assets: [],
+          max_leverage: DEFAULTS.maxLeverage,
+        },
       },
       trader_settings: {
         trading_strategy: {
           type: "order_based",
           risk_parameters: {
-            blocked_assets: [],
             self_proportionality_multiplier: DEFAULTS.multiplier,
-            open_on_low_pnl: { enabled: true, max_pnl: DEFAULTS.maxPnl },
+            open_on_low_pnl: { enabled: false, max_pnl: 0 },
           },
           bucket_config: {
+            type: "auto",
             pricing_strategy: "vwap",
-            auto: {
-              ratio_threshold: DEFAULTS.ratioThreshold,
-              wide_bucket_percent: DEFAULTS.wideBucketPct,
-              narrow_bucket_percent: DEFAULTS.narrowBucketPct,
-            },
+            ratio_threshold: DEFAULTS.ratioThreshold,
+            wide_bucket_percent: DEFAULTS.wideBucketPct,
+            narrow_bucket_percent: DEFAULTS.narrowBucketPct,
           },
         },
       },
@@ -378,12 +384,12 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     name={fieldProps.name}
                     ref={fieldProps.ref}
                     value={(field.value as string | undefined) ?? "order_based"}
-                    onChange={(value) => setValue(form, "config.trader_settings.trading_strategy.type", value as "order_based" | "position_based")}
+                    onChange={() => setValue(form, "config.trader_settings.trading_strategy.type", "order_based")}
                     options={[
                       { value: "order_based", label: "Order Based" },
-                      { value: "position_based", label: "Position Based" },
                     ]}
                   />
+                  <p class="text-xs text-text-muted">Position based exists in config but is not available in manager yet.</p>
                   <Show when={field.error}>
                     <p class="text-xs text-error">{field.error}</p>
                   </Show>
@@ -394,34 +400,44 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
             {/* Risk Parameters section */}
             <SectionLabel label="Risk Parameters" />
             <div class="space-y-4">
-              <FormField name="config.trader_settings.trading_strategy.risk_parameters.allowed_assets" type="string[]">
+              <FormField name="config.provider_settings.risk_parameters.allowed_assets">
                 {(field, _fieldProps) => (
                   <div class="space-y-1.5">
-                    <Label class="text-xs text-text-muted">Allowed Assets</Label>
+                    <div class="flex items-center gap-1.5">
+                      <Label class="text-xs text-text-muted">Allowed Assets</Label>
+                      <button type="button" aria-label="Allowed Assets help" title={ASSET_SELECTOR_HELP} class="text-text-faint hover:text-text-muted">
+                        <Info class="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     <TagInput
-                      value={(field.value as string[] | null) ?? []}
+                      value={Array.isArray(field.value) ? field.value : []}
                       onChange={(tags) => {
-                        setValue(form, "config.trader_settings.trading_strategy.risk_parameters.allowed_assets", tags.length > 0 ? tags : null);
+                        setValue(form, "config.provider_settings.risk_parameters.allowed_assets", tags.length > 0 ? tags : "*");
                       }}
-                      placeholder="Type asset and press Enter (empty = all)"
+                      placeholder="Type selector and press Enter (empty = *)"
                     />
                     <p class="text-xs text-text-muted">
-                      Leave empty to allow all assets
+                      Empty means all markets. Use selectors like BTC, default:*, xyz:*.
                     </p>
                   </div>
                 )}
               </FormField>
 
-              <FormField name="config.trader_settings.trading_strategy.risk_parameters.blocked_assets" type="string[]">
+              <FormField name="config.provider_settings.risk_parameters.blocked_assets" type="string[]">
                 {(field, _fieldProps) => (
                   <div class="space-y-1.5">
-                    <Label class="text-xs text-text-muted">Blocked Assets</Label>
+                    <div class="flex items-center gap-1.5">
+                      <Label class="text-xs text-text-muted">Blocked Assets</Label>
+                      <button type="button" aria-label="Blocked Assets help" title={ASSET_SELECTOR_HELP} class="text-text-faint hover:text-text-muted">
+                        <Info class="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     <TagInput
                       value={(field.value as string[]) ?? []}
                       onChange={(tags) => {
-                        setValue(form, "config.trader_settings.trading_strategy.risk_parameters.blocked_assets", tags);
+                        setValue(form, "config.provider_settings.risk_parameters.blocked_assets", tags);
                       }}
-                      placeholder="Type asset and press Enter"
+                      placeholder="Type selector and press Enter"
                     />
                   </div>
                 )}
@@ -440,15 +456,15 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                       onChange={(checked) => {
                         setMaxLeverageEnabled(checked);
                         if (!checked) {
-                          setValue(form, "config.trader_settings.trading_strategy.risk_parameters.max_leverage", null);
+                          setValue(form, "config.provider_settings.risk_parameters.max_leverage", null);
                         } else {
-                          setValue(form, "config.trader_settings.trading_strategy.risk_parameters.max_leverage", DEFAULTS.maxLeverage);
+                          setValue(form, "config.provider_settings.risk_parameters.max_leverage", DEFAULTS.maxLeverage);
                         }
                       }}
                     />
                   </div>
                   <Show when={maxLeverageEnabled()}>
-                    <FormField name="config.trader_settings.trading_strategy.risk_parameters.max_leverage" type="number">
+                    <FormField name="config.provider_settings.risk_parameters.max_leverage" type="number">
                       {(field, fieldProps) => (
                         <>
                           <Input
@@ -585,17 +601,32 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                   { value: "auto", label: "Auto" },
                 ]}
                 value={bucketMode()}
-                onChange={(v) => setBucketMode(v as "manual" | "auto")}
+                onChange={(v) => {
+                  const mode = v as "manual" | "auto";
+                  setBucketMode(mode);
+                  setValue(
+                    form,
+                    "config.trader_settings.trading_strategy.bucket_config",
+                    (mode === "manual"
+                      ? { type: "manual", width_percent: DEFAULTS.widthPercent, pricing_strategy: "vwap" }
+                      : {
+                          type: "auto",
+                          ratio_threshold: DEFAULTS.ratioThreshold,
+                          wide_bucket_percent: DEFAULTS.wideBucketPct,
+                          narrow_bucket_percent: DEFAULTS.narrowBucketPct,
+                          pricing_strategy: "vwap",
+                        }) as never
+                  );
+                }}
               />
 
               <Show when={bucketMode() === "manual"}>
-                {/* @ts-expect-error - bucket_config.manual path exists when bucketMode is "manual" */}
-                <FormField name="config.trader_settings.trading_strategy.bucket_config.manual.width_percent" type="number">
+                <FormField name="config.trader_settings.trading_strategy.bucket_config.width_percent" type="number">
                   {(field, fieldProps) => (
                     <div class="space-y-1.5">
                       <div class="flex items-center justify-between">
                         <Label for="width_percent" class="text-xs text-text-muted">Width Percent</Label>
-                        <button type="button" title={`Restore default (${DEFAULTS.widthPercent})`} class="text-text-faint hover:text-text-muted transition-colors" onClick={() => setValue(form, "config.trader_settings.trading_strategy.bucket_config.manual.width_percent" as never, DEFAULTS.widthPercent as never)}>
+                        <button type="button" title={`Restore default (${DEFAULTS.widthPercent})`} class="text-text-faint hover:text-text-muted transition-colors" onClick={() => setValue(form, "config.trader_settings.trading_strategy.bucket_config.width_percent" as never, DEFAULTS.widthPercent as never)}>
                           <RotateCcw class="h-3 w-3" />
                         </button>
                       </div>
@@ -618,13 +649,12 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
 
               <Show when={bucketMode() === "auto"}>
                 <FormGrid cols={3}>
-                  {/* @ts-expect-error - bucket_config.auto path exists when bucketMode is "auto" */}
-                  <FormField name="config.trader_settings.trading_strategy.bucket_config.auto.ratio_threshold" type="number">
+                  <FormField name="config.trader_settings.trading_strategy.bucket_config.ratio_threshold" type="number">
                     {(field, fieldProps) => (
                       <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
                           <Label for="ratio_threshold" class="text-xs text-text-muted">Ratio Threshold</Label>
-                          <button type="button" title={`Restore default (${DEFAULTS.ratioThreshold})`} class="text-text-faint hover:text-text-muted transition-colors" onClick={() => setValue(form, "config.trader_settings.trading_strategy.bucket_config.auto.ratio_threshold" as never, DEFAULTS.ratioThreshold as never)}>
+                          <button type="button" title={`Restore default (${DEFAULTS.ratioThreshold})`} class="text-text-faint hover:text-text-muted transition-colors" onClick={() => setValue(form, "config.trader_settings.trading_strategy.bucket_config.ratio_threshold" as never, DEFAULTS.ratioThreshold as never)}>
                             <RotateCcw class="h-3 w-3" />
                           </button>
                         </div>
@@ -642,13 +672,12 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     )}
                   </FormField>
 
-                  {/* @ts-expect-error - bucket_config.auto path exists when bucketMode is "auto" */}
-                  <FormField name="config.trader_settings.trading_strategy.bucket_config.auto.wide_bucket_percent" type="number">
+                  <FormField name="config.trader_settings.trading_strategy.bucket_config.wide_bucket_percent" type="number">
                     {(field, fieldProps) => (
                       <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
                           <Label for="wide_bucket" class="text-xs text-text-muted">Wide Bucket %</Label>
-                          <button type="button" title={`Restore default (${DEFAULTS.wideBucketPct})`} class="text-text-faint hover:text-text-muted transition-colors" onClick={() => setValue(form, "config.trader_settings.trading_strategy.bucket_config.auto.wide_bucket_percent" as never, DEFAULTS.wideBucketPct as never)}>
+                          <button type="button" title={`Restore default (${DEFAULTS.wideBucketPct})`} class="text-text-faint hover:text-text-muted transition-colors" onClick={() => setValue(form, "config.trader_settings.trading_strategy.bucket_config.wide_bucket_percent" as never, DEFAULTS.wideBucketPct as never)}>
                             <RotateCcw class="h-3 w-3" />
                           </button>
                         </div>
@@ -668,13 +697,12 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     )}
                   </FormField>
 
-                  {/* @ts-expect-error - bucket_config.auto path exists when bucketMode is "auto" */}
-                  <FormField name="config.trader_settings.trading_strategy.bucket_config.auto.narrow_bucket_percent" type="number">
+                  <FormField name="config.trader_settings.trading_strategy.bucket_config.narrow_bucket_percent" type="number">
                     {(field, fieldProps) => (
                       <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
                           <Label for="narrow_bucket" class="text-xs text-text-muted">Narrow Bucket %</Label>
-                          <button type="button" title={`Restore default (${DEFAULTS.narrowBucketPct})`} class="text-text-faint hover:text-text-muted transition-colors" onClick={() => setValue(form, "config.trader_settings.trading_strategy.bucket_config.auto.narrow_bucket_percent" as never, DEFAULTS.narrowBucketPct as never)}>
+                          <button type="button" title={`Restore default (${DEFAULTS.narrowBucketPct})`} class="text-text-faint hover:text-text-muted transition-colors" onClick={() => setValue(form, "config.trader_settings.trading_strategy.bucket_config.narrow_bucket_percent" as never, DEFAULTS.narrowBucketPct as never)}>
                             <RotateCcw class="h-3 w-3" />
                           </button>
                         </div>

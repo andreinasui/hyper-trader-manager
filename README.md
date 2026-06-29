@@ -1,126 +1,108 @@
 # HyperTrader Manager
 
-Management application for HyperTrader instances — backend API and web dashboard.
+Self-hosted manager for HyperTrader instances: FastAPI backend, SolidJS dashboard, Docker-based trader runtime, and VPS deployment tooling.
 
-## Deployment
+## What Is Here
 
-Run the full HyperTrader stack on a single VPS with Docker Compose and Traefik.
+| Path | Purpose |
+|---|---|
+| `api/` | FastAPI API, SQLite, auth, Docker/Swarm trader management |
+| `web/` | SolidJS dashboard built with Solid Start, TanStack Solid Query, Tailwind CSS |
+| `environments/dev/` | Local Docker Compose stack for Traefik + API + Web |
+| `environments/prod/` | Production Compose files downloaded by installer |
+| `helper/` | Short-lived update helper container with rollback support |
+| `scripts/` | Install, release, update-test, and stack management scripts |
+| `docs/` | Quick start, development, and SSL testing docs |
 
-> **Getting started?** See the [Quick Start](docs/QUICKSTART.md) for step-by-step instructions.
-> For day-to-day operations see [Operations Guide](docs/OPERATIONS.md).
+## Quick Start
 
-### Stack
-
-| Service   | Description                            | Accessible at             |
-|-----------|----------------------------------------|---------------------------|
-| `traefik` | Reverse proxy, routes requests         | `:80` (or `PUBLIC_PORT`)  |
-| `api`     | FastAPI backend (uvicorn)              | `/api/*`                  |
-| `web`     | React frontend (nginx, static assets)  | `/*`                      |
-| `data/`   | SQLite DB + trader configs (host volume) | —                       |
-
-> **Note:** Trader instances run as Docker Swarm services with private keys stored as Docker Swarm secrets (mounted at `/run/secrets/private_key` inside each service). Docker Swarm mode is initialized automatically on first trader creation.
-
-### Quick Start
+### Local Development
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/yourorg/hyper-trader-manager.git
-cd hyper-trader-manager
+just install
+cp api/.env.example api/.env.development
 
-# 2. Run the installer (guides you through config)
-./scripts/install.sh
+# terminal 1
+just api
+
+# terminal 2
+just web
 ```
 
-Or do it manually:
+Open `http://localhost:3000`. API docs live at `http://localhost:8000/docs`.
+
+More detail: [DEV_SETUP.md](DEV_SETUP.md).
+
+### VPS Production
 
 ```bash
-# 2a. Copy and edit environment file
-cp deploy/.env.example .env
-#    Edit .env — set ADMIN_EMAIL, ADMIN_PASSWORD, DOCKER_GID
-
-# 2b. Start the stack
-docker compose up -d --build
-
-# 2c. Verify
-curl http://localhost/health
-curl http://localhost/api/v1/auth/setup-status
+curl -sSL https://raw.githubusercontent.com/andreinasui/hyper-trader-manager/main/scripts/install.sh | sudo bash
+sudo nano /opt/hyper-trader/api.env
+hyper-trader-manager start
 ```
 
-Open `http://your-server-ip` in a browser to complete first-run setup.
+Open your server in a browser. Production first-run flow configures Let's Encrypt HTTPS, then admin setup.
 
-### Configuration
+More detail: [docs/QUICKSTART.md](docs/QUICKSTART.md).
 
-All settings live in `.env` (copied from `deploy/.env.example`):
+## Stack
 
-| Variable                   | Default                   | Description                                                    |
-|----------------------------|---------------------------|----------------------------------------------------------------|
-| `PUBLIC_PORT`              | `80`                      | Host port to expose                                            |
-| `ADMIN_EMAIL`              | `admin@example.com`       | Admin account email (created on first start)                   |
-| `ADMIN_PASSWORD`           | —                         | Admin account password (**required**)                          |
-| `DOCKER_GID`               | `999`                     | Docker group GID on the host (`getent group docker | cut -d: -f3`) |
-| `DOCKER_SOCKET`            | `/var/run/docker.sock`    | Docker socket path                                             |
-| `TRADER_NETWORK`           | `hypertrader_default`     | Docker network for trader services (Swarm overlay)             |
-| `LOG_LEVEL`                | `INFO`                    | API log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`)            |
+| Service | Tech | Notes |
+|---|---|---|
+| `traefik` | Traefik v3 | Routes `/*` to web and `/api/*` to API, handles HTTPS |
+| `api` | Python 3.11+, FastAPI, SQLAlchemy, SQLite | Manages auth, traders, SSL setup, updates |
+| `web` | SolidJS, Solid Start, TypeScript, Tailwind CSS | Dashboard on port `3000` internally |
+| `helper` | Bash + Docker CLI | Runs self-update flow and rollback |
 
-### Data Persistence
+Trader private keys are stored as Docker Swarm secrets. Swarm mode is initialized when needed.
 
-All persistent data is written to `./data/` on the host:
-
-| Path                | Contents                        |
-|---------------------|---------------------------------|
-| `data/db.sqlite`    | SQLite database                 |
-| `data/traders/`     | Trader configuration files      |
-
-### Updating
+## Common Commands
 
 ```bash
-./scripts/upgrade.sh
+# repo root
+just install          # install api + web dependencies
+just api              # run backend on :8000
+just web              # run frontend on :3000
+just release 0.2.13   # create release artifacts
+
+# api/
+just test
+just lint
+just format
+
+# web/
+pnpm test
+pnpm build
+pnpm test:e2e
 ```
 
-Or manually:
+Production host commands after install:
 
 ```bash
-docker compose build --pull
-docker compose up -d
+hyper-trader-manager start
+hyper-trader-manager status
+hyper-trader-manager logs api
+hyper-trader-manager update
+hyper-trader-manager restore-backup <version>
 ```
 
-### Backup
+## Data
 
-```bash
-./scripts/backup.sh
-```
+| Environment | Location |
+|---|---|
+| Local direct dev | `api/data/hypertrader.db` |
+| Local Compose dev | `environments/dev/sqlitedb/` and `environments/dev/traefik/` |
+| Production | Docker volumes plus `/opt/hyper-trader/traefik/` host config |
 
-Saves a timestamped archive to `./backups/` containing the SQLite database, trader configs, and a redacted copy of the env file.
+## HTTPS
 
----
+Production requires a real domain for Let's Encrypt. Ports `80` and `443` must be reachable. Admin bootstrap is blocked until HTTPS is configured, so admin credentials are not sent over plaintext HTTP.
 
-## Security Notice (v1)
+Local direct dev runs over HTTP. For local SSL testing, see [docs/SSL_LOCAL_TESTING.md](docs/SSL_LOCAL_TESTING.md).
 
-v1 is **HTTP only**. Login credentials are transmitted in plain text.
+## More Docs
 
-Recommended mitigations:
-- restrict access with a VPS / cloud firewall to trusted IPs
-- place behind a secure reverse proxy or VPN for production use
-
----
-
-## Development
-
-See [DEV_SETUP.md](DEV_SETUP.md) for local development setup.
-
-### Project Structure
-
-| Directory | Description | Tech Stack |
-|-----------|-------------|------------|
-| `/api`    | Backend API | Python 3.11+, FastAPI, SQLAlchemy, SQLite |
-| `/web`    | Frontend    | React 19, TypeScript, TanStack Router/Query, Tailwind CSS |
-| `/deploy` | Deployment configs | Docker Compose, Traefik |
-| `/scripts`| Operational scripts | Bash |
-| `/docs`   | Documentation | Markdown |
-
-### Components
-
-- **api/**: FastAPI backend for trader management (SQLite, session token auth, Docker runtime)
-- **web/**: React/Vite frontend for monitoring and controlling traders
-- **deploy/traefik/**: Traefik dynamic routing configuration
-- **scripts/**: Install, upgrade, and backup automation
+- [docs/QUICKSTART.md](docs/QUICKSTART.md) — local and VPS setup
+- [DEV_SETUP.md](DEV_SETUP.md) — contributor setup and commands
+- [helper/README.md](helper/README.md) — update helper behavior
+- [AGENTS.md](AGENTS.md) — repo conventions for agents

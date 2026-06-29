@@ -1,7 +1,6 @@
 ---
 name: frontend-developer
 description: Expert UI engineer focused on crafting robust, scalable frontend solutions. Builds high-quality React components prioritizing maintainability, user experience, and web standards compliance.
-model: github-copilot/claude-sonnet-4.6
 tools:
     read: true
     write: true

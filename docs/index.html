@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Self-hosted manager for HyperTrader bot instances." />
+    <title>HyperTrader Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./site.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="./index.html"><span class="logo">HT</span><span>HyperTrader Manager</span></a>
+      <nav class="topnav" aria-label="Main navigation">
+        <a href="./index.html" aria-current="page">Overview</a>
+        <a href="./setup.html">Setup</a>
+        <a href="https://github.com/andreinasui/hyper-trader-manager">GitHub</a>
+      </nav>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar" aria-label="Documentation navigation">
+        <div class="nav-title">HyperTrader Manager</div>
+        <a class="nav-link active" href="./index.html">Introduction</a>
+        <a class="nav-link" href="./setup.html">Getting started</a>
+        <div class="nav-section">Guides</div>
+        <a class="nav-link" href="./setup.html#requirements">Requirements</a>
+        <a class="nav-link" href="./setup.html#install">Installation</a>
+        <a class="nav-link" href="./setup.html#after-start">After start</a>
+        <div class="nav-section">Reference</div>
+        <a class="nav-link" href="./setup.html#commands">Commands</a>
+      </aside>
+
+      <main class="article">
+        <p class="eyebrow">Introduction</p>
+        <h1 id="hypertrader-manager">HyperTrader Manager</h1>
+        <p class="lead">A self-hosted control panel for running and managing HyperTrader bot instances on your own VPS.</p>
+
+        <div class="hero-card" aria-label="Quick summary">
+          <div><strong>Runtime</strong><span>Docker-based trader services</span></div>
+          <div><strong>Security</strong><span>HTTPS + Docker Swarm secrets</span></div>
+          <div><strong>Stack</strong><span>FastAPI, SQLite, SolidJS, Traefik</span></div>
+        </div>
+
+        <h2 id="highlights">Highlights</h2>
+        <ul>
+          <li>Creates and manages HyperTrader bot instances from a web dashboard.</li>
+          <li>Runs traders as Docker-managed workloads on your VPS.</li>
+          <li>Stores trader private keys as Docker Swarm secrets.</li>
+          <li>Configures production HTTPS with Traefik and Let's Encrypt.</li>
+          <li>Includes update checks, release updates, backups, and rollback commands.</li>
+          <li>Uses SQLite for manager state, keeping deployment small and cheap.</li>
+        </ul>
+
+        <h2 id="what-it-does">What the bot does</h2>
+        <p>HyperTrader bot runs the trading workload. HyperTrader Manager does not replace the bot; it gives you the control plane around it: configuration, lifecycle actions, logs, updates, and safer deployment operations.</p>
+
+        <div class="admonition tip">
+          <p class="admonition-title">Tip</p>
+          <p>Use the manager when you want one repeatable way to run traders instead of manually starting containers and editing files on the server.</p>
+        </div>
+
+        <h2 id="architecture">Architecture</h2>
+        <p>The production stack is intentionally small. Traefik routes traffic, the SolidJS web app provides the dashboard, the FastAPI service manages state and orchestration, and Docker runs trader services.</p>
+        <pre><code>browser
+  -> traefik (:80/:443)
+  -> web dashboard
+  -> api (/api/*)
+  -> docker trader services</code></pre>
+
+        <h2 id="installation">Installation</h2>
+        <p>Install on a VPS with the production installer, then complete HTTPS and admin setup in the browser.</p>
+        <pre><code>curl -sSL https://raw.githubusercontent.com/andreinasui/hyper-trader-manager/main/scripts/install.sh | sudo bash
+sudo nano /opt/hyper-trader/api.env
+hyper-trader-manager start</code></pre>
+
+        <h2 id="learn-more">Learn more</h2>
+        <p>Continue with the <a href="./setup.html">setup guide</a> for requirements, install commands, and day-to-day operations.</p>
+      </main>
+
+      <aside class="toc" aria-label="Table of contents">
+        <div class="toc-title">Table of contents</div>
+        <a href="#highlights">Highlights</a>
+        <a href="#what-it-does">What the bot does</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#installation">Installation</a>
+        <a href="#learn-more">Learn more</a>
+      </aside>
+    </div>
+  </body>
+</html>

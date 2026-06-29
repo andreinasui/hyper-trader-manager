@@ -40,6 +40,7 @@ function normalizeConfig(config: TraderConfig): TraderConfig {
       trading_strategy: {
         ...config.trader_settings.trading_strategy,
         bucket_config: config.trader_settings.trading_strategy.bucket_config ?? {
+          type: "auto",
           pricing_strategy: "vwap",
         },
       },

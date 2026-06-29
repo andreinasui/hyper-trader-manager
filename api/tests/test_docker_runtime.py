@@ -86,7 +86,7 @@ class TestDockerRuntimeCreateTrader:
 
         runtime = DockerRuntime(mock_client)
 
-        config_data = "provider_settings:\n  copy_account:\n    address: '0x5678'\n"
+        config_data = '{"provider_settings": {"copy_account": {"address": "0x5678"}}}'
 
         trader = MagicMock()
         trader.id = "trader-123"
@@ -316,7 +316,7 @@ class TestDockerRuntimeLogConfig:
         trader.image_tag = "0.4.4"
         trader.wallet_address = "0xab12cd34ef56gh78"
 
-        runtime.create_service(trader, "config: yaml")
+        runtime.create_service(trader, "{}")
 
         call_kwargs = mock_client.services.create.call_args.kwargs
         assert call_kwargs.get("log_driver") == "json-file"

@@ -46,10 +46,13 @@ def sample_config():
             "copy_account": {
                 "address": "0x1234567890abcdef1234567890abcdef12345678",
             },
+            "risk_parameters": {
+                "allowed_assets": "*",
+            },
         },
         "trader_settings": {
             "trading_strategy": {
-                "type": "order_based",
+                "type": "position_based",
             },
         },
     }
@@ -93,9 +96,10 @@ def mock_trader_full(mock_user):
             "network": "mainnet",
             "self_account": {"address": "0xe221ef33a07bcf16bde86a5dc6d7c85ebc3a1f9a"},
             "copy_account": {"address": "0x1234567890abcdef1234567890abcdef12345678"},
+            "risk_parameters": {"allowed_assets": "*"},
         },
         "trader_settings": {
-            "trading_strategy": {"type": "order_based"},
+            "trading_strategy": {"type": "position_based"},
         },
     }
     trader.latest_config = mock_config

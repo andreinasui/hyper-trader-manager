@@ -142,7 +142,7 @@ class DockerRuntime:
 
         Args:
             trader_id: Trader ID for config naming
-            config_data: YAML config content as string
+            config_data: JSON config content as string
 
         Returns:
             Config name
@@ -193,7 +193,7 @@ class DockerRuntime:
 
         Args:
             trader: Trader model with runtime_name, image_tag, wallet_address, id
-            config_data: YAML config content as string
+            config_data: JSON config content as string
 
         Raises:
             APIError: If service creation fails
@@ -223,7 +223,7 @@ class DockerRuntime:
             ConfigReference(
                 config_id=config.id,
                 config_name=config_name,
-                filename="/app/config.yaml",
+                filename="/app/config.json",
             ),
         ]
 
@@ -239,7 +239,7 @@ class DockerRuntime:
             endpoint_spec=EndpointSpec(mode="vip"),
             env=[
                 f"WALLET_ADDRESS={trader.wallet_address}",
-                "CONFIG_PATH=/app/config.yaml",
+                "CONFIG_PATH=/app/config.json",
                 "PRIVATE_KEY_FILE=/run/secrets/private_key",
                 "LOG_FORMAT=hyper_trader=json",
                 "LOG_LEVEL=debug",
