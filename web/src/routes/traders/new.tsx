@@ -6,41 +6,24 @@ import { AppShell } from "~/components/layout/AppShell";
 import { PageHeader } from "~/components/layout/PageHeader";
 import { PageContent } from "~/components/layout/PageContent";
 import { PageTitle } from "~/components/layout/PageTitle";
-import { TraderConfigForm } from "~/components/traders/TraderConfigForm";
+import { TraderForm } from "~/components/traders/TraderConfigForm";
+import { toCreateTraderRequest, type TraderFormValues } from "~/components/traders/trader-form-model";
 import { api } from "~/lib/api";
 import { traderKeys } from "~/lib/query-keys";
-import type { CreateTraderForm } from "~/lib/schemas/trader-config";
-import type { CreateTraderRequest } from "~/lib/types";
 
 const NewTraderPage: Component = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const createTraderMutation = createMutation(() => ({
-    mutationFn: (data: CreateTraderForm) => {
-      const payload: CreateTraderRequest = {
-        wallet_address: data.wallet_address,
-        private_key: data.private_key,
-        config: data.config,
-      };
-
-      // Include name and description if provided
-      if (data.name?.trim()) {
-        payload.name = data.name.trim();
-      }
-      if (data.description?.trim()) {
-        payload.description = data.description.trim();
-      }
-
-      return api.createTrader(payload);
-    },
+    mutationFn: (data: TraderFormValues) => api.createTrader(toCreateTraderRequest(data)),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: traderKeys.all });
       navigate("/traders");
     },
   }));
 
-  const handleSubmit = async (data: CreateTraderForm) => {
+  const handleSubmit = async (data: TraderFormValues) => {
     await createTraderMutation.mutateAsync(data);
   };
 
@@ -60,7 +43,8 @@ const NewTraderPage: Component = () => {
             subtitle="Configure and deploy a new trading bot"
           />
 
-          <TraderConfigForm
+          <TraderForm
+            mode="create"
             onSubmit={handleSubmit}
             isSubmitting={createTraderMutation.isPending}
             submitLabel="Create Trader"

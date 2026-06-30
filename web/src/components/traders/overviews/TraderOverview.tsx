@@ -1,9 +1,5 @@
 import { Show, type Component, type JSX, createSignal } from "solid-js";
 import type { Trader, TraderStatusResponse, RuntimeStatus } from "~/lib/types";
-import { Panel, PanelBody } from "~/components/ui/panel";
-import { Input } from "~/components/ui/input";
-import { Textarea } from "~/components/ui/textarea";
-import { Button } from "~/components/ui/button";
 import { StatusDot } from "~/components/ui/status-badge";
 import { AlertCircle, Clock, Tag, Wallet, Copy, Check } from "lucide-solid";
 import type { UseQueryResult } from "@tanstack/solid-query";
@@ -12,14 +8,6 @@ export interface OverviewDesignProps {
   trader: Trader;
   currentStatus: () => Trader["status"] | RuntimeStatus["state"];
   statusQuery: UseQueryResult<TraderStatusResponse, Error>;
-  editName: () => string;
-  editDescription: () => string;
-  handleNameChange: (v: string) => void;
-  handleDescriptionChange: (v: string) => void;
-  infoChanged: () => boolean;
-  infoError: () => string | null;
-  handleInfoSave: () => void;
-  updateInfoMutation: { isPending: boolean };
   needsImageUpdate: () => boolean;
   imageQuery: { data?: { latest_remote?: string | null } };
   formatUptime: (startedAt: string) => string;
@@ -212,57 +200,6 @@ const TraderOverview: Component<OverviewDesignProps> = (props) => {
           </div>
         </div>
       </Show>
-
-      {/* Trader Info Panel */}
-      <Panel>
-        <div class="px-5 py-3.5 border-b border-border-default">
-          <span class="text-sm font-medium text-text-secondary">Trader Information</span>
-        </div>
-        <PanelBody>
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-text-secondary mb-2">Name</label>
-              <Input
-                value={props.editName()}
-                onInput={(e) => props.handleNameChange(e.currentTarget.value)}
-                placeholder="Enter trader name"
-                maxLength={50}
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-text-secondary mb-2">Description</label>
-              <Textarea
-                value={props.editDescription()}
-                onInput={(e) => props.handleDescriptionChange(e.currentTarget.value)}
-                placeholder="Optional description"
-                rows={3}
-                maxLength={255}
-              />
-            </div>
-
-            <Show when={props.infoError()}>
-              <div class="bg-error/10 border border-error/30 rounded px-3 py-2">
-                <div class="flex items-center gap-2">
-                  <AlertCircle class="w-4 h-4 text-error flex-shrink-0" />
-                  <span class="text-sm text-error">{props.infoError()}</span>
-                </div>
-              </div>
-            </Show>
-
-            <Show when={props.infoChanged()}>
-              <div class="flex justify-end pt-2">
-                <Button
-                  onClick={props.handleInfoSave}
-                  disabled={props.updateInfoMutation.isPending}
-                >
-                  {props.updateInfoMutation.isPending ? "Saving..." : "Save"}
-                </Button>
-              </div>
-            </Show>
-          </div>
-        </PanelBody>
-      </Panel>
 
       {/* Timestamps */}
       <div class="flex items-center gap-6 text-xs text-text-muted font-mono">

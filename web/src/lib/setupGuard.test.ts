@@ -1,6 +1,20 @@
 import { describe, it, expect } from "vitest";
 import { evaluateSetupGuard } from "./setupGuard";
 
+function mockLocation(overrides: Partial<Location>) {
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: { ...window.location, ...overrides } as Location,
+  });
+}
+
+function restoreLocation(location: Location) {
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    value: location,
+  });
+}
+
 describe("evaluateSetupGuard", () => {
   it("should allow /setup/ssl when SSL is not yet configured", () => {
     const decision = evaluateSetupGuard("/setup/ssl", false, {
@@ -27,8 +41,7 @@ describe("evaluateSetupGuard", () => {
 
     // Still on HTTP somehow → force HTTPS upgrade
     const originalLocation = window.location;
-    delete (window as any).location;
-    window.location = { ...originalLocation, host: "example.com" } as Location;
+    mockLocation({ host: "example.com" });
     try {
       const decision2 = evaluateSetupGuard("/setup/ssl", false, {
         sslConfigured: true,
@@ -36,7 +49,7 @@ describe("evaluateSetupGuard", () => {
       });
       expect(decision2).toEqual({ type: "redirect-https", url: "https://example.com/" });
     } finally {
-      window.location = originalLocation;
+      restoreLocation(originalLocation);
     }
   });
 
@@ -123,12 +136,10 @@ describe("evaluateSetupGuard", () => {
   it("should preserve query parameters in HTTPS redirect", () => {
     // Mock window.location for this test
     const originalLocation = window.location;
-    delete (window as any).location;
-    window.location = {
-      ...originalLocation,
+    mockLocation({
       host: "example.com:8080",
       search: "?foo=bar",
-    } as Location;
+    });
 
     const decision = evaluateSetupGuard("/traders", false, {
       sslConfigured: true,
@@ -141,6 +152,6 @@ describe("evaluateSetupGuard", () => {
     }
 
     // Restore original location
-    window.location = originalLocation;
+    restoreLocation(originalLocation);
   });
 });

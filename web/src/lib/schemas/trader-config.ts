@@ -131,6 +131,8 @@ export type CreateTraderForm = z.infer<typeof createTraderFormSchema>;
 export const editTraderFormSchema = z.object({
   wallet_address: z.string().optional(),
   private_key: z.string().optional(),
+  name: z.string().max(50).optional(),
+  description: z.string().max(255).optional(),
   config: traderConfigFormSchema,
 });
 

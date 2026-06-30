@@ -1,3 +1,5 @@
+import type { TraderConfig as SchemaTraderConfig } from "~/lib/schemas/trader-config";
+
 export interface User {
   id: string;
   username: string;
@@ -5,44 +7,7 @@ export interface User {
   created_at: string;
 }
 
-export interface TraderConfig {
-  provider_settings: {
-    exchange: "hyperliquid";
-    network: "mainnet" | "testnet";
-    self_account: {
-      address: string;
-      is_sub: boolean;
-    };
-    copy_account: {
-      address: string;
-    };
-    slippage_bps: number;
-  };
-  trader_settings: {
-    trading_strategy: {
-      type: "order_based" | "position_based";
-      risk_parameters: {
-        allowed_assets?: string[] | null;
-        blocked_assets: string[];
-        max_leverage?: number | null;
-        self_proportionality_multiplier: number;
-        open_on_low_pnl: {
-          enabled: boolean;
-          max_pnl: number;
-        };
-      };
-      bucket_config: {
-        manual?: { width_percent: number } | null;
-        auto?: {
-          ratio_threshold: number;
-          wide_bucket_percent: number;
-          narrow_bucket_percent: number;
-        } | null;
-        pricing_strategy: "vwap" | "aggressive";
-      };
-    };
-  };
-}
+export type TraderConfig = SchemaTraderConfig;
 
 export interface Trader {
   id: string;

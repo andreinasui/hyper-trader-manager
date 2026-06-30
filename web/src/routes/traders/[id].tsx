@@ -1,8 +1,8 @@
-import { type Component, Show, Suspense, createSignal, createEffect } from "solid-js";
+import { type Component, Show, Suspense, createEffect, createSignal } from "solid-js";
 import TraderOverview from "~/components/traders/overviews/TraderOverview";
 import { useParams, useNavigate } from "@solidjs/router";
 import { createQuery, createMutation, useQueryClient } from "@tanstack/solid-query";
-import { Trash2, RefreshCw, Play, Square, AlertCircle } from "lucide-solid";
+import { Trash2, RefreshCw, Play, Square } from "lucide-solid";
 import { ProtectedRoute } from "~/components/auth/ProtectedRoute";
 import { AppShell } from "~/components/layout/AppShell";
 import { PageHeader } from "~/components/layout/PageHeader";
@@ -24,29 +24,17 @@ import {
 import { StatusDot } from "~/components/ui/status-badge";
 import { LogViewer } from "~/components/traders/LogViewer";
 import { LogArchives } from "~/components/traders/LogArchives";
-import { TraderConfigForm } from "~/components/traders/TraderConfigForm";
+import { TraderForm } from "~/components/traders/TraderConfigForm";
+import {
+  buildInitialTraderForm,
+  normalizeTraderConfig,
+  toUpdateTraderRequests,
+  type TraderFormValues,
+} from "~/components/traders/trader-form-model";
 import { canStart, canStop } from "~/components/traders/trader-page-utils";
 import { api } from "~/lib/api";
 import { traderKeys, imageKeys } from "~/lib/query-keys";
 import type { Trader, RuntimeStatus } from "~/lib/types";
-import type { CreateTraderForm, TraderConfig } from "~/lib/schemas/trader-config";
-
-/** Ensure config has required defaults (for legacy DB data) */
-function normalizeConfig(config: TraderConfig): TraderConfig {
-  return {
-    ...config,
-    trader_settings: {
-      ...config.trader_settings,
-      trading_strategy: {
-        ...config.trader_settings.trading_strategy,
-        bucket_config: config.trader_settings.trading_strategy.bucket_config ?? {
-          type: "auto",
-          pricing_strategy: "vwap",
-        },
-      },
-    },
-  };
-}
 
 type AnyStatus = Trader["status"] | RuntimeStatus["state"];
 
@@ -82,24 +70,11 @@ const TraderDetailPage: Component = () => {
   const queryClient = useQueryClient();
   const [deleteOpen, setDeleteOpen] = createSignal(false);
   const [showSavedToast, setShowSavedToast] = createSignal(false);
-  const [editName, setEditName] = createSignal<string>("");
-  const [editDescription, setEditDescription] = createSignal<string>("");
-  const [infoChanged, setInfoChanged] = createSignal(false);
-  const [infoError, setInfoError] = createSignal<string | null>(null);
 
   const traderQuery = createQuery(() => ({
     queryKey: traderKeys.detail(params.id),
     queryFn: () => api.getTrader(params.id),
   }));
-
-  // Initialize edit values when trader data loads (only if no unsaved changes)
-  createEffect(() => {
-    const t = traderQuery.data;
-    if (t && !infoChanged()) {
-      setEditName(t.name || "");
-      setEditDescription(t.description || "");
-    }
-  });
 
   const statusQuery = createQuery(() => {
     const status = traderQuery.data?.status;
@@ -175,23 +150,17 @@ const TraderDetailPage: Component = () => {
   }));
 
   const updateMutation = createMutation(() => ({
-    mutationFn: (config: TraderConfig) => api.updateTrader(params.id, { config }),
+    mutationFn: async (values: TraderFormValues) => {
+      const requests = toUpdateTraderRequests(values);
+      if (requests.info.name !== undefined || requests.info.description !== undefined) {
+        await api.updateTraderInfo(params.id, requests.info);
+      }
+      return api.updateTrader(params.id, requests.config);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: traderKeys.detail(params.id) });
+      queryClient.invalidateQueries({ queryKey: traderKeys.all });
       setShowSavedToast(true);
-    },
-  }));
-
-  const updateInfoMutation = createMutation(() => ({
-    mutationFn: (data: { name?: string; description?: string }) =>
-      api.updateTraderInfo(params.id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: traderKeys.detail(params.id) });
-      setInfoError(null);
-      setInfoChanged(false);
-    },
-    onError: (error: Error) => {
-      setInfoError(error.message || "Failed to update trader info");
     },
   }));
 
@@ -228,29 +197,6 @@ const TraderDetailPage: Component = () => {
     if (hours < 24) return `${hours}h ${minutes % 60}m`;
     const days = Math.floor(hours / 24);
     return `${days}d ${hours % 24}h ${minutes % 60}m`;
-  };
-
-  const handleInfoSave = () => {
-    const data: { name?: string; description?: string } = {};
-    const currentName = editName().trim();
-    const currentDesc = editDescription().trim();
-
-    if (currentName) data.name = currentName;
-    if (currentDesc) data.description = currentDesc;
-
-    updateInfoMutation.mutate(data);
-  };
-
-  const handleNameChange = (value: string) => {
-    setEditName(value);
-    setInfoChanged(true);
-    setInfoError(null);
-  };
-
-  const handleDescriptionChange = (value: string) => {
-    setEditDescription(value);
-    setInfoChanged(true);
-    setInfoError(null);
   };
 
   const busy = () =>
@@ -403,22 +349,14 @@ const TraderDetailPage: Component = () => {
 
                       {/* Overview Tab */}
                       <TabsContent value="overview" class="space-y-0">
-                        <TraderOverview
-                          trader={trader()}
-                          currentStatus={currentStatus}
-                          statusQuery={statusQuery}
-                          editName={editName}
-                          editDescription={editDescription}
-                          handleNameChange={handleNameChange}
-                          handleDescriptionChange={handleDescriptionChange}
-                          infoChanged={infoChanged}
-                          infoError={infoError}
-                          handleInfoSave={handleInfoSave}
-                          updateInfoMutation={updateInfoMutation}
-                          needsImageUpdate={needsImageUpdate}
-                          imageQuery={imageQuery}
-                          formatUptime={formatUptime}
-                        />
+                          <TraderOverview
+                            trader={trader()}
+                            currentStatus={currentStatus}
+                            statusQuery={statusQuery}
+                            needsImageUpdate={needsImageUpdate}
+                            imageQuery={imageQuery}
+                            formatUptime={formatUptime}
+                          />
                       </TabsContent>
 
                       {/* Logs Tab */}
@@ -444,18 +382,17 @@ const TraderDetailPage: Component = () => {
                           {(config) => (
                             <Panel>
                               <PanelBody>
-                                <TraderConfigForm
-                                  initialValues={{
-                                    wallet_address: trader().wallet_address,
-                                    private_key: "",
-                                    config: normalizeConfig(config() as TraderConfig),
+                                <TraderForm
+                                  mode="edit"
+                                  initialValues={buildInitialTraderForm("edit", {
+                                    ...trader(),
+                                    latest_config: normalizeTraderConfig(config()),
+                                  })}
+                                  onSubmit={async (data) => {
+                                    await updateMutation.mutateAsync(data);
                                   }}
-                                  onSubmit={async (data: CreateTraderForm) => {
-                                    await updateMutation.mutateAsync(data.config);
-                                  }}
-                                  isEditing={true}
                                   isSubmitting={updateMutation.isPending}
-                                  submitLabel="Save Configuration"
+                                  submitLabel="Save Trader"
                                 />
                               </PanelBody>
                             </Panel>
