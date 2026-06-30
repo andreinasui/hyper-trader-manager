@@ -36,7 +36,7 @@ export function Select(props: SelectProps) {
         </option>
       )}
       <For each={local.options}>
-        {(option) => <option value={option.value}>{option.label}</option>}
+        {(option) => <option value={option.value} selected={others.value === option.value}>{option.label}</option>}
       </For>
     </select>
   );

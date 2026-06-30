@@ -4,6 +4,7 @@ Tests for Docker Swarm runtime implementation.
 Tests the DockerRuntime class with mocked Docker client.
 """
 
+from datetime import UTC
 from unittest.mock import MagicMock, patch
 
 from docker.errors import APIError, NotFound
@@ -103,10 +104,78 @@ class TestDockerRuntimeCreateTrader:
         assert call_kwargs["image"] == "ghcr.io/andreinasui/hyper-trader:v1.0"
         assert len(call_kwargs["secrets"]) == 1
         assert len(call_kwargs["configs"]) == 1
+        assert call_kwargs["stop_grace_period"] == 60_000_000_000
 
 
 class TestDockerRuntimeRemoveTrader:
     """Tests for removing trader services."""
+
+    def _make_runtime(self):
+        """Create a DockerRuntime with a mocked Docker client."""
+        mock_client = MagicMock()
+        mock_client.swarm.attrs = {"ID": "swarm-id"}
+        from hyper_trader_api.runtime.docker_runtime import DockerRuntime
+
+        return DockerRuntime(mock_client), mock_client
+
+    def test_stop_service_scales_service_to_zero(self):
+        """stop_service asks Docker Swarm to stop running tasks by scaling to zero."""
+        runtime, mock_client = self._make_runtime()
+        mock_service = MagicMock()
+        mock_client.services.get.return_value = mock_service
+        mock_service.tasks.return_value = [
+            {"ID": "task-1", "Status": {"State": "shutdown"}},
+        ]
+
+        runtime.stop_service("trader-abc")
+
+        mock_service.scale.assert_called_once_with(0)
+
+    @patch("hyper_trader_api.runtime.docker_runtime.time.sleep")
+    def test_stop_service_waits_until_no_running_tasks(self, mock_sleep):
+        """stop_service polls until Docker reports no running task."""
+        runtime, mock_client = self._make_runtime()
+        mock_service = MagicMock()
+        mock_client.services.get.return_value = mock_service
+        mock_service.tasks.side_effect = [
+            [{"ID": "task-1", "Status": {"State": "running"}}],
+            [{"ID": "task-1", "Status": {"State": "shutdown"}}],
+        ]
+
+        runtime.stop_service("trader-abc", timeout_seconds=30)
+
+        assert mock_service.tasks.call_count == 2
+        mock_sleep.assert_called_once_with(1)
+
+    @patch("hyper_trader_api.runtime.docker_runtime.time.sleep")
+    def test_stop_service_and_capture_logs_streams_while_stopping(self, mock_sleep):
+        """stop_service_and_capture_logs captures logs emitted during SIGTERM cleanup."""
+        runtime, mock_client = self._make_runtime()
+        mock_service = MagicMock()
+        mock_client.services.get.return_value = mock_service
+        mock_service.tasks.side_effect = [
+            [{"ID": "task-1", "Status": {"State": "running"}}],
+            [{"ID": "task-1", "Status": {"State": "shutdown"}}],
+        ]
+        mock_container = MagicMock()
+        mock_container.logs.return_value = iter([b"boot\n", b"cleanup\n"])
+        mock_client.containers.list.return_value = [mock_container]
+
+        logs = runtime.stop_service_and_capture_logs("trader-abc", timeout_seconds=30)
+
+        assert logs == "boot\ncleanup\n"
+        mock_client.containers.list.assert_called_once_with(
+            all=True,
+            filters={"label": "com.docker.swarm.service.name=trader-abc"},
+        )
+        mock_container.logs.assert_called_once_with(
+            stdout=True,
+            stderr=True,
+            stream=True,
+            follow=True,
+            tail="all",
+        )
+        mock_service.scale.assert_called_once_with(0)
 
     @patch("hyper_trader_api.runtime.docker_runtime.docker")
     def test_remove_trader_removes_service_and_secret(self, mock_docker):
@@ -331,6 +400,7 @@ class TestDockerRuntimeGetLogsTimeRange:
         mock_client = MagicMock()
         mock_client.swarm.attrs = {"ID": "swarm-id"}
         from hyper_trader_api.runtime.docker_runtime import DockerRuntime
+
         return DockerRuntime(mock_client), mock_client
 
     def test_get_logs_uses_tail_when_no_since(self):
@@ -344,39 +414,53 @@ class TestDockerRuntimeGetLogsTimeRange:
 
         mock_service.logs.assert_called_once_with(stdout=True, stderr=True, tail=50)
 
-    def test_get_logs_uses_since_and_timestamps_when_since_given(self):
-        """With since, get_logs uses since=dt, timestamps=True, tail=1000."""
-        from datetime import datetime, timezone
+    def test_get_logs_uses_tail_all_when_all_lines_true_without_since(self):
+        """With all_lines=True, get_logs retrieves every line without timestamps."""
         runtime, mock_client = self._make_runtime()
         mock_service = MagicMock()
         mock_client.services.get.return_value = mock_service
         mock_service.logs.return_value = iter([b""])
 
-        since = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
+        runtime.get_logs("trader-abc", all_lines=True)
+
+        mock_service.logs.assert_called_once_with(stdout=True, stderr=True, tail="all")
+
+    def test_get_logs_uses_since_timestamp_when_since_given(self):
+        """With since, get_logs passes Unix seconds Docker accepts."""
+        from datetime import datetime
+
+        runtime, mock_client = self._make_runtime()
+        mock_service = MagicMock()
+        mock_client.services.get.return_value = mock_service
+        mock_service.logs.return_value = iter([b""])
+
+        since = datetime(2026, 5, 1, 12, 0, 0, tzinfo=UTC)
         runtime.get_logs("trader-abc", since=since)
 
         mock_service.logs.assert_called_once_with(
-            stdout=True, stderr=True, since=since, timestamps=True, tail=1000
+            stdout=True, stderr=True, since=int(since.timestamp()), timestamps=True, tail=1000
         )
 
     def test_get_logs_uses_tail_all_when_all_lines_true(self):
         """With all_lines=True, get_logs uses tail='all'."""
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         runtime, mock_client = self._make_runtime()
         mock_service = MagicMock()
         mock_client.services.get.return_value = mock_service
         mock_service.logs.return_value = iter([b""])
 
-        since = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
+        since = datetime(2026, 5, 1, 12, 0, 0, tzinfo=UTC)
         runtime.get_logs("trader-abc", since=since, all_lines=True)
 
         mock_service.logs.assert_called_once_with(
-            stdout=True, stderr=True, since=since, timestamps=True, tail="all"
+            stdout=True, stderr=True, since=int(since.timestamp()), timestamps=True, tail="all"
         )
 
     def test_get_logs_filters_lines_beyond_until(self):
         """Lines with timestamps after 'until' are excluded from the result."""
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         runtime, mock_client = self._make_runtime()
         mock_service = MagicMock()
         mock_client.services.get.return_value = mock_service
@@ -388,8 +472,8 @@ class TestDockerRuntimeGetLogsTimeRange:
         )
         mock_service.logs.return_value = iter([log_bytes])
 
-        since = datetime(2026, 5, 3, 9, 0, 0, tzinfo=timezone.utc)
-        until = datetime(2026, 5, 3, 11, 0, 0, tzinfo=timezone.utc)
+        since = datetime(2026, 5, 3, 9, 0, 0, tzinfo=UTC)
+        until = datetime(2026, 5, 3, 11, 0, 0, tzinfo=UTC)
 
         result = runtime.get_logs("trader-abc", since=since, until=until)
 

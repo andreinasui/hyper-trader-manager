@@ -4,12 +4,12 @@ Trader service for HyperTrader API.
 Handles trader CRUD operations using Docker runtime.
 """
 
+import json
 import logging
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-import json
 from sqlalchemy.orm import Session
 
 from hyper_trader_api.config import get_settings
@@ -111,10 +111,10 @@ class TraderService:
 
         return json.dumps(trader_config.config_json)
 
-    def _safe_archive(self, trader: Trader) -> None:
+    def _safe_archive(self, trader: Trader, logs: str | None = None) -> None:
         """Archive trader logs; silently logs WARNING on failure, never re-raises."""
         try:
-            self.archive_service.archive_run(trader)
+            self.archive_service.archive_run(trader, logs=logs)
         except Exception as e:
             logger.warning("Failed to archive logs for trader %s: %s", trader.id, e)
 
@@ -335,7 +335,8 @@ class TraderService:
 
         try:
             if self.runtime.service_exists(trader.runtime_name):
-                self._safe_archive(trader)
+                logs = self.runtime.stop_service_and_capture_logs(trader.runtime_name)
+                self._safe_archive(trader, logs=logs)
                 self.runtime.remove_service(trader.runtime_name)
             logger.info(f"Trader stop initiated: {trader.runtime_name}")
             return trader
@@ -554,7 +555,8 @@ class TraderService:
         # Stop the running service (keep secret + DB records)
         try:
             if self.runtime.service_exists(trader.runtime_name):
-                self._safe_archive(trader)
+                logs = self.runtime.stop_service_and_capture_logs(trader.runtime_name)
+                self._safe_archive(trader, logs=logs)
                 self.runtime.remove_service(trader.runtime_name)
                 logger.info(f"Stopped trader service for restart: {trader.runtime_name}")
         except Exception as e:

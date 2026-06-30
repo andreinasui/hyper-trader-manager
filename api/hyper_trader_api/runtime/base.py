@@ -78,6 +78,14 @@ class TraderRuntime(Protocol):
         """Create Docker Swarm service for trader."""
         ...
 
+    def stop_service(self, runtime_name: str, timeout_seconds: int = 30) -> None:
+        """Gracefully stop Docker Swarm trader service tasks without removing the service."""
+        ...
+
+    def stop_service_and_capture_logs(self, runtime_name: str, timeout_seconds: int = 75) -> str:
+        """Gracefully stop service tasks and return logs captured during shutdown."""
+        ...
+
     def remove_service(
         self, runtime_name: str, remove_secret: bool = False, trader_id: str = ""
     ) -> None:

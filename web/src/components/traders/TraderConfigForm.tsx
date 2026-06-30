@@ -39,7 +39,7 @@ export interface TraderConfigFormProps {
 const DEFAULTS = {
   multiplier: 1.0,
   maxPnl: 0.05,       // stored as fraction; display = * 100
-  maxLeverage: 10,
+  maxLeverage: 50,
   maxLeverageMin: 1,
   maxLeverageMax: 50,
   slippageBps: 200,
@@ -51,10 +51,15 @@ const DEFAULTS = {
 
 const ASSET_SELECTOR_HELP = '"*" loads all markets. Examples: BTC = default:BTC, default:* loads default market, xyz:* loads xyz market. Block wins over allow.';
 
+const bpsToPercent = (bps: number) => parseFloat((bps / 100).toFixed(4));
+const percentToBps = (percent: number) => Math.round(percent * 100);
+
 export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
   const [error, setError] = createSignal<string | null>(null);
   const [showPrivateKey, setShowPrivateKey] = createSignal(false);
-  const [bucketMode, setBucketMode] = createSignal<"manual" | "auto">("auto");
+  const [bucketMode, setBucketMode] = createSignal<"manual" | "auto">(
+    props.initialValues?.config?.trader_settings?.trading_strategy?.bucket_config?.type ?? "auto"
+  );
   const [advancedOpen, setAdvancedOpen] = createSignal(false);
   const [maxLeverageEnabled, setMaxLeverageEnabled] = createSignal(
     (props.initialValues?.config?.provider_settings?.risk_parameters?.max_leverage ?? null) !== null
@@ -129,7 +134,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
           type: "order_based",
           risk_parameters: {
             self_proportionality_multiplier: DEFAULTS.multiplier,
-            open_on_low_pnl: { enabled: false, max_pnl: 0 },
+            open_on_low_pnl: { enabled: true, max_pnl: 0.05 },
           },
           bucket_config: {
             type: "auto",
@@ -344,11 +349,11 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     />
                   </div>
                 </div>
-                )}
-              </FormField>
-            </FormGrid>
+              )}
+            </FormField>
+          </FormGrid>
 
-          </PanelBody>
+        </PanelBody>
       </Panel>
 
       {/* ── Advanced Settings panel (collapsible) ───────────────────────── */}
@@ -552,7 +557,7 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                         }}
                         min={-100}
                         max={100}
-                        step={0.1}
+                        step={1}
                       />
                       <Show when={field.error}>
                         <p class="text-xs text-error">{field.error}</p>
@@ -570,8 +575,8 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                 {(field, fieldProps) => (
                   <div class="space-y-1.5">
                     <div class="flex items-center justify-between">
-                      <Label for="slippage" class="text-xs text-text-muted">Slippage (bps)</Label>
-                      <button type="button" title={`Restore default (${DEFAULTS.slippageBps} bps)`} class="text-text-faint hover:text-text-muted transition-colors" onClick={() => setValue(form, "config.provider_settings.slippage_bps", DEFAULTS.slippageBps)}>
+                      <Label for="slippage" class="text-xs text-text-muted">Slippage (%)</Label>
+                      <button type="button" title={`Restore default (${bpsToPercent(DEFAULTS.slippageBps)}%)`} class="text-text-faint hover:text-text-muted transition-colors" onClick={() => setValue(form, "config.provider_settings.slippage_bps", DEFAULTS.slippageBps)}>
                         <RotateCcw class="h-3 w-3" />
                       </button>
                     </div>
@@ -579,11 +584,20 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                       {...fieldProps}
                       id="slippage"
                       type="number"
-                      value={field.value ?? DEFAULTS.slippageBps}
+                      value={bpsToPercent(field.value ?? DEFAULTS.slippageBps)}
+                      onInput={(e) => {
+                        const percent = parseFloat((e.target as HTMLInputElement).value);
+                        setValue(
+                          form,
+                          "config.provider_settings.slippage_bps",
+                          isNaN(percent) ? DEFAULTS.slippageBps : percentToBps(percent)
+                        );
+                      }}
                       min={0}
-                      max={1000}
+                      max={10}
+                      step={0.01}
                     />
-                    <p class="text-xs text-text-muted">1 bp = 0.01%</p>
+                    <p class="text-xs text-text-muted">Stored internally as basis points.</p>
                     <Show when={field.error}>
                       <p class="text-xs text-error">{field.error}</p>
                     </Show>
@@ -610,12 +624,12 @@ export const TraderConfigForm: Component<TraderConfigFormProps> = (props) => {
                     (mode === "manual"
                       ? { type: "manual", width_percent: DEFAULTS.widthPercent, pricing_strategy: "vwap" }
                       : {
-                          type: "auto",
-                          ratio_threshold: DEFAULTS.ratioThreshold,
-                          wide_bucket_percent: DEFAULTS.wideBucketPct,
-                          narrow_bucket_percent: DEFAULTS.narrowBucketPct,
-                          pricing_strategy: "vwap",
-                        }) as never
+                        type: "auto",
+                        ratio_threshold: DEFAULTS.ratioThreshold,
+                        wide_bucket_percent: DEFAULTS.wideBucketPct,
+                        narrow_bucket_percent: DEFAULTS.narrowBucketPct,
+                        pricing_strategy: "vwap",
+                      }) as never
                   );
                 }}
               />

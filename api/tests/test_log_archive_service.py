@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import tarfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -50,6 +49,7 @@ def test_archive_run_writes_tar_gz_file_and_db_row(tmp_path: Path, fake_trader: 
     with tarfile.open(file_path, "r:gz") as tar:
         member = tar.getmembers()[0]
         assert member.name == "20260506T120000Z.log"
+        assert member.mtime == int(fake_trader.last_started_at.timestamp())
         extracted = tar.extractfile(member)
         assert extracted is not None
         assert extracted.read().decode("utf-8") == "line one\nline two\n"
@@ -79,6 +79,23 @@ def test_archive_run_skips_when_no_logs(tmp_path: Path, fake_trader: Trader) -> 
     # No tmp files left
     tmp_files = list(tmp_path.rglob("*.tmp"))
     assert tmp_files == []
+
+
+def test_archive_run_uses_supplied_shutdown_logs(tmp_path: Path, fake_trader: Trader) -> None:
+    from hyper_trader_api.services.log_archive_service import LogArchiveService
+
+    runtime = MagicMock()
+    db = MagicMock()
+
+    svc = LogArchiveService(db=db, archive_dir=tmp_path, runtime=runtime)
+    archive = svc.archive_run(fake_trader, logs="boot\ncleanup\n")
+
+    assert archive is not None
+    with tarfile.open(Path(archive.file_path), "r:gz") as tar:
+        extracted = tar.extractfile(tar.getmembers()[0])
+        assert extracted is not None
+        assert extracted.read().decode("utf-8") == "boot\ncleanup\n"
+    runtime.get_logs.assert_not_called()
 
 
 def test_archive_run_falls_back_to_now_if_no_last_started_at(

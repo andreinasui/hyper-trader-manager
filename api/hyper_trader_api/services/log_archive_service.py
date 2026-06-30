@@ -49,7 +49,7 @@ class LogArchiveService:
     def _filename_for(self, run_started_at: datetime) -> str:
         return f"{run_started_at.astimezone(UTC).strftime(_FILENAME_FMT)}.tar.gz"
 
-    def archive_run(self, trader: Trader) -> TraderLogArchive | None:
+    def archive_run(self, trader: Trader, logs: str | None = None) -> TraderLogArchive | None:
         """Capture full logs for the current run, pack into tar.gz, persist a DB row.
 
         Returns the created `TraderLogArchive` on success, or `None` if there
@@ -63,7 +63,8 @@ class LogArchiveService:
 
         run_ended_at = datetime.now(UTC)
 
-        logs = self.runtime.get_logs(trader.runtime_name, all_lines=True)
+        if logs is None:
+            logs = self.runtime.get_logs(trader.runtime_name, all_lines=True)
         if not logs:
             logger.info("archive_run: no logs for trader %s, skipping", trader.id)
             return None
@@ -82,6 +83,7 @@ class LogArchiveService:
             with tarfile.open(tmp_path, "w:gz") as tar:
                 info = tarfile.TarInfo(name=inner_name)
                 info.size = len(log_bytes)
+                info.mtime = int(run_started_at.timestamp())
                 tar.addfile(info, io.BytesIO(log_bytes))
             with open(tmp_path, "rb") as fd:
                 os.fsync(fd.fileno())

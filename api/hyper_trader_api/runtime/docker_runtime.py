@@ -6,6 +6,8 @@ Manages trader services using Docker Swarm with native secret management.
 
 import logging
 import re
+import threading
+import time
 from datetime import datetime
 from typing import Any
 
@@ -59,6 +61,7 @@ class DockerRuntime:
     NETWORK_NAME = "hyper-trader-internal"
     IMAGE_PREFIX = "ghcr.io/andreinasui/hyper-trader"
     SECRET_PREFIX = "ht"
+    STOP_GRACE_PERIOD_NS = 60_000_000_000
 
     def __init__(self, client: docker.DockerClient | None = None):
         """
@@ -239,13 +242,91 @@ class DockerRuntime:
             endpoint_spec=EndpointSpec(mode="vip"),
             env=[
                 f"WALLET_ADDRESS={trader.wallet_address}",
-                "CONFIG_PATH=/app/config.json",
                 "PRIVATE_KEY_FILE=/run/secrets/private_key",
                 "LOG_FORMAT=hyper_trader=json",
-                "LOG_LEVEL=debug",
+                "LOG_LEVEL=hyper_trader=debug",
             ],
             log_driver="json-file",
             log_driver_options={"max-size": "100m", "max-file": "7"},
+            stop_grace_period=self.STOP_GRACE_PERIOD_NS,
+        )
+
+    def _container_for_service(self, runtime_name: str) -> Any | None:
+        containers = self.client.containers.list(
+            all=True,
+            filters={"label": f"com.docker.swarm.service.name={runtime_name}"},
+        )
+        return containers[0] if containers else None
+
+    def stop_service_and_capture_logs(
+        self, runtime_name: str, timeout_seconds: int = 10
+    ) -> str:
+        """Scale service to zero while streaming its task container logs."""
+        try:
+            self.client.services.get(runtime_name)
+        except NotFound:
+            logger.debug("Service %s not found (already stopped)", runtime_name)
+            return ""
+
+        chunks: list[bytes] = []
+        log_stream = None
+        try:
+            container = self._container_for_service(runtime_name)
+            if container is not None:
+                log_stream = container.logs(
+                    stdout=True,
+                    stderr=True,
+                    stream=True,
+                    follow=True,
+                    tail="all",
+                )
+        except Exception as e:
+            logger.warning("Failed to open log stream for %s: %s", runtime_name, e)
+
+        def read_logs() -> None:
+            if log_stream is None:
+                return
+            try:
+                chunks.extend(log_stream)
+            except Exception as e:
+                logger.warning("Failed to stream logs for %s: %s", runtime_name, e)
+
+        reader = threading.Thread(target=read_logs, daemon=True)
+        reader.start()
+
+        self.stop_service(runtime_name, timeout_seconds)
+
+        reader.join(timeout=5)
+        if reader.is_alive():
+            close = getattr(log_stream, "close", None)
+            if close is not None:
+                close()
+            logger.warning("Timed out waiting for log stream for %s", runtime_name)
+
+        return b"".join(chunks).decode("utf-8", errors="replace")
+
+    def stop_service(self, runtime_name: str, timeout_seconds: int = 10) -> None:
+        """Scale service to zero and wait for Docker to stop running tasks."""
+        try:
+            service = self.client.services.get(runtime_name)
+        except NotFound:
+            logger.debug("Service %s not found (already stopped)", runtime_name)
+            return
+
+        logger.info("Stopping trader service %s", runtime_name)
+        service.scale(0)
+
+        for _ in range(timeout_seconds):
+            tasks = service.tasks()
+            if not any(t.get("Status", {}).get("State") == "running" for t in tasks):
+                logger.info("Trader service %s stopped", runtime_name)
+                return
+            time.sleep(1)
+
+        logger.warning(
+            "Timed out waiting %ss for trader service %s to stop",
+            timeout_seconds,
+            runtime_name,
         )
 
     def remove_service(
@@ -464,12 +545,13 @@ class DockerRuntime:
                 logs_gen = service.logs(
                     stdout=True,
                     stderr=True,
-                    since=since,
+                    since=int(since.timestamp()),
                     timestamps=True,
                     tail=tail,
                 )
             else:
-                logs_gen = service.logs(stdout=True, stderr=True, tail=tail_lines)
+                tail = "all" if all_lines else tail_lines
+                logs_gen = service.logs(stdout=True, stderr=True, tail=tail)
 
             logs_bytes = b"".join(logs_gen)
             raw = logs_bytes.decode("utf-8")
