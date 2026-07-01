@@ -1,141 +1,156 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Get started with HyperTrader Manager on a production VPS." />
-    <title>Setup | HyperTrader Manager</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./site.css" />
-  </head>
-  <body>
-    <header class="topbar">
-      <a class="brand" href="./index.html"><span class="logo">HT</span><span>HyperTrader Manager</span></a>
-      <nav class="topnav" aria-label="Main navigation">
-        <a href="./index.html">Overview</a>
-        <a href="./setup.html" aria-current="page">Setup</a>
-        <a href="https://github.com/andreinasui/hyper-trader-manager">GitHub</a>
-      </nav>
-    </header>
 
-    <div class="layout">
-      <aside class="sidebar" aria-label="Documentation navigation">
-        <div class="nav-title">HyperTrader Manager</div>
-        <a class="nav-link" href="./index.html">Introduction</a>
-        <a class="nav-link active" href="./setup.html">Getting started</a>
-        <div class="nav-section">Setup</div>
-        <a class="nav-link" href="#prerequisites">Prerequisites</a>
-        <a class="nav-link" href="#accounts">Accounts</a>
-        <a class="nav-link" href="#dns-vps">DNS and VPS</a>
-        <a class="nav-link" href="#install">Install</a>
-        <a class="nav-link" href="#production-setup">Production setup</a>
-        <div class="nav-section">Reference</div>
-        <a class="nav-link" href="#commands">Commands</a>
-        <a class="nav-link" href="#troubleshooting">Troubleshooting</a>
-      </aside>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Get started with HyperTrader Manager on a production VPS." />
+  <title>Setup | HyperTrader Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="./site.css" />
+</head>
 
-      <main class="article">
-        <p class="eyebrow">Getting started</p>
-        <h1 id="setup">Start using HyperTrader Manager</h1>
-        <p class="lead">Prepare your wallet, Hyperliquid account, DNS, and VPS, then install the manager and finish HTTPS setup in the browser.</p>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./index.html"><span class="logo">HT</span><span>HyperTrader Manager</span></a>
+    <nav class="topnav" aria-label="Main navigation">
+      <a href="./index.html">Overview</a>
+      <a href="./setup.html" aria-current="page">Setup</a>
+      <a href="https://github.com/andreinasui/hyper-trader-manager">GitHub</a>
+    </nav>
+  </header>
 
-        <h2 id="prerequisites">Prerequisites</h2>
-        <ul>
-          <li>An EVM wallet installed. Rabby is recommended: <a href="https://support.rabby.io/hc/en-us/articles/11446794320271-How-to-create-a-new-wallet" rel="noreferrer">Rabby wallet setup guide</a>.</li>
-          <li>A Hyperliquid account. Create one with the referral link: <a href="https://app.hyperliquid.xyz/join/HYPERTCB" rel="noreferrer">Hyperliquid referral signup</a>.</li>
-          <li>USDC deposited into Hyperliquid. The bot does not enforce a minimum, but trading with less than $1,000 can be unreliable and depends on the copied account size.</li>
-          <li>A DNS name pointed at your VPS. <a href="https://www.duckdns.org/" rel="noreferrer">DuckDNS</a> is a free option.</li>
-          <li>A VPS with at least 1 CPU and 2 GB RAM. <a href="https://www.hetzner.com/cloud/" rel="noreferrer">Hetzner Cloud</a> is a good low-cost option.</li>
-          <li>SSH access to the VPS with <code>sudo</code> permissions.</li>
-        </ul>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Documentation navigation">
+      <div class="nav-title">HyperTrader Manager</div>
+      <a class="nav-link" href="./index.html">Introduction</a>
+      <a class="nav-link active" href="./setup.html">Getting started</a>
+      <div class="nav-section">Setup</div>
+      <a class="nav-link" href="#prerequisites">Prerequisites</a>
+      <a class="nav-link" href="#accounts">Accounts</a>
+      <a class="nav-link" href="#dns-vps">DNS and VPS</a>
+      <a class="nav-link" href="#install">Install</a>
+      <a class="nav-link" href="#production-setup">Production setup</a>
+      <div class="nav-section">Reference</div>
+      <a class="nav-link" href="#commands">Commands</a>
+      <a class="nav-link" href="#troubleshooting">Troubleshooting</a>
+    </aside>
 
-        <div class="admonition warning">
-          <p class="admonition-title">Risk note</p>
-          <p>Copy trading can lose money. Start small enough that mistakes, slippage, or copied-account behavior do not create outsized damage.</p>
-        </div>
+    <main class="article">
+      <p class="eyebrow">Getting started</p>
+      <h1 id="setup">Start using HyperTrader Manager</h1>
+      <p class="lead">Prepare your wallet, Hyperliquid account, DNS, and VPS, then install the manager and finish HTTPS
+        setup in the browser.</p>
 
-        <h2 id="accounts">1. Create wallet and Hyperliquid account</h2>
-        <ol>
-          <li>Install Rabby and create or import your EVM wallet.</li>
-          <li>Open <a href="https://app.hyperliquid.xyz/join/HYPERTCB" rel="noreferrer">Hyperliquid</a> and connect the wallet.</li>
-          <li>Deposit USDC into Hyperliquid.</li>
-          <li>Keep the wallet available. You will need account details when configuring trader instances.</li>
-        </ol>
+      <h2 id="prerequisites">Prerequisites</h2>
+      <ul>
+        <li>An EVM wallet available that supports HyperEVM: <a href="https://rabby.io" rel="noreferrer">Rabby is a good
+            choice </a>.</li>
+        <li>A Hyperliquid account. Create one with the referral link to benefit of 4% fee reduction: <a
+            href="https://app.hyperliquid.xyz/join/HYPERTCB" rel="noreferrer">Hyperliquid referral signup</a>.</li>
+        <li>USDC deposited into Hyperliquid. The bot does not enforce a minimum, but trading with less than $1,000 can
+          be unreliable and depends on the copied account size.</li>
+        <li>A DNS name pointed at your VPS. <a href="https://www.duckdns.org/" rel="noreferrer">DuckDNS</a> is a free
+          option.</li>
+        <li>An Ubuntu VPS with at least 1 CPU and 2 GB RAM and Docker available. <a
+            href="https://www.hetzner.com/cloud/" rel="noreferrer">Hetzner
+            Cloud</a> is a good low-cost option that lets you easily setup a VPS with docker preinstalled.</li>
+        <li>SSH access to the VPS with <code>sudo</code> permissions or, if the VPS provider allows, using password
+          authentication.</li>
+      </ul>
 
-        <h2 id="dns-vps">2. Prepare DNS and VPS</h2>
-        <ol>
-          <li>Create a DNS record for the manager, for example <code>trader.example.com</code>.</li>
-          <li>Point the DNS <code>A</code> record to your VPS public IPv4 address.</li>
-          <li>Open inbound ports <code>80</code> and <code>443</code> on the VPS firewall or cloud firewall.</li>
-          <li>SSH into the VPS before running the installer.</li>
-        </ol>
+      <div class="admonition warning">
+        <p class="admonition-title">Risk note</p>
+        <p>Copy trading can lose money. Start small enough that mistakes, slippage, or copied-account behavior do not
+          create outsized damage.</p>
+      </div>
 
-        <div class="admonition tip">
-          <p class="admonition-title">Free DNS option</p>
-          <p>DuckDNS can give you a free hostname such as <code>your-name.duckdns.org</code>. Use that hostname in the SSL setup step.</p>
-        </div>
+      <h2 id="accounts">1. Create wallet and Hyperliquid account</h2>
+      <ol>
+        <li>Install <a href="https://rabby.io" rel="noreferrer">Rabby</a> and create or import your EVM wallet.</li>
+        <li>Open <a href="https://app.hyperliquid.xyz/join/HYPERTCB" rel="noreferrer">Hyperliquid</a> and connect the
+          wallet.</li>
+        <li>Deposit USDC into Hyperliquid.</li>
+        <li>Keep the wallet available. You will need account details when configuring trader instances.</li>
+      </ol>
 
-        <h2 id="install">3. Install HyperTrader Manager</h2>
-        <p>Run this on the VPS. It installs required system packages, downloads the production stack, and starts the manager command.</p>
-        <pre><code>sudo apt update
-sudo apt install -y curl ca-certificates
-curl -sSL https://raw.githubusercontent.com/andreinasui/hyper-trader-manager/main/scripts/install.sh | sudo bash
-sudo nano /opt/hyper-trader/api.env
-hyper-trader-manager start</code></pre>
+      <h2 id="dns-vps">2. Prepare DNS and VPS</h2>
+      <ol>
+        <li>Create a DNS record for the manager, for example <code>trader.example.com</code>.</li>
+        <li>Point the DNS <code>A</code> record to your VPS public IPv4 address.</li>
+        <li>Open inbound ports <code>80</code> and <code>443</code> on the VPS firewall or cloud firewall.</li>
+        <li>SSH into the VPS before running the installer.</li>
+      </ol>
 
-        <p>If your VPS image already has <code>curl</code> and certificates installed, the first two commands are still safe to run.</p>
+      <div class="admonition tip">
+        <p class="admonition-title">Free DNS option</p>
+        <p>DuckDNS can give you a free hostname such as <code>your-name.duckdns.org</code>. Use that hostname in the SSL
+          setup step.</p>
+      </div>
 
-        <h2 id="production-setup">4. Finish production setup</h2>
-        <ol>
-          <li>Open <code>http://your-domain</code> in a browser.</li>
-          <li>The app redirects to the SSL setup page.</li>
-          <li>Enter the domain that points to your VPS and an email address for Let's Encrypt notices.</li>
-          <li>Wait for HTTPS setup to finish. Certificate issuance usually takes about 60 seconds.</li>
-          <li>After redirect to <code>https://your-domain</code>, create the first admin account.</li>
-        </ol>
+      <h2 id="install">3. Install HyperTrader Manager</h2>
+      <p>Run this on the VPS. It installs required system packages, downloads the production stack, and starts the
+        manager command.</p>
+      <pre class="command-block"><code>sudo apt update && sudo apt install -y curl ca-certificates</code></pre>
+      <pre class="command-block"><code>curl -sSL https://raw.githubusercontent.com/andreinasui/hyper-trader-manager/main/scripts/install.sh | sudo bash</code></pre>
+      <pre class="command-block"><code>hyper-trader-manager start</code></pre>
 
-        <div class="admonition warning">
-          <p class="admonition-title">HTTPS required</p>
-          <p>Admin setup is blocked until trusted HTTPS is configured. A public DNS name and reachable ports <code>80</code> and <code>443</code> are required.</p>
-        </div>
+      <h2 id="production-setup">4. Finish production setup</h2>
+      <ol>
+        <li>Open <code>http://your-domain</code> in a browser.</li>
+        <li>The app redirects to the SSL setup page.</li>
+        <li>Enter the domain that points to your VPS and an email address for Let's Encrypt notices.</li>
+        <li>Wait for HTTPS setup to finish. Certificate issuance usually takes about 60 seconds.</li>
+        <li>After redirect to <code>https://your-domain</code>, create the first admin account.</li>
+      </ol>
 
-        <h2 id="first-trader">5. Create your first trader</h2>
-        <ol>
-          <li>Log in to the dashboard.</li>
-          <li>Create a trader from the Traders page.</li>
-          <li>Add the copied account, sizing, and risk settings.</li>
-          <li>Start the trader and watch logs until the first sync is complete.</li>
-        </ol>
+      <div class="admonition warning">
+        <p class="admonition-title">HTTPS required</p>
+        <p>Admin setup is blocked until trusted HTTPS is configured. A public DNS name and reachable ports
+          <code>80</code> and <code>443</code> are required.
+        </p>
+      </div>
 
-        <h2 id="commands">Common commands</h2>
-        <pre><code>hyper-trader-manager status
+      <h2 id="first-trader">5. Create your first trader</h2>
+      <ol>
+        <li>Log in to the dashboard.</li>
+        <li>Create a trader from the Traders page.</li>
+        <li>Add the copied account, sizing, and risk settings.</li>
+        <li>Start the trader and watch logs until the first sync is complete.</li>
+      </ol>
+
+      <h2 id="commands">Common commands</h2>
+      <pre class="command-block"><code>hyper-trader-manager status
 hyper-trader-manager logs api
-hyper-trader-manager logs web
-hyper-trader-manager update
-hyper-trader-manager restore-backup &lt;version&gt;</code></pre>
+hyper-trader-manager logs web</code></pre>
 
-        <h2 id="troubleshooting">Troubleshooting</h2>
-        <ul>
-          <li><strong>SSL setup fails:</strong> confirm DNS points to the VPS and ports <code>80</code>/<code>443</code> are open.</li>
-          <li><strong>Domain does not load:</strong> wait for DNS propagation, then check <code>hyper-trader-manager status</code>.</li>
-          <li><strong>Need logs:</strong> run <code>hyper-trader-manager logs api</code> for backend issues.</li>
-          <li><strong>Need to update:</strong> run <code>hyper-trader-manager update</code>.</li>
-        </ul>
-      </main>
+      <h2 id="troubleshooting">Troubleshooting</h2>
+      <ul>
+        <li><strong>SSL setup fails:</strong> confirm DNS points to the VPS and ports <code>80</code>/<code>443</code>
+          are open.</li>
+        <li><strong>Domain does not load:</strong> wait for DNS propagation, then check <code>hyper-trader-manager
+            status</code>.</li>
+        <li><strong>Need logs:</strong> run <code>hyper-trader-manager logs api</code> for backend issues.</li>
+        <li><strong>Need to update:</strong> run <code>hyper-trader-manager update</code>.</li>
+      </ul>
+    </main>
 
-      <aside class="toc" aria-label="Table of contents">
-        <div class="toc-title">Table of contents</div>
-        <a href="#prerequisites">Prerequisites</a>
-        <a href="#accounts">Accounts</a>
-        <a href="#dns-vps">DNS and VPS</a>
-        <a href="#install">Install</a>
-        <a href="#production-setup">Production setup</a>
-        <a href="#first-trader">First trader</a>
-        <a href="#commands">Commands</a>
-        <a href="#troubleshooting">Troubleshooting</a>
-      </aside>
-    </div>
-  </body>
+    <aside class="toc" aria-label="Table of contents">
+      <div class="toc-title">Table of contents</div>
+      <a href="#prerequisites">Prerequisites</a>
+      <a href="#accounts">Accounts</a>
+      <a href="#dns-vps">DNS and VPS</a>
+      <a href="#install">Install</a>
+      <a href="#production-setup">Production setup</a>
+      <a href="#first-trader">First trader</a>
+      <a href="#commands">Commands</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+    </aside>
+  </div>
+</body>
+
 </html>

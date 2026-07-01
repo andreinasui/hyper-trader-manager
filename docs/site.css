@@ -193,6 +193,15 @@ code {
 }
 pre code { padding: 0; background: transparent; font-size: inherit; }
 
+.command-block {
+  padding: 14px;
+  background-color: #0d1117;
+}
+.command-block code {
+  display: block;
+  white-space: pre;
+}
+
 .admonition {
   margin: 1.2rem 0;
   padding: .85rem 1rem;
